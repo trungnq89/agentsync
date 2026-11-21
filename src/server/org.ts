@@ -22,6 +22,11 @@ export async function listDirectReports(db: Db, managerId: string): Promise<User
     .orderBy(asc(users.displayName));
 }
 
+export async function listAllUsers(db: Db, actor: Actor): Promise<User[]> {
+  requireAdmin(actor);
+  return db.select().from(users).orderBy(asc(users.displayName), asc(users.username));
+}
+
 async function assertValidManager(db: Db, userId: string | null, managerId: string) {
   if (!isUuid(managerId)) throw new DomainError('VALIDATION', 'Quản lý không hợp lệ.');
   if (userId !== null && managerId === userId) {

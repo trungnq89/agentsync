@@ -1,0 +1,49 @@
+'use server';
+import { revalidatePath } from 'next/cache';
+import { getDb } from '@/db';
+import { changeMyPassword, setMySendMode } from '@/server/account';
+import { createAgentToken, revokeAgentToken } from '@/server/auth/tokens';
+import { DomainError } from '@/server/errors';
+import { run, str, type FormState } from '../_lib/action';
+import { getActor } from '../_lib/actor';
+
+export async function createTokenAction(_p: FormState, form: FormData): Promise<FormState> {
+  const actor = await getActor();
+  return run(async () => {
+    const label = str(form, 'label');
+    if (!label) throw new DomainError('VALIDATION', 'Hãy đặt nhãn cho token.');
+    const { token } = await createAgentToken(getDb(), actor.id, label);
+    revalidatePath('/settings');
+    return { token };
+  });
+}
+
+export async function revokeTokenAction(_p: FormState, form: FormData): Promise<FormState> {
+  const actor = await getActor();
+  return run(async () => {
+    await revokeAgentToken(getDb(), actor.id, str(form, 'tokenId'));
+    revalidatePath('/settings');
+    return { ok: 'Đã thu hồi token.' };
+  });
+}
+
+export async function sendModeAction(_p: FormState, form: FormData): Promise<FormState> {
+  const actor = await getActor();
+  return run(async () => {
+    await setMySendMode(getDb(), actor, str(form, 'sendMode') as 'auto' | 'review');
+    revalidatePath('/settings');
+    return { ok: 'Đã lưu chế độ gửi.' };
+  });
+}
+
+export async function changePasswordAction(_p: FormState, form: FormData): Promise<FormState> {
+  const actor = await getActor();
+  return run(async () => {
+    const next = String(form.get('next') ?? '');
+    if (next !== String(form.get('confirm') ?? '')) {
+      throw new DomainError('VALIDATION', 'Mật khẩu nhập lại không khớp.');
+    }
+    await changeMyPassword(getDb(), actor, String(form.get('current') ?? ''), next);
+    return { ok: 'Đã đổi mật khẩu.' };
+  });
+}

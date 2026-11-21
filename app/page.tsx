@@ -1,7 +1,10 @@
-export default function Home() {
+import { getActor } from './_lib/actor';
+
+export default async function Home() {
+  const user = await getActor();
   return (
-    <main className="flex flex-1 items-center justify-center">
-      <h1 className="text-2xl font-semibold">AgentSync</h1>
+    <main>
+      <h1 className="text-xl font-semibold">Xin chào, {user.displayName}</h1>
     </main>
   );
 }

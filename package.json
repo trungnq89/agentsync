@@ -10,7 +10,9 @@
     "test": "vitest run",
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "seed:admin": "tsx scripts/seed-admin.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
