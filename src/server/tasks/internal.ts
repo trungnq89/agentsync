@@ -21,11 +21,11 @@ export async function currentPlan(tx: Tx | Db, taskId: string): Promise<PlanVers
     .where(eq(planVersions.taskId, taskId))
     .orderBy(desc(planVersions.version))
     .limit(1);
-  if (!v) throw new DomainError('NOT_FOUND', 'Không tìm thấy plan của việc này.');
+  if (!v) throw new DomainError('NOT_FOUND', 'notFoundPlan');
   return v;
 }
 
 export function requireOwner(actor: Actor, task: Task) {
-  if (actor.id !== task.ownerId) throw new DomainError('FORBIDDEN', 'Chỉ chủ việc mới được thực hiện thao tác này.');
+  if (actor.id !== task.ownerId) throw new DomainError('FORBIDDEN', 'ownerOnly');
 }
 

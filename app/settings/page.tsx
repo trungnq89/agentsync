@@ -1,6 +1,6 @@
+import { getTranslations } from 'next-intl/server';
 import { getDb } from '@/db';
 import { listMyTokens } from '@/server/account';
-import { sendModeLabel } from '@/server/labels';
 import { getActor } from '../_lib/actor';
 import { changePasswordAction, revokeTokenAction, sendModeAction } from '../_actions/settings';
 import { TokenForm } from '../_components/token-form';
@@ -14,6 +14,7 @@ const fmt = (d: Date | null) =>
 
 export default async function SettingsPage() {
   const actor = await getActor();
+  const tSendMode = await getTranslations('sendMode');
   const tokens = await listMyTokens(getDb(), actor);
   const mcpUrl = `${(process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')}/api/mcp`;
   return (
@@ -55,7 +56,7 @@ export default async function SettingsPage() {
           {(['review', 'auto'] as const).map((m) => (
             <label key={m} className="flex items-center gap-2 text-sm">
               <input type="radio" name="sendMode" value={m} defaultChecked={actor.sendMode === m} />
-              {sendModeLabel(m)}
+              {tSendMode(m)}
             </label>
           ))}
           <button type="submit" className={button}>Lưu</button>

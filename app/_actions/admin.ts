@@ -15,7 +15,7 @@ export async function createUserAction(_p: FormState, form: FormData): Promise<F
   return run(async () => {
     const username = str(form, 'username');
     const password = String(form.get('password') ?? '');
-    if (!username || !password) throw new DomainError('VALIDATION', 'Cần nhập tên đăng nhập và mật khẩu.');
+    if (!username || !password) throw new DomainError('VALIDATION', 'credentialsRequired');
     await createUser(getDb(), actor, {
       username,
       displayName: str(form, 'displayName') || username,

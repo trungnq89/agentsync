@@ -31,7 +31,7 @@ export async function loadTaskForViewer(
   taskId: string,
   opts: { forUpdate?: boolean } = {},
 ): Promise<{ task: Task; owner: User }> {
-  const notFound = () => new DomainError('NOT_FOUND', 'Không tìm thấy việc này.');
+  const notFound = () => new DomainError('NOT_FOUND', 'notFoundTask');
   if (!isUuid(taskId)) throw notFound();
   // Lock the task row first so the read below sees the latest committed state.
   if (opts.forUpdate) await db.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)).for('update');

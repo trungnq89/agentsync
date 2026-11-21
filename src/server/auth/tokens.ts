@@ -6,7 +6,6 @@ import { DomainError } from '../errors';
 import { isUuid } from '../ids';
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
-const BAD_TOKEN = 'Token không hợp lệ hoặc đã bị thu hồi.';
 
 export async function createAgentToken(
   db: Db,
@@ -34,16 +33,16 @@ export async function authenticateAgentToken(db: Db, bearer: string, now: Date =
     row.token.revokedAt ||
     row.user.disabledAt
   ) {
-    throw new DomainError('UNAUTHORIZED', BAD_TOKEN);
+    throw new DomainError('UNAUTHORIZED', 'badToken');
   }
   await db.update(agentTokens).set({ lastUsedAt: now }).where(eq(agentTokens.id, row.token.id));
   return row.user;
 }
 
 export async function revokeAgentToken(db: Db, actorId: string, tokenId: string): Promise<void> {
-  if (!isUuid(tokenId)) throw new DomainError('NOT_FOUND', 'Không tìm thấy token.');
+  if (!isUuid(tokenId)) throw new DomainError('NOT_FOUND', 'notFoundToken');
   const [row] = await db.select().from(agentTokens).where(eq(agentTokens.id, tokenId));
-  if (!row) throw new DomainError('NOT_FOUND', 'Không tìm thấy token.');
-  if (row.userId !== actorId) throw new DomainError('FORBIDDEN', 'Bạn không có quyền thu hồi token này.');
+  if (!row) throw new DomainError('NOT_FOUND', 'notFoundToken');
+  if (row.userId !== actorId) throw new DomainError('FORBIDDEN', 'tokenForbidden');
   if (!row.revokedAt) await db.update(agentTokens).set({ revokedAt: new Date() }).where(eq(agentTokens.id, tokenId));
 }

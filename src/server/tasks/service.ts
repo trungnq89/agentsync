@@ -5,10 +5,9 @@ import {
   type PlanStep, type Task,
 } from '@/db/schema';
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
-import { BAD_DATE, isValidIsoDate, isWithinHours } from '@/server/clock';
+import { isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
 import { asDb, currentPlan, lifecycleCtx, requireOwner, type PlanVersion } from './internal';
-import { statusLabel } from '@/server/labels';
 import { initialStatus, nextStatus, TERMINAL_STATUSES, type TaskAction, type TaskStatus } from './lifecycle';
 
 export type { PlanVersion };;
@@ -36,15 +35,15 @@ export async function createTask(
   now: Date = new Date(),
 ): Promise<Task> {
   if (!isValidIsoDate(input.startDate) || !isValidIsoDate(input.agreedDueDate)) {
-    throw new DomainError('VALIDATION', BAD_DATE);
+    throw new DomainError('VALIDATION', 'invalidDate');
   }
-  if (input.steps.length === 0) throw new DomainError('VALIDATION', 'Plan cần ít nhất một bước.');
+  if (input.steps.length === 0) throw new DomainError('VALIDATION', 'planNeedsStep');
   if (input.agreedDueDate < input.startDate) {
-    throw new DomainError('VALIDATION', 'Hạn thống nhất không được trước ngày bắt đầu.');
+    throw new DomainError('VALIDATION', 'dueBeforeStart');
   }
   return db.transaction(async (tx) => {
     const [owner] = await tx.select().from(users).where(eq(users.id, actor.id));
-    if (!owner) throw new DomainError('NOT_FOUND', 'Không tìm thấy người dùng.');
+    if (!owner) throw new DomainError('NOT_FOUND', 'notFoundUser');
     const isPrivate = input.isPrivate ?? false;
     const status = initialStatus({ hasManager: owner.managerId !== null, isPrivate });
     const [task] = await tx
@@ -118,7 +117,7 @@ export function requestChanges(
   note: string,
   now: Date = new Date(),
 ): Promise<Task> {
-  if (!note.trim()) throw new DomainError('VALIDATION', 'Cần nhập ghi chú khi yêu cầu chỉnh sửa.');
+  if (!note.trim()) throw new DomainError('VALIDATION', 'noteRequiredForChanges');
   return managerAction(db, actor, taskId, 'request_changes', now, note);
 }
 
@@ -129,15 +128,15 @@ export async function changePlan(
   input: { steps: PlanStep[]; reason?: string; expectedEndDate?: string },
   now: Date = new Date(),
 ): Promise<Task> {
-  if (input.steps.length === 0) throw new DomainError('VALIDATION', 'Plan cần ít nhất một bước.');
+  if (input.steps.length === 0) throw new DomainError('VALIDATION', 'planNeedsStep');
   if (input.expectedEndDate !== undefined && !isValidIsoDate(input.expectedEndDate)) {
-    throw new DomainError('VALIDATION', BAD_DATE);
+    throw new DomainError('VALIDATION', 'invalidDate');
   }
   return db.transaction(async (tx) => {
     const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);
     if (TERMINAL_STATUSES.includes(task.status)) {
-      throw new DomainError('INVALID_TRANSITION', `Không thể sửa plan khi việc đang ở trạng thái "${statusLabel(task.status)}".`);
+      throw new DomainError('INVALID_TRANSITION', 'planEditBlocked', { status: task.status });
     }
     const current = await currentPlan(tx, taskId);
     const reason = input.reason?.trim() || null;
@@ -151,7 +150,7 @@ export async function changePlan(
       kind = 'edit';
     } else {
       if (!reason) {
-        throw new DomainError('EDIT_WINDOW_CLOSED', 'Plan đã khóa sau 24 giờ. Hãy gửi lý do để tạo phiên bản mới.');
+        throw new DomainError('EDIT_WINDOW_CLOSED', 'planLocked');
       }
       kind = 'revision';
     }
@@ -163,7 +162,7 @@ export async function changePlan(
     } catch (e) {
       const code = (e as { code?: string; cause?: { code?: string } });
       if (code.code === '23505' || code.cause?.code === '23505') {
-        throw new DomainError('INVALID_TRANSITION', 'Việc vừa được người khác cập nhật, hãy thử lại.');
+        throw new DomainError('INVALID_TRANSITION', 'taskModified');
       }
       throw e;
     }
@@ -196,7 +195,7 @@ export async function setTaskStatus(
 ): Promise<Task> {
   const trimmed = reason?.trim() || null;
   if ((action === 'pause' || action === 'cancel') && !trimmed) {
-    throw new DomainError('VALIDATION', 'Cần nhập lý do.');
+    throw new DomainError('VALIDATION', 'reasonRequired');
   }
   return db.transaction(async (tx) => {
     const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
@@ -209,7 +208,7 @@ export async function setTaskStatus(
         .from(solutionSummaries)
         .where(eq(solutionSummaries.taskId, taskId));
       if (!summary) {
-        throw new DomainError('VALIDATION', 'Cần gửi tóm tắt giải pháp trước khi đánh dấu xong.');
+        throw new DomainError('VALIDATION', 'summaryRequiredBeforeDone');
       }
     }
     const [updated] = await tx
@@ -235,9 +234,9 @@ export async function makePublic(
   return db.transaction(async (tx) => {
     const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);
-    if (!task.isPrivate) throw new DomainError('VALIDATION', 'Việc này đã công khai.');
+    if (!task.isPrivate) throw new DomainError('VALIDATION', 'alreadyPublic');
     if (TERMINAL_STATUSES.includes(task.status)) {
-      throw new DomainError('INVALID_TRANSITION', `Không thể công khai việc đang ở trạng thái "${statusLabel(task.status)}".`);
+      throw new DomainError('INVALID_TRANSITION', 'cannotPublishStatus', { status: task.status });
     }
     const hasManager = owner.managerId !== null;
     const [updated] = await tx

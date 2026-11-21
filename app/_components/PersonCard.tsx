@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { PersonCard as Card } from '@/server/tasks/queries';
-import { relativeTime } from '../_lib/relative-time';
+import { useLocale } from 'next-intl';
+import type { Locale } from '@/i18n/config';
+import { formatRelative } from '../_lib/format';
 
 export function Avatar({ name, url, size = 36 }: { name: string; url: string | null; size?: number }) {
   const style = { width: size, height: size };
@@ -20,6 +22,7 @@ export function Avatar({ name, url, size = 36 }: { name: string; url: string | n
 }
 
 export function PersonCard({ card, now = new Date() }: { card: Card; now?: Date }) {
+  const locale = useLocale() as Locale;
   return (
     <Link
       href={`/people/${card.userId}`}
@@ -43,7 +46,7 @@ export function PersonCard({ card, now = new Date() }: { card: Card; now?: Date 
           {card.doneCount30d} việc xong · {card.activeCount} việc đang làm
         </div>
         {card.lastActivityAt && (
-          <div className="text-[11px] opacity-55">cập nhật {relativeTime(card.lastActivityAt, now)}</div>
+          <div className="text-[11px] opacity-55">cập nhật {formatRelative(card.lastActivityAt, now, locale)}</div>
         )}
       </div>
     </Link>

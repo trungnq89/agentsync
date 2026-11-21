@@ -1,84 +1,89 @@
-import { healthLabel, levelLabel, statusLabel } from '@/server/labels';
+import { attentionDetail } from '@/i18n/attention';
 import type { ListedTask, AttentionItem, DigestPerson, PersonCard, taskDetail } from '@/server/tasks/queries';
 
-const KIND_LABEL: Record<AttentionItem['kind'], string> = {
-  pending_confirmation: 'Chờ xác nhận',
-  awaiting_review: 'Chờ review',
-  blocked: 'Đang kẹt',
-  overdue: 'Trễ hạn',
-  stale: 'Lâu không cập nhật',
-  paused_or_cancelled: 'Tạm dừng / đã hủy',
-  changes_requested: 'Cần sửa plan',
-  question_for_me: 'Có câu hỏi cho bạn',
-};
+/** Translator over the full catalog; keys are namespaced (`mcp.noTasks`, `status.done`). */
+export type T = (key: string, values?: Record<string, string | number | Date>) => string;
 
-export function formatTaskList(list: ListedTask[]): string {
-  if (list.length === 0) return 'Không có việc nào.';
+export function formatTaskList(t: T, list: ListedTask[]): string {
+  if (list.length === 0) return t('mcp.noTasks');
   return [
-    '## Việc của bạn',
+    `## ${t('mcp.tasksHeading')}`,
     ...list.map(
-      (t) =>
-        `- **${t.title}** (id: ${t.id}) — ${statusLabel(t.status)}, ${t.progress}%, ${healthLabel(t.health)}, dự kiến ${t.expectedEndDate} (hạn ${t.agreedDueDate})` +
-        (t.repoRef?.branch ? `, branch: ${t.repoRef.branch}` : '') +
-        (t.cwdHint ? `, thư mục: ${t.cwdHint}` : ''),
+      (x) =>
+        t('mcp.taskLine', {
+          title: x.title, id: x.id, status: t(`status.${x.status}`), progress: x.progress,
+          health: t(`health.${x.health}`), expected: x.expectedEndDate, due: x.agreedDueDate,
+        }) +
+        (x.repoRef?.branch ? t('mcp.branch', { branch: x.repoRef.branch }) : '') +
+        (x.cwdHint ? t('mcp.cwd', { cwd: x.cwdHint }) : ''),
     ),
   ].join('\n');
 }
 
-export function formatOverview(o: { tiers: { level: string; people: PersonCard[] }[] }): string {
-  const lines = ['## Tổng quan nhóm'];
+export function formatOverview(t: T, o: { tiers: { level: string; people: PersonCard[] }[] }): string {
+  const lines = [`## ${t('mcp.overviewHeading')}`];
   for (const tier of o.tiers) {
-    lines.push(`### ${levelLabel(tier.level)}`);
+    lines.push(`### ${t(`level.${tier.level}`)}`);
     for (const p of tier.people) {
-      const flags = [p.hasBlocked ? 'đang kẹt' : '', p.hasAwaitingReview ? 'chờ review' : ''].filter(Boolean);
+      const flags = [
+        p.hasBlocked ? t('mcp.flagBlocked') : '',
+        p.hasAwaitingReview ? t('mcp.flagAwaitingReview') : '',
+      ].filter(Boolean);
       lines.push(
-        `- **${p.displayName}** — đang làm ${p.activeCount}, xong 30 ngày ${p.doneCount30d}${flags.length ? ` (${flags.join(', ')})` : ''}`,
+        t('mcp.personLine', { name: p.displayName, active: p.activeCount, done: p.doneCount30d }) +
+          (flags.length ? t('mcp.personFlags', { flags: flags.join(', ') }) : ''),
       );
     }
   }
   return lines.join('\n');
 }
 
-export function formatAttention(items: AttentionItem[]): string {
-  if (items.length === 0) return 'Không có mục nào cần chú ý.';
+export function formatAttention(t: T, items: AttentionItem[]): string {
+  if (items.length === 0) return t('mcp.attentionNone');
   return [
-    '## Cần chú ý',
-    ...items.map((i) => `- [${KIND_LABEL[i.kind]}] **${i.taskTitle}** (id: ${i.taskId}) — ${i.ownerName}: ${i.detail}`),
+    `## ${t('mcp.attentionHeading')}`,
+    ...items.map((i) =>
+      t('mcp.attentionLine', {
+        kind: t(`mcp.attentionKind.${i.kind}`), title: i.taskTitle, id: i.taskId,
+        owner: i.ownerIsMe ? t('attention.you') : i.ownerName,
+        detail: attentionDetail((k, v) => t(`attention.${k}`, v), i),
+      }),
+    ),
   ].join('\n');
 }
 
-export function formatTaskDetail(d: Awaited<ReturnType<typeof taskDetail>>): string {
-  const t = d.task;
+export function formatTaskDetail(t: T, d: Awaited<ReturnType<typeof taskDetail>>): string {
+  const x = d.task;
   const lines = [
-    `## ${t.title}`,
-    `Người phụ trách: ${d.owner.displayName}`,
-    `Trạng thái: ${statusLabel(t.status)} — ${d.progress}% — ${healthLabel(d.health.health)}`,
-    `Bắt đầu ${t.startDate}, hạn thống nhất ${t.agreedDueDate}, dự kiến ${t.expectedEndDate}`,
-    `Kết quả thống nhất: ${t.agreedOutcome}`,
-    '### Plan',
+    `## ${x.title}`,
+    t('mcp.detailOwner', { name: d.owner.displayName }),
+    t('mcp.detailStatus', { status: t(`status.${x.status}`), progress: d.progress, health: t(`health.${d.health.health}`) }),
+    t('mcp.detailDates', { start: x.startDate, due: x.agreedDueDate, expected: x.expectedEndDate }),
+    t('mcp.detailOutcome', { outcome: x.agreedOutcome }),
+    `### ${t('mcp.planHeading')}`,
     ...d.plan.steps.map((s) => `- [${s.status === 'done' ? 'x' : ' '}] ${s.title}`),
   ];
   const open = d.questions.filter((q) => q.status === 'open');
   if (open.length) {
-    lines.push('### Vướng mắc / câu hỏi đang mở');
-    for (const q of open) lines.push(`- (id: ${q.id}) ${q.isBlocker ? '[kẹt] ' : ''}${q.body}`);
+    lines.push(`### ${t('mcp.openQuestionsHeading')}`);
+    for (const q of open) lines.push(`- (id: ${q.id}) ${q.isBlocker ? `${t('mcp.blockerTag')} ` : ''}${q.body}`);
   }
   if (d.updates.length) {
-    lines.push('### Cập nhật gần đây');
+    lines.push(`### ${t('mcp.recentUpdatesHeading')}`);
     for (const u of d.updates.slice(0, 3)) lines.push(`- ${u.createdAt.toISOString().slice(0, 10)}: ${u.body}`);
   }
   return lines.join('\n');
 }
 
-export function formatDigest(d: { people: DigestPerson[] }): string {
-  if (d.people.length === 0) return 'Tuần này chưa có thay đổi nào.';
-  const lines = ['## Tổng kết tuần'];
+export function formatDigest(t: T, d: { people: DigestPerson[] }): string {
+  if (d.people.length === 0) return t('mcp.digestNone');
+  const lines = [`## ${t('mcp.digestHeading')}`];
   for (const p of d.people) {
     lines.push(`### ${p.displayName}`);
-    for (const x of p.completed) lines.push(`- Xong: ${x.title}`);
-    for (const x of p.started) lines.push(`- Bắt đầu: ${x.title}`);
-    for (const x of p.blocked) lines.push(`- Đang kẹt: ${x.title} — ${x.detail}`);
-    for (const x of p.slipped) lines.push(`- Trễ: ${x.title} (${x.from} → ${x.to})`);
+    for (const x of p.completed) lines.push(`- ${t('mcp.digestDone', { title: x.title })}`);
+    for (const x of p.started) lines.push(`- ${t('mcp.digestStarted', { title: x.title })}`);
+    for (const x of p.blocked) lines.push(`- ${t('mcp.digestBlocked', { title: x.title, detail: x.detail })}`);
+    for (const x of p.slipped) lines.push(`- ${t('mcp.digestSlipped', { title: x.title, from: x.from, to: x.to })}`);
   }
   return lines.join('\n');
 }

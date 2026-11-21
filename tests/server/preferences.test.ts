@@ -17,7 +17,7 @@ describe('preferences', () => {
     expect(row.theme).toBe('dark');
     await expect(setMyLocale(testDb, u, 'fr')).rejects.toMatchObject({
       code: 'VALIDATION',
-      message: 'errors.invalidPreference',
+      key: 'invalidPreference',
     });
     await expect(setMyTheme(testDb, u, 'blue')).rejects.toMatchObject({ code: 'VALIDATION' });
   });

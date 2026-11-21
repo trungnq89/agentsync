@@ -5,7 +5,7 @@ export const MIN_PASSWORD_LENGTH = 8;
 
 export function assertPasswordLength(pw: string): void {
   if (pw.length < MIN_PASSWORD_LENGTH) {
-    throw new DomainError('VALIDATION', `Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`);
+    throw new DomainError('VALIDATION', 'passwordTooShort', { min: MIN_PASSWORD_LENGTH });
   }
 }
 

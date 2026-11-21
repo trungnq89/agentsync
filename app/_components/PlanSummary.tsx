@@ -1,5 +1,7 @@
+import { useLocale } from 'next-intl';
+import type { Locale } from '@/i18n/config';
 import type { PlanStep } from '@/db/schema';
-import { relativeTime } from '../_lib/relative-time';
+import { formatRelative } from '../_lib/format';
 
 const MARK = { todo: '○', doing: '◐', done: '●' } as const;
 
@@ -10,6 +12,7 @@ export function PlanSummary({
   history: { kind: string; reason: string | null; createdAt: Date }[];
   now: Date;
 }) {
+  const locale = useLocale() as Locale;
   const doneCount = steps.filter((s) => s.status === 'done').length;
   const revisions = history.filter((h) => h.kind === 'revision');
   const latest = revisions[revisions.length - 1];
@@ -32,7 +35,7 @@ export function PlanSummary({
         <p className="mt-2 text-xs opacity-70">
           Plan đã đổi {revisions.length} lần
           {latest?.reason && <> · Lý do gần nhất: {latest.reason}</>}
-          {latest && <> ({relativeTime(latest.createdAt, now)})</>}
+          {latest && <> ({formatRelative(latest.createdAt, now, locale)})</>}
         </p>
       )}
     </section>

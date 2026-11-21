@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { translateError, type DomainError } from '@/server/errors';
 import {
   nextStatus, initialStatus, ACTIVE_STATUSES, DONE_STATUSES, TERMINAL_STATUSES,
   type TaskAction, type Role,
@@ -72,15 +73,15 @@ describe('status groups', () => {
   });
 });
 
-describe('Vietnamese error messages', () => {
+describe('translated error messages', () => {
   it('invalid transition and forbidden messages use labels, not raw ids', () => {
     const ctx = { status: 'paused', mode: 'executive', hasManager: true, isPrivate: false } as never;
     let msg = '';
-    try { nextStatus(ctx, 'complete', 'owner'); } catch (e) { msg = (e as Error).message; }
+    try { nextStatus(ctx, 'complete', 'owner'); } catch (e) { msg = translateError(e as DomainError, 'vi'); }
     expect(msg).toContain('Hoàn thành');
     expect(msg).toContain('Tạm dừng');
     expect(msg).not.toMatch(/complete|paused/);
-    try { nextStatus({ ...(ctx as object), status: 'awaiting_review' } as never, 'approve_review', 'owner'); } catch (e) { msg = (e as Error).message; }
+    try { nextStatus({ ...(ctx as object), status: 'awaiting_review' } as never, 'approve_review', 'owner'); } catch (e) { msg = translateError(e as DomainError, 'vi'); }
     expect(msg).not.toMatch(/approve_review/);
   });
 });

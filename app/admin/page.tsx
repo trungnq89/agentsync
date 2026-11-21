@@ -1,5 +1,5 @@
+import { getTranslations } from 'next-intl/server';
 import { getDb } from '@/db';
-import { levelLabel } from '@/server/labels';
 import { listAllUsers } from '@/server/org';
 import { getStaleBusinessDays } from '@/server/settings';
 import { getAdminActor } from '../_lib/actor';
@@ -13,11 +13,12 @@ const LEVELS = ['director', 'manager', 'leader', 'member'] as const;
 
 export default async function AdminPage() {
   const actor = await getAdminActor();
+  const tLevel = await getTranslations('level');
   const db = getDb();
   const [users, staleDays] = await Promise.all([listAllUsers(db, actor), getStaleBusinessDays(db)]);
   const levelSelect = (value: string) => (
     <select name="level" defaultValue={value} className={input} aria-label="Cấp">
-      {LEVELS.map((l) => <option key={l} value={l}>{levelLabel(l)}</option>)}
+      {LEVELS.map((l) => <option key={l} value={l}>{tLevel(l)}</option>)}
     </select>
   );
   const managerSelect = (value: string | null, exclude?: string) => (

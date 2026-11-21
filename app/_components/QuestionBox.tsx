@@ -1,6 +1,8 @@
+import { useLocale } from 'next-intl';
+import type { Locale } from '@/i18n/config';
 import type { Question } from '@/server/tasks/activity';
 import { answerAction, askAction } from '../_actions/task';
-import { relativeTime } from '../_lib/relative-time';
+import { formatRelative } from '../_lib/format';
 import { ActionForm, button, input } from './ui';
 
 export function QuestionBox({
@@ -14,6 +16,7 @@ export function QuestionBox({
   questions: Question[];
   now: Date;
 }) {
+  const locale = useLocale() as Locale;
   const open = questions.filter((q) => q.status !== 'resolved');
   const canAnswer = (q: Question) =>
     q.direction === 'manager_to_member' ? viewerId === ownerId : isCurrentManager;
@@ -28,14 +31,14 @@ export function QuestionBox({
             {q.body}
           </div>
           <div className="mt-1 text-xs opacity-60">
-            {q.direction === 'manager_to_member' ? 'Quản lý hỏi' : `${ownerName} hỏi`} · {relativeTime(q.createdAt, now)}
+            {q.direction === 'manager_to_member' ? 'Quản lý hỏi' : `${ownerName} hỏi`} · {formatRelative(q.createdAt, now, locale)}
           </div>
           {q.status === 'answered' && q.answer && (
             <div data-testid="answer" className="mt-2 border-l-2 border-neutral-300 pl-3 dark:border-neutral-700">
               <div className="break-words whitespace-pre-wrap">{q.answer}</div>
               <div className="mt-1 text-xs opacity-60">
                 {q.answeredById === q.authorId ? 'Người hỏi' : q.direction === 'manager_to_member' ? ownerName : 'Quản lý'} đã trả lời
-                {q.answeredAt && <> · {relativeTime(q.answeredAt, now)}</>}
+                {q.answeredAt && <> · {formatRelative(q.answeredAt, now, locale)}</>}
               </div>
             </div>
           )}

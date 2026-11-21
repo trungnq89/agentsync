@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { getDb } from '@/db';
+import { defaultLocale, isLocale } from '@/i18n/config';
 import { registerTools } from '@/mcp/tools';
 import { authenticateAgentToken } from '@/server/auth/tokens';
 import { DomainError } from '@/server/errors';
@@ -23,7 +24,7 @@ async function handle(req: Request): Promise<Response> {
   }
   // Stateless: a fresh server + transport per request.
   const server = new McpServer({ name: 'agentsync', version: '0.1.0' });
-  registerTools(server, { db, getActor: () => user });
+  registerTools(server, { db, getActor: () => user, locale: isLocale(user.locale) ? user.locale : defaultLocale() });
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

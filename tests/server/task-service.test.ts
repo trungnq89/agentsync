@@ -102,7 +102,7 @@ describe('task service', () => {
     const steps = [{ title: 'N', status: 'todo' as const }];
     await expect(changePlan(testDb, member, t.id, { steps }, now)).rejects.toMatchObject({
       code: 'EDIT_WINDOW_CLOSED',
-      message: 'Plan đã khóa sau 24 giờ. Hãy gửi lý do để tạo phiên bản mới.',
+      key: 'planLocked',
     });
     await changePlan(testDb, member, t.id, { steps, reason: 'Đổi hướng' }, now);
     const plan = await getCurrentPlan(testDb, t.id);
@@ -137,7 +137,7 @@ describe('task service', () => {
     const t = await makeTask(member.id, { mode: 'project', status: 'in_progress' });
     await expect(setTaskStatus(testDb, member, t.id, 'complete')).rejects.toMatchObject({
       code: 'VALIDATION',
-      message: 'Cần gửi tóm tắt giải pháp trước khi đánh dấu xong.',
+      key: 'summaryRequiredBeforeDone',
     });
     await testDb.insert(solutionSummaries).values({
       taskId: t.id, problem: 'p', solution: 's', rejectedAlternatives: 'r', keyChanges: 'k', risks: 'x', testing: 't',
@@ -213,7 +213,7 @@ describe('date validation', () => {
   it('createTask and changePlan reject malformed dates', async () => {
     const { member } = await pair();
     await expect(createTask(testDb, member, { ...base, startDate: 'next week' }))
-      .rejects.toMatchObject({ code: 'VALIDATION', message: expect.stringContaining('YYYY-MM-DD') });
+      .rejects.toMatchObject({ code: 'VALIDATION', key: 'invalidDate' });
     await expect(createTask(testDb, member, { ...base, agreedDueDate: '2026-02-30' }))
       .rejects.toMatchObject({ code: 'VALIDATION' });
     const t = await createTask(testDb, member, base);

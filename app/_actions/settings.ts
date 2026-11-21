@@ -12,7 +12,7 @@ export async function createTokenAction(_p: FormState, form: FormData): Promise<
   const actor = await getActor();
   return run(async () => {
     const label = str(form, 'label');
-    if (!label) throw new DomainError('VALIDATION', 'Hãy đặt nhãn cho token.');
+    if (!label) throw new DomainError('VALIDATION', 'tokenLabelRequired');
     const { token } = await createAgentToken(getDb(), actor.id, label);
     revalidatePath('/settings');
     return { token };
@@ -43,7 +43,7 @@ export async function changePasswordAction(_p: FormState, form: FormData): Promi
     const sessionId = (await cookies()).get(SESSION_COOKIE)?.value;
     const next = String(form.get('next') ?? '');
     if (next !== String(form.get('confirm') ?? '')) {
-      throw new DomainError('VALIDATION', 'Mật khẩu nhập lại không khớp.');
+      throw new DomainError('VALIDATION', 'passwordMismatch');
     }
     await changeMyPassword(getDb(), actor, String(form.get('current') ?? ''), next, sessionId);
     return { ok: 'Đã đổi mật khẩu.' };

@@ -10,9 +10,9 @@ export async function getStaleBusinessDays(db: Db): Promise<number> {
 }
 
 export async function setStaleBusinessDays(db: Db, actor: Actor, days: number): Promise<void> {
-  if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'Chỉ quản trị viên mới có quyền thực hiện thao tác này.');
+  if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'adminOnly');
   if (!Number.isInteger(days) || days < 1 || days > 30) {
-    throw new DomainError('VALIDATION', 'Số ngày làm việc phải là số nguyên từ 1 đến 30.');
+    throw new DomainError('VALIDATION', 'staleDaysRange');
   }
   await db
     .insert(appSettings)

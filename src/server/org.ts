@@ -10,17 +10,17 @@ type Level = User['level'];
 const LEVELS: readonly string[] = ['director', 'manager', 'leader', 'member'];
 
 function assertLevel(level: string) {
-  if (!LEVELS.includes(level)) throw new DomainError('VALIDATION', 'Cấp không hợp lệ.');
+  if (!LEVELS.includes(level)) throw new DomainError('VALIDATION', 'invalidLevel');
 }
 function assertDisplayName(name: string) {
-  if (!name.trim()) throw new DomainError('VALIDATION', 'Tên hiển thị không được để trống.');
+  if (!name.trim()) throw new DomainError('VALIDATION', 'displayNameRequired');
 }
 
 function requireAdmin(actor: Actor) {
-  if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'Chỉ quản trị viên mới có quyền thực hiện thao tác này.');
+  if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'adminOnly');
 }
 
-const userNotFound = () => new DomainError('NOT_FOUND', 'Không tìm thấy người dùng.');
+const userNotFound = () => new DomainError('NOT_FOUND', 'notFoundUser');
 
 export async function listDirectReports(db: Db, managerId: string): Promise<User[]> {
   return db
@@ -36,16 +36,16 @@ export async function listAllUsers(db: Db, actor: Actor): Promise<User[]> {
 }
 
 async function assertValidManager(db: Db, userId: string | null, managerId: string) {
-  if (!isUuid(managerId)) throw new DomainError('VALIDATION', 'Quản lý không hợp lệ.');
+  if (!isUuid(managerId)) throw new DomainError('VALIDATION', 'invalidManager');
   if (userId !== null && managerId === userId) {
-    throw new DomainError('VALIDATION', 'Không thể đặt chính mình làm quản lý.');
+    throw new DomainError('VALIDATION', 'selfManager');
   }
   // Walk up the manager chain from the new manager; meeting userId means a cycle.
   const seen = new Set<string>();
   let cur: string | null = managerId;
   while (cur) {
     if (userId !== null && cur === userId) {
-      throw new DomainError('VALIDATION', 'Quản lý này tạo thành vòng lặp trong sơ đồ tổ chức.');
+      throw new DomainError('VALIDATION', 'managerCycle');
     }
     if (seen.has(cur)) break;
     seen.add(cur);
@@ -53,9 +53,9 @@ async function assertValidManager(db: Db, userId: string | null, managerId: stri
       .select({ managerId: users.managerId, disabledAt: users.disabledAt })
       .from(users)
       .where(eq(users.id, cur));
-    if (!row) throw new DomainError('VALIDATION', 'Không tìm thấy quản lý được chọn.');
+    if (!row) throw new DomainError('VALIDATION', 'managerNotFound');
     if (cur === managerId && row.disabledAt) {
-      throw new DomainError('VALIDATION', 'Không thể chọn người đã bị vô hiệu hóa làm quản lý.');
+      throw new DomainError('VALIDATION', 'managerDisabled');
     }
     cur = row.managerId;
   }
@@ -80,7 +80,7 @@ export async function createUser(
   const managerId = input.managerId || null;
   if (managerId) await assertValidManager(db, null, managerId);
   const [dup] = await db.select({ id: users.id }).from(users).where(eq(users.username, input.username));
-  if (dup) throw new DomainError('VALIDATION', 'Tên đăng nhập đã tồn tại.');
+  if (dup) throw new DomainError('VALIDATION', 'usernameTaken');
   const [u] = await db
     .insert(users)
     .values({
@@ -123,7 +123,7 @@ export async function updateUser(
       .where(and(eq(users.isAdmin, true), isNull(users.disabledAt), ne(users.id, id)))
       .limit(1);
     if (others.length === 0) {
-      throw new DomainError('VALIDATION', 'Phải còn ít nhất một quản trị viên đang hoạt động.');
+      throw new DomainError('VALIDATION', 'lastAdmin');
     }
   }
   // '' means "no manager".

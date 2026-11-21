@@ -23,12 +23,12 @@ describe('activity', () => {
     const { manager, member } = await pair();
     const t = await makeTask(member.id, { status: 'in_progress' });
     await expect(postUpdate(testDb, manager, t.id, upd, T0)).rejects.toMatchObject({
-      code: 'NOT_FOUND', message: expect.stringContaining('list_my_tasks'),
+      code: 'NOT_FOUND', key: 'notFoundTaskOrNotOwner',
     });
     const stranger = await makeUser();
     await expect(postUpdate(testDb, stranger, t.id, upd, T0)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(postUpdate(testDb, member, 'bad-id', upd, T0)).rejects.toMatchObject({
-      code: 'NOT_FOUND', message: expect.stringContaining('list_my_tasks'),
+      code: 'NOT_FOUND', key: 'notFoundTaskOrNotOwner',
     });
   });
 
@@ -43,7 +43,7 @@ describe('activity', () => {
     const { member } = await pair();
     const t = await makeTask(member.id, { status: 'cancelled' });
     await expect(askQuestion(testDb, member, t.id, 'Vướng', { isBlocker: true }, T0)).rejects.toMatchObject({
-      code: 'INVALID_TRANSITION', message: expect.stringContaining('list_my_tasks'),
+      code: 'INVALID_TRANSITION', key: 'taskClosed',
     });
     expect(await testDb.select().from(questions)).toHaveLength(0);
   });
@@ -52,7 +52,7 @@ describe('activity', () => {
     const { member } = await pair();
     const t = await makeTask(member.id, { status: 'closed', mode: 'project' });
     await expect(submitSolutionSummary(testDb, member, t.id, summary, T0)).rejects.toMatchObject({
-      code: 'INVALID_TRANSITION', message: expect.stringContaining('list_my_tasks'),
+      code: 'INVALID_TRANSITION', key: 'taskClosed',
     });
   });
 
@@ -146,7 +146,7 @@ describe('activity', () => {
     const { member } = await pair();
     const t = await makeTask(member.id, { status: 'in_progress', steps: ['A'] });
     await expect(postUpdate(testDb, member, t.id, { ...upd, stepsCompleted: ['A', 'X', 'Y'] }, T0)).rejects.toMatchObject({
-      code: 'VALIDATION', message: expect.stringContaining('X, Y'),
+      code: 'VALIDATION', key: 'unknownSteps', params: { steps: 'X, Y' },
     });
     expect(await testDb.select().from(updates)).toHaveLength(0);
     expect((await getCurrentPlan(testDb, t.id)).steps[0].status).toBe('todo');
@@ -158,6 +158,6 @@ describe('postUpdate date validation', () => {
     const member = await makeUser();
     const t = await makeTask(member.id, { status: 'in_progress' });
     await expect(postUpdate(testDb, member, t.id, { body: 'x', source: 'auto', expectedEndDate: 'soon' }, new Date()))
-      .rejects.toMatchObject({ code: 'VALIDATION', message: expect.stringContaining('YYYY-MM-DD') });
+      .rejects.toMatchObject({ code: 'VALIDATION', key: 'invalidDate' });
   });
 });

@@ -34,4 +34,3 @@ export function isValidIsoDate(s: string): boolean {
   const d = new Date(`${s}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
-export const BAD_DATE = 'Ngày không hợp lệ, dùng định dạng YYYY-MM-DD.';

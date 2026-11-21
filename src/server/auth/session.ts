@@ -6,7 +6,6 @@ import { DomainError } from '../errors';
 import { hashPassword, verifyPassword } from './password';
 
 const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-const BAD_LOGIN = 'Sai tên đăng nhập hoặc mật khẩu.';
 
 let dummyHash: Promise<string> | undefined;
 
@@ -14,7 +13,7 @@ export async function login(db: Db, username: string, pw: string): Promise<{ ses
   const [user] = await db.select().from(users).where(eq(users.username, username));
   // Always run a verification so unknown users take about as long as known ones.
   const ok = await verifyPassword(user?.passwordHash ?? (await (dummyHash ??= hashPassword('dummy'))), pw);
-  if (!user || !ok || user.disabledAt) throw new DomainError('UNAUTHORIZED', BAD_LOGIN);
+  if (!user || !ok || user.disabledAt) throw new DomainError('UNAUTHORIZED', 'badLogin');
 
   const sessionId = randomBytes(32).toString('base64url');
   await db.insert(sessions).values({

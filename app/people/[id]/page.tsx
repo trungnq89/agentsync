@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { getDb } from '@/db';
 import { DomainError } from '@/server/errors';
-import { levelLabel } from '@/server/labels';
 import { personTimeline } from '@/server/tasks/queries';
 import { Avatar } from '../../_components/PersonCard';
 import { Timeline } from '../../_components/Timeline';
@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getActor();
+  const tLevel = await getTranslations('level');
   const { id } = await params;
   const now = new Date();
   let data;
@@ -28,7 +29,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         <Avatar name={data.person.displayName} url={data.person.avatarUrl} size={44} />
         <div>
           <h1 className="text-xl font-semibold">{data.person.displayName}</h1>
-          <div className="text-xs opacity-70">{levelLabel(data.person.level)}</div>
+          <div className="text-xs opacity-70">{tLevel(data.person.level)}</div>
         </div>
       </div>
       <Timeline tasks={data.tasks} now={now} />

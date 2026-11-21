@@ -10,7 +10,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
-  use: { baseURL: `http://localhost:${PORT}`, ...devices['Desktop Chrome'] },
+  // Accept-Language outranks DEFAULT_LOCALE, so pin the browser to Vietnamese like the pre-i18n UI.
+  use: { baseURL: `http://localhost:${PORT}`, ...devices['Desktop Chrome'], locale: 'vi-VN' },
   webServer: {
     command: `pnpm exec tsx src/db/migrate.ts && pnpm exec next dev -p ${PORT}`,
     url: `http://localhost:${PORT}/login`,

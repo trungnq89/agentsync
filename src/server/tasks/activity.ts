@@ -5,7 +5,7 @@ import {
   type Task,
 } from '@/db/schema';
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
-import { BAD_DATE, isValidIsoDate, isWithinHours } from '@/server/clock';
+import { isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
 import { isUuid } from '@/server/ids';
 import { nextStatus, TERMINAL_STATUSES } from './lifecycle';
@@ -15,9 +15,6 @@ export type Update = typeof updates.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type SolutionSummary = typeof solutionSummaries.$inferSelect;
 
-const TERMINAL_TASK = 'Việc này đã đóng/hủy. Dùng list_my_tasks để chọn việc đang mở.';
-const NOT_FOUND_TASK =
-  'Không tìm thấy việc này hoặc bạn không phải người phụ trách. Dùng list_my_tasks để xem việc của bạn.';
 
 export interface PostUpdateInput {
   body: string;
@@ -35,31 +32,31 @@ export async function postUpdate(
   input: PostUpdateInput,
   now: Date = new Date(),
 ): Promise<Update> {
-  if (!input.body.trim()) throw new DomainError('VALIDATION', 'Nội dung cập nhật không được để trống.');
+  if (!input.body.trim()) throw new DomainError('VALIDATION', 'updateBodyRequired');
   if (input.progressPct !== undefined && (!Number.isInteger(input.progressPct) || input.progressPct < 0 || input.progressPct > 100)) {
-    throw new DomainError('VALIDATION', 'Tiến độ phải là số nguyên từ 0 đến 100.');
+    throw new DomainError('VALIDATION', 'progressRange');
   }
   if (input.expectedEndDate !== undefined && !isValidIsoDate(input.expectedEndDate)) {
-    throw new DomainError('VALIDATION', BAD_DATE);
+    throw new DomainError('VALIDATION', 'invalidDate');
   }
   return db.transaction(async (tx) => {
     let task: Task;
     try {
       ({ task } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true }));
     } catch (e) {
-      if (e instanceof DomainError && e.code === 'NOT_FOUND') throw new DomainError('NOT_FOUND', NOT_FOUND_TASK);
+      if (e instanceof DomainError && e.code === 'NOT_FOUND') throw new DomainError('NOT_FOUND', 'notFoundTaskOrNotOwner');
       throw e;
     }
-    if (actor.id !== task.ownerId) throw new DomainError('NOT_FOUND', NOT_FOUND_TASK);
+    if (actor.id !== task.ownerId) throw new DomainError('NOT_FOUND', 'notFoundTaskOrNotOwner');
     if (TERMINAL_STATUSES.includes(task.status)) {
-      throw new DomainError('INVALID_TRANSITION', TERMINAL_TASK);
+      throw new DomainError('INVALID_TRANSITION', 'taskClosed');
     }
     const done = input.stepsCompleted ?? [];
     if (done.length > 0) {
       const plan = await currentPlan(tx, taskId);
       const unknown = done.filter((t) => !plan.steps.some((s) => s.title === t));
       if (unknown.length > 0) {
-        throw new DomainError('VALIDATION', `Không tìm thấy bước: ${unknown.join(', ')}. Kiểm tra lại tên bước trong plan.`);
+        throw new DomainError('VALIDATION', 'unknownSteps', { steps: unknown.join(', ') });
       }
       const steps = plan.steps.map((s) => (done.includes(s.title) ? { ...s, status: 'done' as const } : s));
       await tx.update(planVersions).set({ steps }).where(eq(planVersions.id, plan.id));
@@ -84,21 +81,22 @@ export async function postUpdate(
   });
 }
 
-const notFound = (what: string) => new DomainError('NOT_FOUND', `Không tìm thấy ${what}.`);
+const notFound = (what: 'update' | 'question') =>
+  new DomainError('NOT_FOUND', what === 'update' ? 'notFoundUpdate' : 'notFoundQuestion');
 
 function assertEditable(row: { authorId: string; createdAt: Date }, actor: Actor, now: Date) {
-  if (row.authorId !== actor.id) throw new DomainError('FORBIDDEN', 'Chỉ tác giả mới được sửa.');
+  if (row.authorId !== actor.id) throw new DomainError('FORBIDDEN', 'authorOnlyEdit');
   if (!isWithinHours(row.createdAt, now, 24)) {
-    throw new DomainError('EDIT_WINDOW_CLOSED', 'Đã quá 24 giờ, không thể sửa.');
+    throw new DomainError('EDIT_WINDOW_CLOSED', 'editWindowClosed');
   }
 }
 
 export async function editUpdate(db: Db, actor: Actor, updateId: string, body: string, now: Date = new Date()): Promise<Update> {
-  if (!isUuid(updateId)) throw notFound('cập nhật');
-  if (!body.trim()) throw new DomainError('VALIDATION', 'Nội dung không được để trống.');
+  if (!isUuid(updateId)) throw notFound('update');
+  if (!body.trim()) throw new DomainError('VALIDATION', 'bodyRequired');
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(updates).where(eq(updates.id, updateId));
-    if (!row) throw notFound('cập nhật');
+    if (!row) throw notFound('update');
     await loadTaskForViewer(asDb(tx), actor, row.taskId, { forUpdate: true });
     assertEditable(row, actor, now);
     const [updated] = await tx.update(updates).set({ body, editedAt: now }).where(eq(updates.id, updateId)).returning();
@@ -107,11 +105,11 @@ export async function editUpdate(db: Db, actor: Actor, updateId: string, body: s
 }
 
 export async function editQuestion(db: Db, actor: Actor, questionId: string, body: string, now: Date = new Date()): Promise<Question> {
-  if (!isUuid(questionId)) throw notFound('câu hỏi');
-  if (!body.trim()) throw new DomainError('VALIDATION', 'Nội dung không được để trống.');
+  if (!isUuid(questionId)) throw notFound('question');
+  if (!body.trim()) throw new DomainError('VALIDATION', 'bodyRequired');
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(questions).where(eq(questions.id, questionId));
-    if (!row) throw notFound('câu hỏi');
+    if (!row) throw notFound('question');
     await loadTaskForViewer(asDb(tx), actor, row.taskId, { forUpdate: true });
     assertEditable(row, actor, now);
     const [updated] = await tx.update(questions).set({ body, editedAt: now }).where(eq(questions.id, questionId)).returning();
@@ -120,13 +118,13 @@ export async function editQuestion(db: Db, actor: Actor, questionId: string, bod
 }
 
 export async function deleteUpdate(db: Db, actor: Actor, updateId: string): Promise<void> {
-  if (!isUuid(updateId)) throw notFound('cập nhật');
+  if (!isUuid(updateId)) throw notFound('update');
   await db.transaction(async (tx) => {
     const [row] = await tx.select().from(updates).where(eq(updates.id, updateId));
-    if (!row) throw notFound('cập nhật');
+    if (!row) throw notFound('update');
     const { task } = await loadTaskForViewer(asDb(tx), actor, row.taskId, { forUpdate: true });
-    if (!task.isPrivate) throw new DomainError('FORBIDDEN', 'Chỉ được xóa cập nhật của việc riêng tư.');
-    if (row.authorId !== actor.id) throw new DomainError('FORBIDDEN', 'Chỉ tác giả mới được xóa.');
+    if (!task.isPrivate) throw new DomainError('FORBIDDEN', 'privateOnlyDelete');
+    if (row.authorId !== actor.id) throw new DomainError('FORBIDDEN', 'authorOnlyDelete');
     await tx.delete(updates).where(eq(updates.id, updateId));
   });
 }
@@ -139,10 +137,10 @@ export async function askQuestion(
   opts: { isBlocker: boolean },
   now: Date = new Date(),
 ): Promise<Question> {
-  if (!body.trim()) throw new DomainError('VALIDATION', 'Nội dung câu hỏi không được để trống.');
+  if (!body.trim()) throw new DomainError('VALIDATION', 'questionBodyRequired');
   return db.transaction(async (tx) => {
     const { task } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
-    if (TERMINAL_STATUSES.includes(task.status)) throw new DomainError('INVALID_TRANSITION', TERMINAL_TASK);
+    if (TERMINAL_STATUSES.includes(task.status)) throw new DomainError('INVALID_TRANSITION', 'taskClosed');
     const isOwner = actor.id === task.ownerId;
     const [row] = await tx
       .insert(questions)
@@ -157,9 +155,9 @@ export async function askQuestion(
 }
 
 async function loadQuestion(tx: Tx, actor: Actor, questionId: string) {
-  if (!isUuid(questionId)) throw notFound('câu hỏi');
+  if (!isUuid(questionId)) throw notFound('question');
   const [q] = await tx.select().from(questions).where(eq(questions.id, questionId));
-  if (!q) throw notFound('câu hỏi');
+  if (!q) throw notFound('question');
   const { task, owner } = await loadTaskForViewer(asDb(tx), actor, q.taskId, { forUpdate: true });
   // Re-read under the task lock.
   const [fresh] = await tx.select().from(questions).where(eq(questions.id, questionId));
@@ -173,14 +171,14 @@ export async function answerQuestion(
   answer: string,
   now: Date = new Date(),
 ): Promise<Question> {
-  if (!answer.trim()) throw new DomainError('VALIDATION', 'Câu trả lời không được để trống.');
+  if (!answer.trim()) throw new DomainError('VALIDATION', 'answerRequired');
   return db.transaction(async (tx) => {
     const { q, task, owner } = await loadQuestion(tx, actor, questionId);
     const allowed = q.direction === 'manager_to_member'
       ? actor.id === task.ownerId
       : isCurrentManagerOf(actor, owner) && actor.id !== task.ownerId;
-    if (!allowed) throw new DomainError('FORBIDDEN', 'Chỉ phía còn lại mới được trả lời câu hỏi này.');
-    if (q.status === 'resolved') throw new DomainError('INVALID_TRANSITION', 'Câu hỏi đã được giải quyết.');
+    if (!allowed) throw new DomainError('FORBIDDEN', 'onlyOtherSideAnswers');
+    if (q.status === 'resolved') throw new DomainError('INVALID_TRANSITION', 'questionResolved');
     const [row] = await tx
       .update(questions)
       .set({ status: 'answered', answer, answeredById: actor.id, answeredAt: now })
@@ -193,7 +191,7 @@ export async function answerQuestion(
 export async function resolveQuestion(db: Db, actor: Actor, questionId: string): Promise<Question> {
   return db.transaction(async (tx) => {
     const { q } = await loadQuestion(tx, actor, questionId);
-    if (q.authorId !== actor.id) throw new DomainError('FORBIDDEN', 'Chỉ người hỏi mới được đánh dấu đã giải quyết.');
+    if (q.authorId !== actor.id) throw new DomainError('FORBIDDEN', 'onlyAskerResolves');
     const [row] = await tx
       .update(questions)
       .set({ status: 'resolved' })
@@ -223,9 +221,9 @@ export async function submitSolutionSummary(
   return db.transaction(async (tx) => {
     const { task } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);
-    if (TERMINAL_STATUSES.includes(task.status)) throw new DomainError('INVALID_TRANSITION', TERMINAL_TASK);
+    if (TERMINAL_STATUSES.includes(task.status)) throw new DomainError('INVALID_TRANSITION', 'taskClosed');
     if (task.mode !== 'project') {
-      throw new DomainError('VALIDATION', 'Chỉ việc mode project mới có tóm tắt giải pháp.');
+      throw new DomainError('VALIDATION', 'summaryProjectOnly');
     }
     const [row] = await tx
       .insert(solutionSummaries)
@@ -248,7 +246,7 @@ export async function reviewSolution(
   now: Date = new Date(),
 ): Promise<Task> {
   if (verdict === 'changes_needed' && !note?.trim()) {
-    throw new DomainError('VALIDATION', 'Cần nhập ghi chú khi yêu cầu chỉnh sửa.');
+    throw new DomainError('VALIDATION', 'noteRequiredForChanges');
   }
   return db.transaction(async (tx) => {
     const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });

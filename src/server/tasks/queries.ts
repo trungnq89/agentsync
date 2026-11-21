@@ -114,7 +114,7 @@ export async function teamOverview(
   now: Date = new Date(),
 ): Promise<{ tiers: { level: Level; people: PersonCard[] }[] }> {
   const [self] = await db.select().from(users).where(eq(users.id, actor.id));
-  if (!self) throw new DomainError('NOT_FOUND', 'Không tìm thấy người dùng.');
+  if (!self) throw new DomainError('NOT_FOUND', 'notFoundUser');
   const people = [self, ...(await listDirectReports(db, actor.id))];
   const rows = (await tasksOf(db, people.map((p) => p.id))).filter((t) => !t.isPrivate || t.ownerId === actor.id);
   const metrics = await loadMetrics(db, rows, now);
@@ -161,7 +161,13 @@ export interface AttentionItem {
   taskId: string;
   taskTitle: string;
   ownerName: string;
+  /** True when the item concerns the viewer's own task (shown as "you"). */
+  ownerIsMe: boolean;
+  /** User-written text (blocker, note, question, reason); empty when a system detail applies. */
   detail: string;
+  /** System-generated detail, translated by the consumer (namespace `attention.detail`). */
+  detailKey?: 'pendingConfirmation' | 'awaitingReview' | 'overdue' | 'stale' | 'paused' | 'cancelled';
+  detailParams?: Record<string, string>;
   at: Date;
 }
 
@@ -171,24 +177,33 @@ export async function needsAttention(db: Db, actor: Actor, now: Date = new Date(
   const rows = (await tasksOf(db, reports.map((r) => r.id))).filter((t) => !t.isPrivate);
   const metrics = await loadMetrics(db, rows, now);
   const items: AttentionItem[] = [];
-  const push = (kind: AttentionKind, t: Task, ownerName: string, detail: string, at: Date) =>
-    items.push({ kind, taskId: t.id, taskTitle: t.title, ownerName, detail, at });
+  const push = (
+    kind: AttentionKind, t: Task, ownerName: string, detail: string, at: Date,
+    extra: Pick<AttentionItem, 'detailKey' | 'detailParams'> & { ownerIsMe?: boolean } = {},
+  ) => {
+    const { ownerIsMe = false, ...rest } = extra;
+    items.push({ kind, taskId: t.id, taskTitle: t.title, ownerName, ownerIsMe, detail, at, ...rest });
+  };
 
   for (const t of rows) {
     const m = metrics.get(t.id)!;
     const owner = nameBy.get(t.ownerId)!;
-    if (t.status === 'pending_confirmation') push('pending_confirmation', t, owner, 'Chờ bạn xác nhận plan.', t.statusChangedAt);
-    if (t.status === 'awaiting_review') push('awaiting_review', t, owner, 'Chờ bạn review giải pháp.', t.statusChangedAt);
+    if (t.status === 'pending_confirmation') push('pending_confirmation', t, owner, '', t.statusChangedAt, { detailKey: 'pendingConfirmation' });
+    if (t.status === 'awaiting_review') push('awaiting_review', t, owner, '', t.statusChangedAt, { detailKey: 'awaitingReview' });
     if (isActive(t) && m.blocker) push('blocked', t, owner, m.blocker.body, m.blocker.createdAt);
     if (isActive(t) && m.overdue) {
-      push('overdue', t, owner, `Hạn thống nhất ${t.agreedDueDate}, dự kiến ${t.expectedEndDate}.`, m.lastActivityAt);
+      push('overdue', t, owner, '', m.lastActivityAt, {
+        detailKey: 'overdue', detailParams: { due: t.agreedDueDate, expected: t.expectedEndDate },
+      });
     }
-    if (m.stale) push('stale', t, owner, 'Lâu không có cập nhật.', m.lastActivityAt);
+    if (m.stale) push('stale', t, owner, '', m.lastActivityAt, { detailKey: 'stale' });
     if (
       (t.status === 'paused' || t.status === 'cancelled') &&
       t.statusChangedAt.getTime() >= now.getTime() - 7 * DAY_MS
     ) {
-      push('paused_or_cancelled', t, owner, t.statusReason ?? (t.status === 'paused' ? 'Tạm dừng.' : 'Đã hủy.'), t.statusChangedAt);
+      push('paused_or_cancelled', t, owner, t.statusReason ?? '', t.statusChangedAt, {
+        detailKey: t.statusReason ? undefined : t.status === 'paused' ? 'paused' : 'cancelled',
+      });
     }
   }
 
@@ -197,6 +212,8 @@ export async function needsAttention(db: Db, actor: Actor, now: Date = new Date(
   const ownIds = [...new Set([...fb.changesRequested, ...fb.questionsForMe].map((x) => x.taskId))];
   if (ownIds.length > 0) {
     const own = new Map((await db.select().from(tasks).where(inArray(tasks.id, ownIds))).map((t) => [t.id, t]));
+    const [me] = await db.select({ name: users.displayName }).from(users).where(eq(users.id, actor.id));
+    const myName = me?.name ?? '';
     const qIds = fb.questionsForMe.map((q) => q.questionId);
     const qAt = new Map(
       qIds.length
@@ -205,10 +222,10 @@ export async function needsAttention(db: Db, actor: Actor, now: Date = new Date(
     );
     for (const c of fb.changesRequested) {
       const t = own.get(c.taskId)!;
-      push('changes_requested', t, 'Bạn', c.note, t.statusChangedAt);
+      push('changes_requested', t, myName, c.note, t.statusChangedAt, { ownerIsMe: true });
     }
     for (const q of fb.questionsForMe) {
-      push('question_for_me', own.get(q.taskId)!, 'Bạn', q.body, qAt.get(q.questionId) ?? now);
+      push('question_for_me', own.get(q.taskId)!, myName, q.body, qAt.get(q.questionId) ?? now, { ownerIsMe: true });
     }
   }
 
@@ -234,7 +251,7 @@ export async function personTimeline(
   userId: string,
   now: Date = new Date(),
 ): Promise<{ person: PublicUser; tasks: TimelineTask[] }> {
-  const notFound = () => new DomainError('NOT_FOUND', 'Không tìm thấy người này.');
+  const notFound = () => new DomainError('NOT_FOUND', 'notFoundPerson');
   if (!isUuid(userId)) throw notFound();
   const [person] = await db.select().from(users).where(eq(users.id, userId));
   if (!person || !canViewUser(actor, person)) throw notFound();

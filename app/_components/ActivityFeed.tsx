@@ -1,14 +1,17 @@
+import { useLocale } from 'next-intl';
+import type { Locale } from '@/i18n/config';
 import type { Update } from '@/server/tasks/activity';
-import { relativeTime } from '../_lib/relative-time';
+import { formatRelative } from '../_lib/format';
 
 const SHOWN = 3;
 
 function Item({ u, now }: { u: Update; now: Date }) {
+  const locale = useLocale() as Locale;
   return (
     <li data-testid="activity-item" className="rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-800">
       <div className="break-words whitespace-pre-wrap">{u.body}</div>
       <div className="mt-1 flex flex-wrap gap-x-2 text-xs opacity-60">
-        <span>{relativeTime(u.createdAt, now)}</span>
+        <span>{formatRelative(u.createdAt, now, locale)}</span>
         <span>{u.source === 'auto' ? 'tự động' : 'đã duyệt'}</span>
         {u.editedAt && <span>đã sửa</span>}
       </div>

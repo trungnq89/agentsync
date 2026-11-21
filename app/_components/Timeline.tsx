@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { vnDateString } from '@/server/clock';
-import { healthLabel, statusLabel } from '@/server/labels';
+import { useTranslations } from 'next-intl';
 import type { TimelineTask } from '@/server/tasks/queries';
 import { barSpan, computeAxis, position } from '../_lib/timeline';
 
@@ -16,13 +16,15 @@ function colours(t: TimelineTask): { track: string; fill: string } {
   return { track: 'bg-blue-500/20', fill: 'bg-blue-500/55' };
 }
 
-function rowStatus(t: TimelineTask): string {
+function rowStatus(t: TimelineTask, tStatus: (k: string) => string, tHealth: (k: string) => string): string {
   if (t.status === 'done' || t.status === 'closed') return '✅ Xong';
-  if (t.health === 'blocked' || t.health === 'at_risk') return healthLabel(t.health);
-  return statusLabel(t.status);
+  if (t.health === 'blocked' || t.health === 'at_risk') return tHealth(t.health);
+  return tStatus(t.status);
 }
 
 export function Timeline({ tasks, now = new Date() }: { tasks: TimelineTask[]; now?: Date }) {
+  const tStatus = useTranslations('status');
+  const tHealth = useTranslations('health');
   if (tasks.length === 0) return <p className="text-sm opacity-70">Chưa có việc nào để hiển thị.</p>;
   const todayStr = vnDateString(now);
   const axis = computeAxis(tasks, todayStr);
@@ -56,7 +58,7 @@ export function Timeline({ tasks, now = new Date() }: { tasks: TimelineTask[]; n
             >
               <div className="mb-1 min-w-0 md:mb-0 md:w-44 md:shrink-0 md:pr-2">
                 <div className="truncate text-sm">{t.title}</div>
-                <div className="text-[11px] opacity-70">{rowStatus(t)}</div>
+                <div className="text-[11px] opacity-70">{rowStatus(t, tStatus, tHealth)}</div>
               </div>
               <div className="relative h-[18px] w-full md:flex-1">
                 <div

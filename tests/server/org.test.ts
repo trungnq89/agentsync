@@ -64,7 +64,7 @@ describe('org', () => {
     const gone = await makeUser({ level: 'manager', disabledAt: new Date() });
     const u = await makeUser();
     await expect(updateUser(testDb, admin, u.id, { managerId: gone.id })).rejects.toMatchObject({
-      code: 'VALIDATION', message: 'Không thể chọn người đã bị vô hiệu hóa làm quản lý.',
+      code: 'VALIDATION', key: 'managerDisabled',
     });
     await expect(
       createUser(testDb, admin, { username: 'dm', displayName: 'D', password: 'password-1', level: 'member', managerId: gone.id }),
@@ -115,7 +115,7 @@ describe('org', () => {
     await createUser(testDb, admin, input);
     await expect(createUser(testDb, admin, input)).rejects.toMatchObject({
       code: 'VALIDATION',
-      message: 'Tên đăng nhập đã tồn tại.',
+      key: 'usernameTaken',
     });
   });
 

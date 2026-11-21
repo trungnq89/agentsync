@@ -8,9 +8,9 @@ import { registerTools } from '@/mcp/tools';
 import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
 
-async function connect(getActor: () => User) {
+async function connect(getActor: () => User, locale: 'en' | 'vi' = 'vi') {
   const server = new McpServer({ name: 'test', version: '0' });
-  registerTools(server, { db: testDb, getActor });
+  registerTools(server, { db: testDb, getActor, locale });
   const client = new Client({ name: 'c', version: '0' });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(a), client.connect(b)]);
@@ -169,5 +169,31 @@ describe('mcp tools', () => {
     expect(text(r)).toContain('feat/api-x');
     expect(text(r)).toContain('/work/api');
     expect(JSON.parse(r.content[1].text)[0]).toMatchObject({ repoRef: { branch: 'feat/api-x' }, cwdHint: '/work/api' });
+  });
+
+  it('replies in the user locale (en)', async () => {
+    const mgr = await makeUser({ level: 'manager' });
+    const me = await makeUser({ managerId: mgr.id });
+    await makeTask(me.id, { title: 'Job', status: 'pending_confirmation' });
+    const r = await call(await connect(() => me, 'en'), 'list_my_tasks');
+    expect(text(r)).toContain('Pending confirmation');
+    expect(text(r)).not.toContain('Chờ xác nhận');
+  });
+
+  it('null user locale falls back to DEFAULT_LOCALE (route logic)', async () => {
+    const prev = process.env.DEFAULT_LOCALE;
+    process.env.DEFAULT_LOCALE = 'vi';
+    try {
+      const { isLocale, defaultLocale } = await import('@/i18n/config');
+      const mgr = await makeUser({ level: 'manager' });
+      const me = await makeUser({ managerId: mgr.id });
+      await makeTask(me.id, { title: 'Job', status: 'pending_confirmation' });
+      const locale = isLocale(me.locale) ? me.locale : defaultLocale();
+      const r = await call(await connect(() => me, locale), 'list_my_tasks');
+      expect(text(r)).toContain('Chờ xác nhận');
+    } finally {
+      if (prev === undefined) delete process.env.DEFAULT_LOCALE;
+      else process.env.DEFAULT_LOCALE = prev;
+    }
   });
 });

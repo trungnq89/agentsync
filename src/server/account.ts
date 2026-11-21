@@ -24,7 +24,7 @@ export async function listMyTokens(db: Db, actor: Actor): Promise<TokenInfo[]> {
 }
 
 export async function setMySendMode(db: Db, actor: Actor, mode: 'auto' | 'review'): Promise<void> {
-  if (mode !== 'auto' && mode !== 'review') throw new DomainError('VALIDATION', 'Chế độ gửi không hợp lệ.');
+  if (mode !== 'auto' && mode !== 'review') throw new DomainError('VALIDATION', 'invalidSendMode');
   await db.update(users).set({ sendMode: mode }).where(eq(users.id, actor.id));
 }
 
@@ -38,7 +38,7 @@ export async function changeMyPassword(
 ): Promise<void> {
   const [row] = await db.select({ hash: users.passwordHash }).from(users).where(eq(users.id, actor.id));
   if (!row || !(await verifyPassword(row.hash, current))) {
-    throw new DomainError('VALIDATION', 'Mật khẩu hiện tại không đúng.');
+    throw new DomainError('VALIDATION', 'wrongCurrentPassword');
   }
   assertPasswordLength(next);
   await db.update(users).set({ passwordHash: await hashPassword(next) }).where(eq(users.id, actor.id));

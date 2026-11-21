@@ -2,9 +2,10 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Db } from '@/db/client';
 import type { User } from '@/db/schema';
-import { isValidIsoDate, BAD_DATE } from '@/server/clock';
-import { DomainError } from '@/server/errors';
-import { levelLabel, sendModeLabel, statusLabel, verdictLabel } from '@/server/labels';
+import type { Locale } from '@/i18n/config';
+import { serverTranslator } from '@/i18n/translator';
+import { isValidIsoDate } from '@/server/clock';
+import { DomainError, translateError } from '@/server/errors';
 import {
   answerQuestion, askQuestion, getPendingFeedback, postUpdate, resolveQuestion, reviewSolution, submitSolutionSummary,
 } from '@/server/tasks/activity';
@@ -21,10 +22,10 @@ import {
 export interface ToolCtx {
   db: Db;
   getActor: () => User;
+  /** Language of the token owner; all tool output is rendered in it. */
+  locale: Locale;
   now?: () => Date;
 }
-
-const GENERIC_ERROR = 'Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.';
 
 const reply = (markdown: string, data: unknown) => ({
   content: [
@@ -39,15 +40,16 @@ const errorReply = (message: string) => ({
 });
 
 const planStep = z.object({
-  title: z.string().describe('Tên bước'),
-  status: z.enum(['todo', 'doing', 'done']).describe('Trạng thái bước'),
+  title: z.string().describe('Step title'),
+  status: z.enum(['todo', 'doing', 'done']).describe('Step status'),
 });
-const isoDate = z.string().refine(isValidIsoDate, BAD_DATE);
-const taskId = z.string().describe('ID của việc (lấy từ list_my_tasks)');
-const questionId = z.string().describe('ID của câu hỏi');
+const isoDate = z.string().refine(isValidIsoDate, 'Invalid date, use the YYYY-MM-DD format.');
+const taskId = z.string().describe('Task ID (from list_my_tasks)');
+const questionId = z.string().describe('Question ID');
 
 export function registerTools(server: McpServer, ctx: ToolCtx): void {
-  const { db } = ctx;
+  const { db, locale } = ctx;
+  const t = serverTranslator(locale);
   const now = () => ctx.now?.() ?? new Date();
 
   function tool<S extends z.ZodRawShape>(
@@ -62,12 +64,13 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         return reply(markdown, data);
       } catch (e) {
         if (e instanceof DomainError) {
-          const hint = e.code === 'NOT_FOUND' && !e.message.includes('list_my_tasks')
-            ? ' Dùng list_my_tasks để xem việc của bạn.' : '';
-          return errorReply(e.message + hint);
+          const message = translateError(e, locale);
+          const hint = e.code === 'NOT_FOUND' && !message.includes('list_my_tasks')
+            ? ` ${t('errors.notFoundHint')}` : '';
+          return errorReply(message + hint);
         }
         console.error(`[mcp] tool ${name} failed`, e);
-        return errorReply(GENERIC_ERROR);
+        return errorReply(t('errors.systemError'));
       }
     }) as never);
   }
@@ -75,106 +78,106 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
   const done = (markdown: string, data: unknown) => ({ markdown, data });
 
   // ------------------------------------------------------------ member
-  tool('list_my_tasks', 'Liệt kê các việc của bạn (đang làm; thêm việc đã xong nếu includeDone).',
-    { includeDone: z.boolean().optional().describe('Gồm cả việc đã xong/đã hủy') },
+  tool('list_my_tasks', 'List your tasks (open ones; include finished tasks with includeDone).',
+    { includeDone: z.boolean().optional().describe('Include done/cancelled tasks') },
     async ({ includeDone }, actor) => {
       const list = await listMyTasks(db, actor, { includeDone }, now());
-      return done(formatTaskList(list), list);
+      return done(formatTaskList(t, list), list);
     });
 
-  tool('create_task', 'Tạo việc mới kèm plan để chờ quản lý xác nhận.',
+  tool('create_task', 'Create a new task with a plan, pending manager confirmation.',
     {
-      title: z.string().describe('Tên việc'),
-      mode: z.enum(['executive', 'project']).describe('executive = không code, project = có code'),
-      agreedOutcome: z.string().describe('Kết quả đã thống nhất'),
-      startDate: isoDate.describe('Ngày bắt đầu YYYY-MM-DD'),
-      agreedDueDate: isoDate.describe('Hạn thống nhất YYYY-MM-DD'),
-      steps: z.array(z.string()).describe('Các bước của plan'),
-      isPrivate: z.boolean().optional().describe('Việc riêng tư, chỉ bạn thấy'),
+      title: z.string().describe('Task title'),
+      mode: z.enum(['executive', 'project']).describe('executive = no code, project = involves code'),
+      agreedOutcome: z.string().describe('Agreed outcome'),
+      startDate: isoDate.describe('Start date, YYYY-MM-DD'),
+      agreedDueDate: isoDate.describe('Agreed due date, YYYY-MM-DD'),
+      steps: z.array(z.string()).describe('Plan steps'),
+      isPrivate: z.boolean().optional().describe('Private task, visible only to you'),
       repoRef: z.object({ repo: z.string().optional(), branch: z.string().optional() }).optional(),
-      cwdHint: z.string().optional().describe('Thư mục làm việc gợi ý'),
+      cwdHint: z.string().optional().describe('Suggested working directory'),
     },
     async (input, actor) => {
-      const t = await createTask(db, actor, input, now());
-      return done(`Đã tạo việc **${t.title}** (id: ${t.id}).`, t);
+      const task = await createTask(db, actor, input, now());
+      return done(t('mcp.taskCreated', { title: task.title, id: task.id }), task);
     });
 
-  tool('update_progress', 'Gửi cập nhật tiến độ cho một việc của bạn.',
+  tool('update_progress', 'Post a progress update on one of your tasks.',
     {
       taskId,
-      body: z.string().describe('Nội dung cập nhật'),
-      stepsCompleted: z.array(z.string()).optional().describe('Tên các bước vừa xong'),
-      progressPct: z.number().int().min(0).max(100).optional().describe('Tiến độ 0-100'),
-      expectedEndDate: isoDate.optional().describe('Ngày dự kiến mới YYYY-MM-DD'),
-      source: z.enum(['auto', 'reviewed']).describe('auto = agent tự gửi, reviewed = người dùng đã duyệt'),
+      body: z.string().describe('Update text'),
+      stepsCompleted: z.array(z.string()).optional().describe('Titles of the steps just completed'),
+      progressPct: z.number().int().min(0).max(100).optional().describe('Progress 0-100'),
+      expectedEndDate: isoDate.optional().describe('New expected end date, YYYY-MM-DD'),
+      source: z.enum(['auto', 'reviewed']).describe('auto = sent by the agent, reviewed = approved by the user'),
       evidence: z.object({
         branch: z.string().optional(), commits: z.number().optional(), prUrl: z.string().optional(),
       }).optional(),
     },
     async ({ taskId: id, ...input }, actor) => {
       const u = await postUpdate(db, actor, id, input, now());
-      return done('Đã gửi cập nhật.', u);
+      return done(t('mcp.updateSent'), u);
     });
 
-  tool('revise_plan', 'Sửa plan của một việc.',
+  tool('revise_plan', 'Revise the plan of a task.',
     {
       taskId,
-      steps: z.array(planStep).describe('Toàn bộ các bước của plan mới'),
-      reason: z.string().optional().describe('Lý do sửa plan'),
-      expectedEndDate: isoDate.optional().describe('Ngày dự kiến mới YYYY-MM-DD'),
+      steps: z.array(planStep).describe('All steps of the new plan'),
+      reason: z.string().optional().describe('Reason for revising the plan'),
+      expectedEndDate: isoDate.optional().describe('New expected end date, YYYY-MM-DD'),
     },
     async ({ taskId: id, ...input }, actor) => {
-      const t = await changePlan(db, actor, id, input, now());
-      return done('Đã cập nhật plan.', t);
+      const task = await changePlan(db, actor, id, input, now());
+      return done(t('mcp.planUpdated'), task);
     });
 
-  tool('set_task_status', 'Đổi trạng thái việc: complete, pause, resume hoặc cancel.',
+  tool('set_task_status', 'Change the task status: complete, pause, resume or cancel.',
     {
       taskId,
       action: z.enum(['complete', 'pause', 'resume', 'cancel']),
-      reason: z.string().optional().describe('Lý do (bắt buộc với pause/cancel)'),
+      reason: z.string().optional().describe('Reason (required for pause/cancel)'),
     },
     async ({ taskId: id, action, reason }, actor) => {
-      const t = await setTaskStatus(db, actor, id, action, reason, now());
-      return done(`Việc giờ ở trạng thái: ${statusLabel(t.status)}.`, t);
+      const task = await setTaskStatus(db, actor, id, action, reason, now());
+      return done(t('mcp.statusNow', { status: t(`status.${task.status}`) }), task);
     });
 
-  tool('make_task_public', 'Chuyển việc riêng tư thành công khai để quản lý thấy.',
+  tool('make_task_public', 'Make a private task public so your manager can see it.',
     { taskId },
     async ({ taskId: id }, actor) => {
-      const t = await makePublic(db, actor, id, now());
-      return done('Đã công khai việc.', t);
+      const task = await makePublic(db, actor, id, now());
+      return done(t('mcp.madePublic'), task);
     });
 
-  tool('report_blocker', 'Báo vướng mắc (blocker) cho quản lý.',
-    { taskId, body: z.string().describe('Nội dung vướng mắc') },
+  tool('report_blocker', 'Report a blocker to your manager.',
+    { taskId, body: z.string().describe('Blocker description') },
     async ({ taskId: id, body }, actor) => {
       const q = await askQuestion(db, actor, id, body, { isBlocker: true }, now());
-      return done('Đã báo vướng mắc.', q);
+      return done(t('mcp.blockerReported'), q);
     });
 
-  tool('ask_manager', 'Hỏi quản lý một câu hỏi (không phải blocker).',
-    { taskId, body: z.string().describe('Nội dung câu hỏi') },
+  tool('ask_manager', 'Ask your manager a question (not a blocker).',
+    { taskId, body: z.string().describe('Question text') },
     async ({ taskId: id, body }, actor) => {
       const q = await askQuestion(db, actor, id, body, { isBlocker: false }, now());
-      return done('Đã gửi câu hỏi.', q);
+      return done(t('mcp.questionSent'), q);
     });
 
-  tool('answer_question', 'Trả lời câu hỏi của quản lý.',
-    { questionId, answer: z.string().describe('Câu trả lời') },
+  tool('answer_question', 'Answer a question from your manager.',
+    { questionId, answer: z.string().describe('Answer') },
     async ({ questionId: id, answer }, actor) => {
       const q = await answerQuestion(db, actor, id, answer, now());
-      return done('Đã trả lời.', q);
+      return done(t('mcp.answered'), q);
     });
 
-  tool('resolve_question', 'Đánh dấu câu hỏi bạn đã hỏi là đã giải quyết (sau khi đã đọc câu trả lời).',
+  tool('resolve_question', 'Mark a question you asked as resolved (after reading the answer).',
     { questionId },
     async ({ questionId: id }, actor) => {
       const q = await resolveQuestion(db, actor, id);
-      return done('Đã đánh dấu đã giải quyết.', q);
+      return done(t('mcp.resolved'), q);
     });
 
-  tool('submit_solution_summary', 'Nộp tóm tắt giải pháp (việc mode project) để chờ review.',
+  tool('submit_solution_summary', 'Submit a solution summary (project-mode tasks) for review.',
     {
       taskId,
       problem: z.string(), solution: z.string(), rejectedAlternatives: z.string(),
@@ -183,90 +186,95 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     },
     async ({ taskId: id, ...input }, actor) => {
       const s = await submitSolutionSummary(db, actor, id, input, now());
-      return done('Đã nộp tóm tắt giải pháp.', s);
+      return done(t('mcp.summarySubmitted'), s);
     });
 
-  tool('get_pending_feedback', 'Xem phản hồi đang chờ: yêu cầu sửa plan, câu hỏi, câu trả lời, kết quả review.',
+  tool('get_pending_feedback', 'Show pending feedback: plan change requests, questions, answers, review results.',
     {},
     async (_a, actor) => {
       const f = await getPendingFeedback(db, actor);
-      const lines = ['## Phản hồi đang chờ'];
-      for (const c of f.changesRequested) lines.push(`- Cần sửa plan **${c.title}** (id: ${c.taskId}): ${c.note}`);
-      for (const q of f.questionsForMe) lines.push(`- Câu hỏi cho bạn ở **${q.title}** (câu hỏi id: ${q.questionId}): ${q.body}`);
-      for (const a of f.answersToMyQuestions) lines.push(`- Trả lời cho **${a.title}**: ${a.body} → ${a.answer}`);
-      for (const r of f.reviewResults) lines.push(`- Review **${r.title}**: ${verdictLabel(r.verdict)}${r.note ? ` — ${r.note}` : ''}`);
-      return done(lines.length === 1 ? 'Không có phản hồi nào đang chờ.' : lines.join('\n'), f);
+      const lines = [`## ${t('mcp.feedbackHeading')}`];
+      for (const c of f.changesRequested) lines.push(t('mcp.feedbackChanges', { title: c.title, id: c.taskId, note: c.note }));
+      for (const q of f.questionsForMe) lines.push(t('mcp.feedbackQuestion', { title: q.title, id: q.questionId, body: q.body }));
+      for (const a of f.answersToMyQuestions) lines.push(t('mcp.feedbackAnswer', { title: a.title, body: a.body, answer: a.answer }));
+      for (const rv of f.reviewResults) {
+        lines.push(
+          t('mcp.feedbackReview', { title: rv.title, verdict: t(`verdict.${rv.verdict}`) }) +
+            (rv.note ? t('mcp.feedbackReviewNote', { note: rv.note }) : ''),
+        );
+      }
+      return done(lines.length === 1 ? t('mcp.feedbackNone') : lines.join('\n'), f);
     });
 
-  tool('get_my_settings', 'Xem cài đặt của bạn, gồm sendMode (auto = tự gửi, review = duyệt trước khi gửi).',
+  tool('get_my_settings', 'Show your settings, including sendMode (auto = send automatically, review = review before sending).',
     {},
     async (_a, actor) => {
       const data = { sendMode: actor.sendMode, displayName: actor.displayName, level: actor.level };
-      return done(`${actor.displayName} (${levelLabel(actor.level)}) — chế độ gửi: ${sendModeLabel(actor.sendMode)}.`, data);
+      return done(t('mcp.settingsLine', { name: actor.displayName, level: t(`level.${actor.level}`), mode: t(`sendMode.${actor.sendMode}`) }), data);
     });
 
   // ------------------------------------------------------------ manager
-  tool('team_overview', 'Tổng quan nhóm: bạn và các báo cáo trực tiếp.', {},
+  tool('team_overview', 'Team overview: you and your direct reports.', {},
     async (_a, actor) => {
       const o = await teamOverview(db, actor, now());
-      return done(formatOverview(o), o);
+      return done(formatOverview(t, o), o);
     });
 
-  tool('needs_attention', 'Các mục cần quản lý chú ý.', {},
+  tool('needs_attention', 'Items that need the manager\'s attention.', {},
     async (_a, actor) => {
       const items = await needsAttention(db, actor, now());
-      return done(formatAttention(items), items);
+      return done(formatAttention(t, items), items);
     });
 
-  tool('task_detail', 'Chi tiết một việc: plan, cập nhật, câu hỏi.',
+  tool('task_detail', 'Task details: plan, updates, questions.',
     { taskId },
     async ({ taskId: id }, actor) => {
       const d = await taskDetail(db, actor, id, now());
-      return done(formatTaskDetail(d), d);
+      return done(formatTaskDetail(t, d), d);
     });
 
-  tool('weekly_digest', 'Tổng kết tuần của các báo cáo trực tiếp.', {},
+  tool('weekly_digest', 'Weekly digest of your direct reports.', {},
     async (_a, actor) => {
       const d = await weeklyDigest(db, actor, now());
-      return done(formatDigest(d), d);
+      return done(formatDigest(t, d), d);
     });
 
-  tool('confirm_task', 'Xác nhận plan của một việc.',
+  tool('confirm_task', 'Confirm the plan of a task.',
     { taskId },
     async ({ taskId: id }, actor) => {
-      const t = await confirmTask(db, actor, id, now());
-      return done('Đã xác nhận.', t);
+      const task = await confirmTask(db, actor, id, now());
+      return done(t('mcp.confirmed'), task);
     });
 
-  tool('request_changes', 'Yêu cầu member sửa plan.',
-    { taskId, note: z.string().describe('Ghi chú cần sửa gì') },
+  tool('request_changes', 'Ask the member to revise the plan.',
+    { taskId, note: z.string().describe('Note describing what to change') },
     async ({ taskId: id, note }, actor) => {
-      const t = await requestChanges(db, actor, id, note, now());
-      return done('Đã yêu cầu sửa plan.', t);
+      const task = await requestChanges(db, actor, id, note, now());
+      return done(t('mcp.changesRequested'), task);
     });
 
-  tool('answer_blocker', 'Trả lời vướng mắc/câu hỏi của member.',
-    { questionId, answer: z.string().describe('Câu trả lời') },
+  tool('answer_blocker', 'Answer a member\'s blocker or question.',
+    { questionId, answer: z.string().describe('Answer') },
     async ({ questionId: id, answer }, actor) => {
       const q = await answerQuestion(db, actor, id, answer, now());
-      return done('Đã trả lời.', q);
+      return done(t('mcp.answered'), q);
     });
 
-  tool('ask_question', 'Hỏi member một câu hỏi về việc của họ.',
-    { taskId, body: z.string().describe('Nội dung câu hỏi') },
+  tool('ask_question', 'Ask a member a question about their task.',
+    { taskId, body: z.string().describe('Question text') },
     async ({ taskId: id, body }, actor) => {
       const q = await askQuestion(db, actor, id, body, { isBlocker: false }, now());
-      return done('Đã gửi câu hỏi.', q);
+      return done(t('mcp.questionSent'), q);
     });
 
-  tool('review_solution', 'Review tóm tắt giải pháp: approved hoặc changes_needed. note là bắt buộc khi verdict là changes_needed.',
+  tool('review_solution', 'Review a solution summary: approved or changes_needed. note is required when verdict is changes_needed.',
     {
       taskId,
       verdict: z.enum(['approved', 'changes_needed']),
-      note: z.string().optional().describe('Bắt buộc khi verdict là changes_needed'),
+      note: z.string().optional().describe('Required when verdict is changes_needed'),
     },
     async ({ taskId: id, verdict, note }, actor) => {
-      const t = await reviewSolution(db, actor, id, verdict, note, now());
-      return done(`${verdictLabel(verdict)}.`, t);
+      const task = await reviewSolution(db, actor, id, verdict, note, now());
+      return done(t('mcp.reviewResult', { verdict: t(`verdict.${verdict}`) }), task);
     });
 }

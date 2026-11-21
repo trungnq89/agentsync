@@ -1,7 +1,8 @@
 import type { Task } from '@/db/schema';
-import { healthLabel, statusLabel } from '@/server/labels';
+import { useLocale, useTranslations } from 'next-intl';
+import type { Locale } from '@/i18n/config';
 import { confirmAction, requestChangesAction } from '../_actions/task';
-import { relativeTime } from '../_lib/relative-time';
+import { formatRelative } from '../_lib/format';
 import { ActionForm, button, buttonQuiet, input } from './ui';
 
 const DAY_MS = 86_400_000;
@@ -22,6 +23,9 @@ export function TaskHeader({
   canConfirm: boolean;
   now: Date;
 }) {
+  const locale = useLocale() as Locale;
+  const tStatus = useTranslations('status');
+  const tHealth = useTranslations('health');
   const late = lateDays(task);
   return (
     <header>
@@ -29,16 +33,16 @@ export function TaskHeader({
       <div className="mt-1 text-sm opacity-70">{ownerName}</div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span data-testid="task-status" className="rounded-full border border-neutral-300 px-2 py-0.5 dark:border-neutral-700">
-          {statusLabel(task.status)}
+          {tStatus(task.status)}
         </span>
-        {health.health !== 'on_track' && <span className="opacity-80">{healthLabel(health.health)}</span>}
+        {health.health !== 'on_track' && <span className="opacity-80">{tHealth(health.health)}</span>}
         <span data-testid="task-progress">{progress}%</span>
         <span className="opacity-80">
           Dự kiến {fmt(task.expectedEndDate)}
           {late > 0 && <span className="text-red-600 dark:text-red-400"> · trễ {late} ngày</span>}
         </span>
       </div>
-      <div className="mt-1 text-xs opacity-60">Cập nhật {relativeTime(lastActivityAt, now)}</div>
+      <div className="mt-1 text-xs opacity-60">Cập nhật {formatRelative(lastActivityAt, now, locale)}</div>
       {canConfirm && (
         <div className="mt-4 flex flex-wrap items-start gap-2">
           <ActionForm action={confirmAction}>
