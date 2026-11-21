@@ -1,64 +1,72 @@
+Tiếng Việt: [README.vi.md](README.vi.md)
+
 # AgentSync
 
-Ứng dụng self-host để quản lý xem tiến độ công việc của team, còn agent AI (Claude Code, Codex) của từng thành viên tự đồng bộ plan và tiến độ qua MCP.
+A self-hosted app for managers to follow their team's work progress, while each member's AI agent (Claude Code, Codex) syncs plans and progress automatically over MCP.
 
-## Kiến trúc
+## Architecture
 
-- Một ứng dụng Next.js 16 (App Router) + Postgres 16, chạy bằng Docker Compose.
-- Toàn bộ nghiệp vụ là hàm thuần trong `src/server/` (nhận `db, actor, input`), mọi kiểm tra quyền đi qua `src/server/authz.ts`.
-- Web (RSC + server actions, tiếng Việt) và MCP (`POST /api/mcp`, Streamable HTTP, xác thực bằng token `ags_...`) chỉ là lớp mỏng gọi vào đó.
-- Schema và migration bằng Drizzle (`src/db/schema.ts`, thư mục `drizzle/`).
-- Gói skill cho agent nằm ở `plugins/agentsync` (Claude Code + Codex).
+- One Next.js 16 (App Router) app + Postgres 16, run with Docker Compose.
+- All business logic is plain functions in `src/server/` (taking `db, actor, input`); every permission check goes through `src/server/authz.ts`.
+- The web UI (RSC + server actions, English and Vietnamese) and MCP (`POST /api/mcp`, Streamable HTTP, authenticated with `ags_...` tokens) are thin layers over it.
+- Schema and migrations use Drizzle (`src/db/schema.ts`, `drizzle/`).
+- The agent skill bundle lives in `plugins/agentsync` (Claude Code + Codex).
 
-## Chạy khi phát triển
+## Language & theme
+
+- **Language:** the UI and MCP output support `en` and `vi`. Set the install-wide default with the `DEFAULT_LOCALE` environment variable (`en` or `vi`, default `en`). An invalid value falls back to `en` with a one-time warning. Each user can pick their own language in the UI, and that choice wins over the default. On the web the order is: the user's saved choice, then the `locale` cookie, then the browser's `Accept-Language`, then `DEFAULT_LOCALE`. For MCP it is the token owner's saved choice, then `DEFAULT_LOCALE`.
+- **Theme:** `system` (follows the OS, default), `light` or `dark`. Each user picks one with the theme switcher; it is stored per user and applied on every device after sign-in. There is no install-wide theme setting.
+
+## Run for development
 
 ```bash
-cp .env.example .env          # sửa DB_PORT và các DATABASE_URL* nếu cổng 5432 đã bị chiếm
+cp .env.example .env          # edit DB_PORT and the DATABASE_URL* values if port 5432 is taken
 pnpm install
-docker compose up -d db       # Postgres (kèm hai DB test: agentsync_test, agentsync_e2e)
+docker compose up -d db       # Postgres (with two test DBs: agentsync_test, agentsync_e2e)
 pnpm db:migrate
-SEED_ADMIN_PASSWORD='mat-khau-dai-hon-12-ky-tu' pnpm seed:admin --username admin
+SEED_ADMIN_PASSWORD='a-password-longer-than-12-chars' pnpm seed:admin --username admin
 pnpm dev                      # http://localhost:3000
 ```
 
-Kiểm tra: `pnpm vitest run`, `pnpm playwright test`, `pnpm typecheck`, `pnpm lint`.
+Checks: `pnpm vitest run`, `pnpm playwright test`, `pnpm typecheck`, `pnpm lint`.
 
-## Triển khai (Docker Compose)
+## Deploy (Docker Compose)
 
 ```bash
-export POSTGRES_PASSWORD='doi-mat-khau-nay'        # chỉ dùng chữ, số, - và _ (được ghép vào DATABASE_URL)
-export APP_URL='https://agentsync.example.com'   # địa chỉ công khai, hiện trong hướng dẫn cấu hình MCP
+export POSTGRES_PASSWORD='change-this-password'        # letters, digits, - and _ only (it is spliced into DATABASE_URL)
+export APP_URL='https://agentsync.example.com'         # public address, shown in the MCP setup snippet
+export DEFAULT_LOCALE=en                               # optional: en | vi
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-- Container `app` tự chạy migration khi khởi động rồi mới start server. Cổng db không mở ra ngoài; dữ liệu nằm trong volume `pgdata`.
-- Bắt buộc: `POSTGRES_PASSWORD`. Tùy chọn: `APP_URL`, `APP_PORT` (mặc định 3000), `ALLOWED_ORIGINS`. Không cần `SESSION_SECRET` (phiên đăng nhập là id ngẫu nhiên lưu trong DB).
-- HTTPS rất nên dùng. Cookie phiên có cờ `Secure` khi `APP_URL` bắt đầu bằng `https://`; đặt `COOKIE_SECURE=false` chỉ để thử nội bộ qua HTTP thuần (nếu không, trình duyệt sẽ không giữ cookie và đăng nhập bị lặp), hoặc `COOKIE_SECURE=true` để ép bật.
-- Không có dịch vụ ngoài lúc chạy: không CDN, không analytics, dùng font hệ thống.
-- Đặt sau reverse proxy (nginx, Caddy, ...): cấp HTTPS ở proxy và chuyển tiếp tới cổng app. Nếu proxy đổi header `Host` so với `Origin` của trình duyệt, server actions sẽ bị từ chối; khi đó đặt `ALLOWED_ORIGINS` (các host cách nhau bằng dấu phẩy, ví dụ `agentsync.example.com`). Biến này được nhúng lúc build: đổi giá trị thì phải chạy lại `docker compose -f docker-compose.prod.yml up -d --build`.
-- Container chạy bằng user `node` (không phải root) và có healthcheck. Nếu `app` cứ khởi động lại liên tục, xem log: `docker compose -f docker-compose.prod.yml logs app`.
+- The `app` container runs migrations on startup, then starts the server. The db port is not exposed; data lives in the `pgdata` volume.
+- Required: `POSTGRES_PASSWORD`. Optional: `APP_URL`, `APP_PORT` (default 3000), `ALLOWED_ORIGINS`, `DEFAULT_LOCALE`. No `SESSION_SECRET` is needed (sessions are random ids stored in the database).
+- HTTPS is strongly recommended. The session cookie gets the `Secure` flag when `APP_URL` starts with `https://`. Set `COOKIE_SECURE=false` only for internal testing over plain HTTP (otherwise the browser drops the cookie and sign-in loops), or `COOKIE_SECURE=true` to force it on.
+- No external services at runtime: no CDN, no analytics; the Inter font is bundled in the build.
+- Behind a reverse proxy (nginx, Caddy, ...): terminate HTTPS at the proxy and forward to the app port. If the proxy changes the `Host` header relative to the browser's `Origin`, server actions are rejected; then set `ALLOWED_ORIGINS` (comma-separated hosts, for example `agentsync.example.com`). This variable is baked in at build time: after changing it, run `docker compose -f docker-compose.prod.yml up -d --build` again.
+- The container runs as the non-root `node` user and has a healthcheck. If `app` keeps restarting, check the logs: `docker compose -f docker-compose.prod.yml logs app`.
 
-## Tạo admin đầu tiên
+## Create the first admin
 
 ```bash
-docker compose -f docker-compose.prod.yml exec -e SEED_ADMIN_PASSWORD='mat-khau-dai-hon-12-ky-tu' app \
+docker compose -f docker-compose.prod.yml exec -e SEED_ADMIN_PASSWORD='a-password-longer-than-12-chars' app \
   sh -c 'cd /tools && node_modules/.bin/tsx scripts/seed-admin.ts --username admin'
 ```
 
-Nếu không đặt `SEED_ADMIN_PASSWORD`, script sẽ hỏi mật khẩu ở stdin. Cờ `--password` vẫn dùng được nhưng không khuyến khích (mật khẩu lộ trong lịch sử shell và danh sách tiến trình).
+If `SEED_ADMIN_PASSWORD` is not set, the script asks for the password on stdin. The `--password` flag still works but is discouraged (the password leaks into shell history and the process list).
 
-Đăng nhập web bằng tài khoản này, vào **Quản trị** để tạo người dùng và gán quản lý, mỗi người vào **Cài đặt** để tạo token agent.
+Sign in to the web app with this account, open **Admin** to create users and assign managers, and have each person open **Settings** to create an agent token.
 
-## Kiểm tra khói MCP
+## MCP smoke test
 
-Chạy từ bản checkout trên máy host sau `pnpm install`. Script tạo một việc thật, nên dùng tài khoản member tạm (throwaway), không dùng tài khoản thật.
+Run from a checkout on the host after `pnpm install`. The script creates a real task, so use a throwaway member account, not a real one.
 
 ```bash
 AGENTSYNC_URL=http://localhost:3000 AGENTSYNC_TOKEN=ags_... pnpm smoke:mcp
 ```
 
-Tạo một việc mới (tên có timestamp), gửi cập nhật, đọc phản hồi, liệt kê việc; in `SMOKE OK` nếu không có lỗi, thoát mã khác 0 nếu có `isError`.
+It creates a new task (title with a timestamp), sends an update, reads feedback and lists tasks; it prints `SMOKE OK` on success and exits non-zero on any `isError`.
 
-## Cài cho agent
+## Install for agents
 
-Xem [docs/install-agent.md](docs/install-agent.md).
+See [docs/install-agent.md](docs/install-agent.md).

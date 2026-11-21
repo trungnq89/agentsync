@@ -43,7 +43,7 @@ export function UserActions({ user, people }: { user: AdminUser; people: Person[
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">{t('edit')}</Button>
         </DialogTrigger>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="break-words">{t('editTitle', { username: user.username })}</DialogTitle>
             <DialogDescription className="sr-only">{user.displayName}</DialogDescription>

@@ -171,7 +171,7 @@ test.describe('English', () => {
 });
 
 for (const locale of ['vi-VN', 'en-US']) {
-  test(`375px with long title and PR url, no horizontal scroll (${locale})`, async ({ browser }) => {
+  test(`375px with long title and PR url, no horizontal scroll (${locale})`, async ({ browser, baseURL }) => {
     const task = await withDb(async (db, { manager, leader }) => {
       const t = await createTask(db, leader, { ...base(LONG_TITLE, 'project'), agreedOutcome: 'y'.repeat(120) });
       await confirmTask(db, manager, t.id);
@@ -181,7 +181,7 @@ for (const locale of ['vi-VN', 'en-US']) {
       await setTaskStatus(db, leader, t.id, 'complete');
       return t;
     });
-    const ctx = await browser.newContext({ viewport: { width: 375, height: 800 }, locale, baseURL: 'http://localhost:3100' });
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 800 }, locale, baseURL });
     const page = await ctx.newPage();
     await page.goto('/login');
     await page.getByLabel(locale === 'vi-VN' ? 'Tên đăng nhập' : 'Username').fill('manager1');

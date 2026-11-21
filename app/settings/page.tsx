@@ -54,7 +54,8 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <ActionForm action={sendModeAction} className="space-y-3">
-            <div role="radiogroup" aria-label={t('sendModeTitle')} className="space-y-2">
+            <fieldset className="space-y-2">
+              <legend className="sr-only">{t('sendModeTitle')}</legend>
               {(['review', 'auto'] as const).map((m) => (
                 <div key={m} className="flex items-center gap-2">
                   <input
@@ -68,7 +69,7 @@ export default async function SettingsPage() {
                   <Label htmlFor={`send-mode-${m}`}>{tSendMode(m)}</Label>
                 </div>
               ))}
-            </div>
+            </fieldset>
             <Button type="submit">{tc('save')}</Button>
           </ActionForm>
         </CardContent>

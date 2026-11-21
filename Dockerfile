@@ -27,6 +27,7 @@ WORKDIR /tools
 COPY --from=builder --chown=node:node /build/node_modules ./node_modules
 COPY --from=builder --chown=node:node /build/package.json /build/tsconfig.json ./
 COPY --from=builder --chown=node:node /build/src ./src
+COPY --from=builder --chown=node:node /build/messages ./messages
 COPY --from=builder --chown=node:node /build/scripts ./scripts
 COPY --from=builder --chown=node:node /build/drizzle ./drizzle
 COPY --chown=node:node docker/entrypoint.sh /entrypoint.sh

@@ -3,34 +3,36 @@ name: agentsync-session
 description: Use when starting or resuming work on an existing AgentSync task, and when the member says they are done or ends the session. Checks pending feedback, identifies the current task, then reports progress, blockers or the solution summary.
 ---
 
-# Phiên làm việc với AgentSync
+# Working session with AgentSync
 
-## Quy tắc đầu tiên: chế độ gửi
+Always reply to the member in the language they use.
 
-Gọi `get_my_settings` để biết `sendMode`. Nếu `sendMode` là `review`, MỌI lần gửi từ phía member (`create_task`, `update_progress`, `revise_plan`, `report_blocker`, `ask_manager`, `answer_question`, `resolve_question`, `submit_solution_summary`, `set_task_status`) đều phải hiện bản nháp và CHỜ member đồng ý rồi mới gọi tool. Nếu là `auto` thì gửi luôn, sau đó báo lại nội dung đã gửi.
+## First rule: send mode
 
-## Khi bắt đầu hoặc tiếp tục một việc
+Call `get_my_settings` to read `sendMode`. If `sendMode` is `review`, EVERY member-side send (`create_task`, `update_progress`, `revise_plan`, `report_blocker`, `ask_manager`, `answer_question`, `resolve_question`, `submit_solution_summary`, `set_task_status`) must show a draft and WAIT for the member to agree before you call the tool. If it is `auto`, send right away, then tell the member what was sent.
 
-1. Gọi `get_pending_feedback` và nhắc member các mục đang chờ (yêu cầu sửa plan, câu hỏi, câu trả lời, kết quả review). Có câu hỏi dành cho member thì hỏi member rồi trả lời bằng `answer_question`. Sau khi đã chuyển câu trả lời của quản lý cho member, gọi `resolve_question` (với `questionId`) để câu hỏi không hiện lại trong `get_pending_feedback`.
-2. Xác định việc đang làm: gọi `list_my_tasks` trước. Đối chiếu branch hiện tại (`git branch --show-current`) với `repoRef.branch`; nếu không khớp thì đối chiếu thư mục hiện tại với `cwdHint`. Nếu không có đúng một việc khớp, hỏi member chọn. Không bao giờ đoán từ tên việc.
-3. Nếu quản lý yêu cầu sửa plan, soạn plan mới rồi gọi `revise_plan` (theo quy tắc `sendMode`).
-4. Nếu kết quả review là `changes_needed`: sửa theo ghi chú, rồi chạy lại `submit_solution_summary` (gửi lại sẽ ghi đè bản cũ) và `set_task_status` với `action` là `complete`.
+## When starting or resuming a task
 
-## Khi member nói xong hoặc kết thúc phiên
+1. Call `get_pending_feedback` and remind the member of pending items (plan change requests, questions, answers, review results). If there is a question for the member, ask them and reply with `answer_question`. After you have passed the manager's answer on to the member, call `resolve_question` (with `questionId`) so the question no longer shows up in `get_pending_feedback`.
+2. Identify the current task: call `list_my_tasks` first. Match the current branch (`git branch --show-current`) against `repoRef.branch`; if that does not match, match the current directory against `cwdHint`. If exactly one task does not match, ask the member to choose. Never guess from task titles.
+3. If the manager asked for plan changes, draft a new plan and call `revise_plan` (following the `sendMode` rule).
+4. If the review verdict is `changes_needed`: make the changes from the note, then run `submit_solution_summary` again (resubmitting overwrites the old one) and `set_task_status` with `action` set to `complete`.
 
-1. Tóm tắt trong 2–4 câu: đã làm gì, bước nào xong, phát hiện gì mới, có vướng mắc không. Đặt phần tóm tắt vào `body`.
-2. Các bước vừa xong: điền vào `stepsCompleted`, dùng đúng tên bước như trong plan của việc (xem bằng `task_detail` nếu cần, không tự đặt tên khác).
-3. Bằng chứng (`evidence`): `branch` từ `git branch --show-current`; `commits` là kết quả `git rev-list --count <base>..HEAD`, với `<base>` là kết quả `git merge-base HEAD origin/main` (thử `origin/master` nếu không có). Không xác định được base thì bỏ `commits`. Thêm `prUrl` nếu có PR.
-4. Gọi `update_progress`: `source` là `reviewed` nếu member đã duyệt bản nháp, `auto` nếu `sendMode` là `auto`.
-5. Có vướng mắc cần quản lý quyết định thì gọi `report_blocker`. Câu hỏi thường thì gọi `ask_manager`.
+## When the member says they are done or ends the session
 
-## Khi xong việc mode project
+1. Summarize in 2-4 sentences: what was done, which steps finished, what was newly discovered, any blockers. Put the summary in `body`.
+2. Steps just finished: fill `stepsCompleted`, using the exact step names from the task's plan (see `task_detail` if needed; do not invent other names).
+3. Evidence (`evidence`): `branch` from `git branch --show-current`; `commits` is the result of `git rev-list --count <base>..HEAD`, where `<base>` is the result of `git merge-base HEAD origin/main` (try `origin/master` if missing). If you cannot determine the base, omit `commits`. Add `prUrl` if there is a PR.
+4. Call `update_progress`: `source` is `reviewed` if the member approved the draft, `auto` if `sendMode` is `auto`.
+5. If there is a blocker the manager must decide, call `report_blocker`. For an ordinary question, call `ask_manager`.
 
-1. Soạn tóm tắt giải pháp gồm: `problem` (vấn đề), `solution` (giải pháp), `rejectedAlternatives` (phương án đã loại), `keyChanges` (thay đổi chính), `risks` (rủi ro), `testing` (kiểm thử), thêm `prUrl` nếu có.
-2. Gọi `submit_solution_summary`, rồi `set_task_status` với `action` là `complete` (theo quy tắc `sendMode`: với `review` thì cho member duyệt trước).
+## When a project-mode task is finished
 
-## Quy tắc
+1. Write a solution summary with: `problem`, `solution`, `rejectedAlternatives`, `keyChanges`, `risks`, `testing`, plus `prUrl` if there is a PR.
+2. Call `submit_solution_summary`, then `set_task_status` with `action` set to `complete` (following the `sendMode` rule: with `review`, let the member approve first).
 
-- KHÔNG BAO GIỜ gửi nội dung code, secret (token, mật khẩu, khóa API), hay dữ liệu khách hàng lên server. Chỉ gửi bản tóm tắt bằng lời.
-- Ngày luôn dạng YYYY-MM-DD.
-- Việc không hợp lệ (của người khác, đã đóng, sai id) sẽ trả lỗi kèm gợi ý `list_my_tasks`: gọi tool đó, không tự bịa id.
+## Rules
+
+- NEVER send code, secrets (tokens, passwords, API keys) or customer data to the server. Send only a written summary.
+- Dates are always YYYY-MM-DD.
+- An invalid task (someone else's, closed, wrong id) returns an error with a hint to use `list_my_tasks`: call that tool; never invent an id.

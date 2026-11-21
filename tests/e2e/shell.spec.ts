@@ -32,7 +32,7 @@ test('login page switches language while logged out', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 });
 
-test('language choice persists via DB across contexts', async ({ page, browser }) => {
+test('language choice persists via DB across contexts', async ({ page, browser, baseURL }) => {
   await login(page);
   await pick(page, 'lang-switch', 'Tiếng Anh');
   await expect(page.getByTestId('nav-home')).toHaveText('Home');
@@ -43,7 +43,7 @@ test('language choice persists via DB across contexts', async ({ page, browser }
   await page.getByTestId('logout').click();
   await expect(page).toHaveURL(/\/login$/);
 
-  const ctx = await browser.newContext({ locale: 'vi-VN', baseURL: 'http://localhost:3100' });
+  const ctx = await browser.newContext({ locale: 'vi-VN', baseURL });
   const p2 = await ctx.newPage();
   await p2.goto('/login');
   await p2.getByLabel('Tên đăng nhập').fill(ADMIN.username);

@@ -1,38 +1,38 @@
-# AgentSync cho Codex
+# AgentSync for Codex
 
-Bộ skill dùng chung định dạng `SKILL.md` với Claude Code. Cấu hình MCP làm riêng cho Codex như dưới đây.
+The skill bundle shares the `SKILL.md` format with Claude Code. The MCP configuration is done separately for Codex, as below.
 
-## 1. Cài skill
+## 1. Install the skills
 
-Tài liệu Codex hiện hành (learn.chatgpt.com/docs/build-skills, trước đây developers.openai.com/codex/skills) ghi vị trí skill cấp người dùng là `$HOME/.agents/skills`, và cấp repo là `$REPO_ROOT/.agents/skills`. Tài liệu đó không nhắc `~/.codex/skills`.
+Current Codex docs (learn.chatgpt.com/docs/build-skills, formerly developers.openai.com/codex/skills) list the user-level skills location as `$HOME/.agents/skills` and the repo-level one as `$REPO_ROOT/.agents/skills`. They do not mention `~/.codex/skills`.
 
-Thư mục `plugins/agentsync` lấy từ mã nguồn AgentSync (xem `docs/install-agent.md`, mục 0). Dùng đường dẫn tuyệt đối, ví dụ trên macOS:
+The `plugins/agentsync` folder comes from the AgentSync source (see `docs/install-agent.md`, section 0). Use absolute paths, for example on macOS:
 
 ```bash
 mkdir -p ~/.agents/skills
-cp -R /Users/ten-ban/agentsync/plugins/agentsync/skills/* ~/.agents/skills/
+cp -R /Users/your-name/agentsync/plugins/agentsync/skills/* ~/.agents/skills/
 ```
 
-Nếu phiên bản Codex của bạn vẫn đọc `~/.codex/skills/` (các bản cũ), copy thêm vào đó:
+If your Codex version still reads `~/.codex/skills/` (older versions), copy there too:
 
 ```bash
 mkdir -p ~/.codex/skills
-cp -R /Users/ten-ban/agentsync/plugins/agentsync/skills/* ~/.codex/skills/
+cp -R /Users/your-name/agentsync/plugins/agentsync/skills/* ~/.codex/skills/
 ```
 
-Chưa kiểm chứng: việc `~/.codex/skills` còn được đọc ở bản Codex mới hay không. Hãy kiểm tra bằng cách khởi động Codex lại rồi xem danh sách skill.
+Not verified: whether `~/.codex/skills` is still read by newer Codex versions. Restart Codex and check the skill list.
 
-## 2. Thêm MCP server
+## 2. Add the MCP server
 
-Lấy token ở trang Cài đặt của AgentSync, rồi đặt biến môi trường (thêm vào `~/.zshrc` hoặc tương đương):
+Get a token on AgentSync's Settings page, then set an environment variable (add it to `~/.zshrc` or equivalent):
 
 ```bash
 export AGENTSYNC_TOKEN="ags_..."
 ```
 
-Biến trong `~/.zshrc` chỉ có hiệu lực với chương trình khởi động từ terminal. Ứng dụng Codex desktop mở bằng cách bấm icon sẽ không thấy chúng: hãy chạy `codex` trong terminal, hoặc mở ứng dụng từ terminal sau khi đã `export`. Chưa kiểm tra cách đặt biến cố định cho ứng dụng desktop.
+Variables in `~/.zshrc` only apply to programs started from a terminal. The Codex desktop app opened by clicking its icon will not see them: run `codex` in a terminal, or open the app from a terminal after the `export`. Setting the variable permanently for the desktop app has not been verified.
 
-### Cách A: `~/.codex/config.toml` (khuyến nghị, có bearer token)
+### Option A: `~/.codex/config.toml` (recommended, uses a bearer token)
 
 ```toml
 [mcp_servers.agentsync]
@@ -40,16 +40,16 @@ url = "https://agentsync.example.com/api/mcp"
 bearer_token_env_var = "AGENTSYNC_TOKEN"
 ```
 
-Đổi `url` thành địa chỉ AgentSync của bạn. Codex đọc token từ biến môi trường và gửi trong header `Authorization: Bearer ...`.
+Change `url` to your AgentSync address. Codex reads the token from the environment variable and sends it in the `Authorization: Bearer ...` header.
 
-### Cách B: `codex mcp add`
+### Option B: `codex mcp add`
 
 ```bash
 codex mcp add agentsync --url https://agentsync.example.com/api/mcp
 ```
 
-Theo tài liệu, lệnh này chỉ có cờ `--url` (và các cờ OAuth). Tài liệu không ghi cờ cho bearer token, nên sau khi chạy lệnh, mở `~/.codex/config.toml` và thêm dòng `bearer_token_env_var = "AGENTSYNC_TOKEN"` vào mục `[mcp_servers.agentsync]`.
+According to the docs, this command only has the `--url` flag (and OAuth flags). The docs list no flag for a bearer token, so after running it, open `~/.codex/config.toml` and add the line `bearer_token_env_var = "AGENTSYNC_TOKEN"` under `[mcp_servers.agentsync]`.
 
-## Chưa kiểm tra
+## Not verified
 
-Chỉ đọc tài liệu Codex khi viết: các khóa `url`, `bearer_token_env_var`, `http_headers`, cờ `--url`, và thư mục skill `$HOME/.agents/skills`. Chưa chạy thử với Codex thật.
+Written from the Codex docs only: the `url`, `bearer_token_env_var` and `http_headers` keys, the `--url` flag, and the `$HOME/.agents/skills` skills folder. Not tried with a real Codex.

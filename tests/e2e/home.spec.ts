@@ -100,9 +100,9 @@ test.describe('English', () => {
 });
 
 for (const locale of ['vi-VN', 'en-US']) {
-  test(`375px with a 40-char name, no horizontal scroll (${locale})`, async ({ browser }) => {
+  test(`375px with a 40-char name, no horizontal scroll (${locale})`, async ({ browser, baseURL }) => {
     const long = await seedLongNamedLeader();
-    const ctx = await browser.newContext({ viewport: { width: 375, height: 800 }, locale, baseURL: 'http://localhost:3100' });
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 800 }, locale, baseURL });
     const page = await ctx.newPage();
     await page.goto('/login');
     await page.getByLabel(/^(Tên đăng nhập|Username)$/).fill('manager1');

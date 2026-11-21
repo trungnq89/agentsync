@@ -130,7 +130,7 @@ export default async function AdminPage() {
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                   <span>{tLevel(u.level)}</span>
                   <span className="break-words text-muted-foreground">
-                    {t('colManager')}: {manager}
+                    {t('managerLabel', { name: manager })}
                   </span>
                   {status(u)}
                 </div>

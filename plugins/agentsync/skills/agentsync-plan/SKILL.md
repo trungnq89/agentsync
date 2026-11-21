@@ -1,33 +1,35 @@
 ---
 name: agentsync-plan
-description: Use when a member wants to draft a plan or create a task in AgentSync after discussing work with their manager (e.g. "lập plan cho việc X, hạn thứ 6", "tạo việc mới"). Creates the task with its plan so the manager can confirm it.
+description: Use when a member wants to draft a plan or create a task in AgentSync after discussing work with their manager (e.g. "make a plan for X, due Friday", "create a new task"). Creates the task with its plan so the manager can confirm it.
 ---
 
-# Lập plan và tạo việc trên AgentSync
+# Draft a plan and create a task in AgentSync
 
-Dùng khi member vừa thảo luận với quản lý và muốn lập plan hoặc tạo việc mới.
+Use when the member has just discussed work with their manager and wants to draft a plan or create a new task.
 
-## Quy tắc đầu tiên: chế độ gửi
+Always reply to the member in the language they use.
 
-Gọi `get_my_settings` để biết `sendMode`. Nếu `sendMode` là `review`, MỌI lần gửi từ phía member (`create_task`, `update_progress`, `revise_plan`, `report_blocker`, `ask_manager`, `answer_question`, `submit_solution_summary`, `set_task_status`) đều phải hiện bản nháp và CHỜ member đồng ý rồi mới gọi tool. Nếu là `auto` thì gửi luôn, sau đó báo lại nội dung đã gửi.
+## First rule: send mode
 
-## Các bước
+Call `get_my_settings` to read `sendMode`. If `sendMode` is `review`, EVERY member-side send (`create_task`, `update_progress`, `revise_plan`, `report_blocker`, `ask_manager`, `answer_question`, `resolve_question`, `submit_solution_summary`, `set_task_status`) must show a draft and WAIT for the member to agree before you call the tool. If it is `auto`, send right away, then tell the member what was sent.
 
-1. Hỏi những gì còn thiếu, chỉ hỏi phần chưa rõ:
-   - Tên việc (`title`): lấy từ lời member, nếu chưa có thì đề xuất một tên ngắn và hỏi xác nhận.
-   - Kết quả đã thống nhất với quản lý (`agreedOutcome`).
-   - Ngày bắt đầu (`startDate`) và hạn thống nhất (`agreedDueDate`).
-   - Việc này có riêng tư không (`isPrivate`).
-2. Đoán `mode`: đang trong repo git thì `project`, ngược lại `executive`. Nói rõ lựa chọn cho member để họ sửa nếu cần.
-3. Soạn plan 3–8 bước (`steps`), mỗi bước một dòng ngắn, kiểm tra được.
-4. Gọi `get_my_settings`.
-   - `review`: hiện bản nháp (tên việc, mode, kết quả, ngày, các bước) và CHỜ member đồng ý. Chưa đồng ý thì không gọi `create_task`.
-   - `auto`: chuyển thẳng sang bước 5.
-5. Gọi `create_task` với `cwdHint` là đường dẫn tuyệt đối của thư mục hiện tại và `repoRef.branch` là branch hiện tại (`git branch --show-current`, nếu có repo git).
-6. Báo member: việc đã tạo và đang ở trạng thái "Chờ xác nhận" để quản lý xác nhận.
+## Steps
 
-## Quy tắc
+1. Ask for what is missing, and only what is unclear:
+   - Task title (`title`): take it from the member's words; if none, propose a short one and ask for confirmation.
+   - The outcome agreed with the manager (`agreedOutcome`).
+   - Start date (`startDate`) and the agreed due date (`agreedDueDate`).
+   - Whether the task is private (`isPrivate`).
+2. Guess `mode`: `project` if you are inside a git repo, otherwise `executive`. Tell the member your choice so they can correct it.
+3. Draft a plan of 3-8 steps (`steps`), one short, verifiable line each.
+4. Call `get_my_settings`.
+   - `review`: show the draft (title, mode, outcome, dates, steps) and WAIT for the member to agree. Do not call `create_task` until they do.
+   - `auto`: go straight to step 5.
+5. Call `create_task` with `cwdHint` set to the absolute path of the current directory and `repoRef.branch` set to the current branch (`git branch --show-current`, if in a git repo).
+6. Tell the member the task was created and is now "Awaiting confirmation" for the manager to confirm.
 
-- Ngày luôn dạng YYYY-MM-DD (ví dụ 2026-11-27). Đổi "thứ 6", "tuần sau" thành ngày cụ thể và nói lại cho member xác nhận.
-- Không gửi code, secret, hay dữ liệu khách hàng. Chỉ gửi tên bước và tóm tắt.
-- Nếu tool trả lỗi, đọc thông báo lỗi cho member, không tự thử lại âm thầm.
+## Rules
+
+- Dates are always YYYY-MM-DD (for example 2026-11-27). Convert "Friday" or "next week" to a concrete date and repeat it to the member for confirmation.
+- Never send code, secrets or customer data. Send only step names and summaries.
+- If a tool returns an error, read the error message to the member; do not silently retry.

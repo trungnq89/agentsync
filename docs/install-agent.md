@@ -1,52 +1,54 @@
-# Cài AgentSync cho agent của bạn
+Tiếng Việt: [install-agent.vi.md](install-agent.vi.md)
 
-Mất khoảng 5 phút. Bạn cần: địa chỉ AgentSync của công ty (ví dụ `https://agentsync.example.com`) và tài khoản đăng nhập được.
+# Install AgentSync for your agent
 
-## 0. Lấy thư mục plugin
+Takes about 5 minutes. You need: your company's AgentSync address (for example `https://agentsync.example.com`) and an account you can sign in with.
 
-Thư mục `plugins/agentsync` nằm trong mã nguồn AgentSync. Xin admin đường dẫn tải về: `<LINK_DO_ADMIN_CUNG_CAP>`. Hai cách:
+## 0. Get the plugin folder
 
-- Clone: `git clone <LINK_DO_ADMIN_CUNG_CAP> ~/agentsync`, thư mục plugin là `~/agentsync/plugins/agentsync`.
-- Hoặc tải file zip từ link, giải nén vào `~/agentsync`.
+The `plugins/agentsync` folder is part of the AgentSync source. Ask your admin for the download link: `<LINK_FROM_YOUR_ADMIN>`. Two ways:
 
-Các ví dụ dưới đây giả định plugin ở `/Users/ten-ban/agentsync/plugins/agentsync` (macOS). Thay `ten-ban` bằng tên tài khoản của bạn (chạy `echo $HOME` để xem), và dùng đường dẫn tuyệt đối đầy đủ.
+- Clone: `git clone <LINK_FROM_YOUR_ADMIN> ~/agentsync`; the plugin folder is `~/agentsync/plugins/agentsync`.
+- Or download the zip from the link and unpack it into `~/agentsync`.
 
-## 1. Lấy token
+The examples below assume the plugin is at `/Users/your-name/agentsync/plugins/agentsync` (macOS). Replace `your-name` with your account name (run `echo $HOME` to see it) and use the full absolute path.
 
-1. Đăng nhập AgentSync, vào trang **Cài đặt**.
-2. Tạo token agent mới. Token dạng `ags_...`, chỉ hiện một lần: copy ngay.
-3. Thêm hai dòng vào `~/.zshrc`, rồi mở terminal mới:
+## 1. Get a token
+
+1. Sign in to AgentSync and open the **Settings** page. You can also pick your language (en/vi) and theme (system/light/dark) there.
+2. Create a new agent token. It looks like `ags_...` and is shown only once: copy it right away.
+3. Add two lines to `~/.zshrc`, then open a new terminal:
 
 ```bash
-export AGENTSYNC_URL="https://agentsync.example.com"   # không có dấu / ở cuối
+export AGENTSYNC_URL="https://agentsync.example.com"   # no trailing /
 export AGENTSYNC_TOKEN="ags_..."
 ```
 
-Không dán token vào chat hay commit vào repo.
+Never paste the token into a chat or commit it to a repo.
 
-Lưu ý: biến trong `~/.zshrc` chỉ có hiệu lực với chương trình khởi động từ terminal. Ứng dụng desktop mở bằng cách bấm icon (Claude Desktop, Codex app) sẽ KHÔNG thấy chúng. Cách xử lý: mở ứng dụng từ terminal (ví dụ `open -a "Claude"` sau khi đã `export`), hoặc dùng bản CLI (`claude`, `codex`) trong terminal. Chưa kiểm tra cách đặt biến cố định cho ứng dụng desktop; nếu cần, hỏi admin.
+Note: variables in `~/.zshrc` only apply to programs started from a terminal. Desktop apps opened by clicking their icon (Claude Desktop, the Codex app) will NOT see them. Workarounds: open the app from a terminal (for example `open -a "Claude"` after the `export`), or use the CLI (`claude`, `codex`) in a terminal. Setting the variables permanently for desktop apps has not been verified; ask your admin if you need it.
 
 ## 2. Claude Code
 
-Cách chính: nạp plugin bằng `--plugin-dir` (dùng đường dẫn tuyệt đối) mỗi lần khởi động từ terminal, để có biến môi trường:
+Main way: load the plugin with `--plugin-dir` (absolute path) every time you start from a terminal, so the environment variables are present:
 
 ```bash
-claude --plugin-dir /Users/ten-ban/agentsync/plugins/agentsync
+claude --plugin-dir /Users/your-name/agentsync/plugins/agentsync
 ```
 
-Kiểm tra: gõ `/mcp`, thấy server AgentSync đã kết nối. Tên có thể hiện là `agentsync` hoặc `plugin:agentsync:agentsync`.
+Check: type `/mcp` and confirm the AgentSync server is connected. Its name may show as `agentsync` or `plugin:agentsync:agentsync`.
 
-Cách thay thế (chưa kiểm tra thủ công): không dùng `--plugin-dir`, copy từng skill vào thư mục skill cá nhân và thêm MCP server bằng lệnh:
+Alternative (not manually verified): skip `--plugin-dir`, copy each skill into your personal skills folder and add the MCP server with a command:
 
 ```bash
 mkdir -p ~/.claude/skills
-cp -R /Users/ten-ban/agentsync/plugins/agentsync/skills/* ~/.claude/skills/
+cp -R /Users/your-name/agentsync/plugins/agentsync/skills/* ~/.claude/skills/
 claude mcp add --transport http agentsync https://agentsync.example.com/api/mcp --header "Authorization: Bearer $AGENTSYNC_TOKEN"
 ```
 
 ## 3. Codex
 
-Xem `plugins/agentsync/codex/README.md`. Tóm tắt: copy `/Users/ten-ban/agentsync/plugins/agentsync/skills/*` vào `~/.agents/skills/`, thêm vào `~/.codex/config.toml`:
+See `plugins/agentsync/codex/README.md`. In short: copy `/Users/your-name/agentsync/plugins/agentsync/skills/*` into `~/.agents/skills/` and add this to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.agentsync]
@@ -54,20 +56,21 @@ url = "https://agentsync.example.com/api/mcp"
 bearer_token_env_var = "AGENTSYNC_TOKEN"
 ```
 
-## 4. Dùng
+## 4. Use it
 
-- Sau buổi thảo luận với quản lý: nói "lập plan cho việc thêm API X, hạn thứ 6". Việc xuất hiện "Chờ xác nhận" trên web của quản lý.
-- Đầu phiên làm việc: agent nhắc phản hồi đang chờ và nhận ra việc đang làm.
-- Cuối phiên: nói "xong rồi", agent tóm tắt và gửi cập nhật.
-- Chế độ gửi mặc định là `review`: agent cho bạn duyệt trước mọi lần gửi. Đổi sang `auto` ở trang Cài đặt.
-- Agent chỉ gửi bản tóm tắt, không gửi code, secret hay dữ liệu khách hàng.
+- After a discussion with your manager, say "make a plan for adding API X, due Friday". The task appears as "Pending confirmation" on your manager's web page.
+- At the start of a session, the agent reminds you of pending feedback and recognizes the task you are working on.
+- At the end of a session, say "done"; the agent summarizes and sends an update.
+- The agent always replies in the language you use. What it reads from AgentSync follows the language chosen in Settings (or the install's default language).
+- The default send mode is `review`: the agent lets you approve every submission first. Switch to `auto` on the Settings page.
+- The agent only sends summaries, never code, secrets or customer data.
 
-## Đã kiểm tra
+## Verified
 
-Đã làm:
-- Test tự động (`tests/server/plugin-files.test.ts`): frontmatter của skill; mọi tên tool và tên trường nhắc trong skill đều khớp với `registerTools`; `.mcp.json` là JSON hợp lệ.
-- Đọc tài liệu Claude Code (bố cục plugin, `.mcp.json`, `--plugin-dir`) và tài liệu Codex (khóa `url`, `bearer_token_env_var`, cờ `--url`, thư mục skill) khi viết.
+Done:
+- Automated test (`tests/server/plugin-files.test.ts`): skill frontmatter; every tool and field name mentioned in the skills matches `registerTools`; `.mcp.json` is valid JSON.
+- Read the Claude Code docs (plugin layout, `.mcp.json`, `--plugin-dir`) and the Codex docs (the `url` and `bearer_token_env_var` keys, the `--url` flag, the skills folder) while writing.
 
-Chưa làm (chờ người dùng thực hiện):
-- Cài thật và chạy từ đầu đến cuối trong Claude Code và Codex (cài plugin, nói "lập plan cho việc thêm API X, hạn thứ 6", thấy việc "Chờ xác nhận" trên web quản lý).
-- Chưa chạy thử với Codex. Chưa chạy `claude plugin validate`. Chưa kiểm tra việc mở rộng `${VAR}` trong header của `.mcp.json` trên máy thật.
+Not done (waiting on a person):
+- A real end-to-end install and run in Claude Code and Codex (install the plugin, say "make a plan for adding API X, due Friday", see the "Pending confirmation" task on the manager's web page).
+- Not tried with Codex. `claude plugin validate` not run. `${VAR}` expansion in `.mcp.json` headers not checked on a real machine.

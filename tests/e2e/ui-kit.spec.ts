@@ -52,9 +52,9 @@ test.describe('ui kit', () => {
     });
   }
 
-  test('theme=system with dark OS preference gets html.dark', async ({ browser }) => {
+  test('theme=system with dark OS preference gets html.dark', async ({ browser, baseURL }) => {
     const ctx = await browser.newContext({ colorScheme: 'dark', locale: 'vi-VN' });
-    await ctx.addCookies([{ name: 'theme', value: 'system', url: 'http://localhost:3100' }]);
+    await ctx.addCookies([{ name: 'theme', value: 'system', url: baseURL! }]);
     const page = await ctx.newPage();
     await page.goto('/dev/ui');
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
