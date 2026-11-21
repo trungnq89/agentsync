@@ -134,7 +134,8 @@ export async function teamOverview(
     people: cards
       .filter((c) => c.level === level)
       .sort((a, b) => a.displayName.localeCompare(b.displayName))
-      .map(({ level: _l, ...c }) => c),
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- strip the grouping key
+      .map(({ level: _level, ...c }) => c),
   })).filter((t) => t.people.length > 0);
   return { tiers };
 }

@@ -28,24 +28,24 @@ Lưu ý: biến trong `~/.zshrc` chỉ có hiệu lực với chương trình kh
 
 ## 2. Claude Code
 
-Cách đơn giản nhất: copy plugin vào thư mục skill cá nhân. Thư mục nào có `.claude-plugin/plugin.json` trong `~/.claude/skills/` sẽ tự tải mỗi phiên.
+Cách chính: nạp plugin bằng `--plugin-dir` (dùng đường dẫn tuyệt đối) mỗi lần khởi động từ terminal, để có biến môi trường:
+
+```bash
+claude --plugin-dir /Users/ten-ban/agentsync/plugins/agentsync
+```
+
+Kiểm tra: gõ `/mcp`, thấy server AgentSync đã kết nối. Tên có thể hiện là `agentsync` hoặc `plugin:agentsync:agentsync`.
+
+Cách thay thế (chưa kiểm tra): copy plugin vào thư mục skill cá nhân để tự tải mỗi phiên.
 
 ```bash
 mkdir -p ~/.claude/skills
 cp -R /Users/ten-ban/agentsync/plugins/agentsync ~/.claude/skills/agentsync
 ```
 
-Mở một phiên Claude Code mới từ terminal (để có biến môi trường). Kiểm tra: gõ `/mcp`, thấy server `agentsync` đã kết nối.
-
-Dùng thử một phiên mà không copy:
-
-```bash
-claude --plugin-dir /Users/ten-ban/agentsync/plugins/agentsync
-```
-
 ## 3. Codex
 
-Xem `plugins/agentsync/codex/README.md`. Tóm tắt: copy `plugins/agentsync/skills/*` vào `~/.agents/skills/`, thêm vào `~/.codex/config.toml`:
+Xem `plugins/agentsync/codex/README.md`. Tóm tắt: copy `/Users/ten-ban/agentsync/plugins/agentsync/skills/*` vào `~/.agents/skills/`, thêm vào `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.agentsync]
@@ -65,7 +65,7 @@ bearer_token_env_var = "AGENTSYNC_TOKEN"
 
 Đã làm:
 - Test tự động (`tests/server/plugin-files.test.ts`): frontmatter của skill; mọi tên tool và tên trường nhắc trong skill đều khớp với `registerTools`; `.mcp.json` là JSON hợp lệ.
-- Đọc tài liệu Claude Code (bố cục plugin, `.mcp.json`, `--plugin-dir`, thư mục skill cá nhân) và tài liệu Codex (khóa `url`, `bearer_token_env_var`, cờ `--url`, thư mục skill) khi viết.
+- Đọc tài liệu Claude Code (bố cục plugin, `.mcp.json`, `--plugin-dir`) và tài liệu Codex (khóa `url`, `bearer_token_env_var`, cờ `--url`, thư mục skill) khi viết.
 
 Chưa làm (chờ người dùng thực hiện):
 - Cài thật và chạy từ đầu đến cuối trong Claude Code và Codex (cài plugin, nói "lập plan cho việc thêm API X, hạn thứ 6", thấy việc "Chờ xác nhận" trên web quản lý).

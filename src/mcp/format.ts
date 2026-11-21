@@ -1,5 +1,5 @@
 import { healthLabel, levelLabel, statusLabel } from '@/server/labels';
-import type { ListedTask, AttentionItem, DigestPerson, PersonCard, TimelineTask, taskDetail } from '@/server/tasks/queries';
+import type { ListedTask, AttentionItem, DigestPerson, PersonCard, taskDetail } from '@/server/tasks/queries';
 
 const KIND_LABEL: Record<AttentionItem['kind'], string> = {
   pending_confirmation: 'Chờ xác nhận',

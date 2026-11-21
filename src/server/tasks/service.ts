@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import {
   managerFeedback, planVersions, solutionSummaries, tasks, users,

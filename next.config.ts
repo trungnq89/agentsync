@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "standalone",
+  // Behind a reverse proxy with a different Host: ALLOWED_ORIGINS=app.example.com (comma-separated hosts)
+  experimental: { serverActions: { allowedOrigins } },
   turbopack: {
     rules: {
       "*.css": {

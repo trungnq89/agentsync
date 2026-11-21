@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+test-results
+tests
+.superpowers
+docs
+playwright-report
+tsconfig.tsbuildinfo
