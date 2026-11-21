@@ -191,14 +191,15 @@ const LOG_MAX_BYTES = 1024 * 1024;
  *   session_id, transcript_path (format "not a stable interface"), stop_hook_active,
  *   last_assistant_message (string|null). Block = exit 0 + stdout {"decision":"block","reason":...};
  *   reason becomes the continuation prompt. Plain text on stdout is invalid.
- * - antigravity: UNVERIFIED. Docs not consulted; Claude-compatible shape implemented.
+ * - antigravity: https://antigravity.google/docs/build-plugins/ : exit 0 and stdout
+ *   {"decision":"continue","reason":...} prevents completion and keeps the agent running
+ *   ({} allows the stop). Stop stdin payload fields are not documented; not tested on a real install.
  * @param {string} agent
  * @param {string} reason
  * @returns {string}
  */
 export function blockOutput(agent, reason) {
-  void agent; // all three currently share the shape; kept as a seam for per-agent divergence
-  return JSON.stringify({ decision: 'block', reason });
+  return JSON.stringify({ decision: agent === 'antigravity' ? 'continue' : 'block', reason });
 }
 
 /**

@@ -8,9 +8,9 @@ Status: **not tested** (chua kiem tra thuc te). This is a template written from 
 - Command hooks receive event context as JSON on stdin. The docs do not describe the `Stop` payload fields.
 - To keep the agent running, a hook exits 0 and prints JSON on stdout. The docs show `{"decision": "continue", "reason": "..."}` to prevent completion and `{}` to allow the stop.
 
-## Known mismatch (not resolved)
+## Output
 
-`agentsync-hook.mjs --agent antigravity` currently prints the Claude-style `{"decision":"block","reason":"..."}`. The Antigravity docs name `"continue"` instead, so the reminder may not take effect. Until this is tested on a real Antigravity, rely on the skills: they tell the agent to send `update_progress` right after each step.
+`agentsync-hook.mjs --agent antigravity` prints `{"decision":"continue","reason":"..."}`, the shape the docs give for keeping the agent running. The `Stop` stdin payload fields are not documented, so payload parsing is a best guess. Until this is tested on a real Antigravity, the skills remain the primary mechanism: they tell the agent to send `update_progress` right after each step.
 
 ## Use it (at your own risk)
 

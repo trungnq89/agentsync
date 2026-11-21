@@ -199,4 +199,13 @@ describe('hook runtime', () => {
     expect(typeof out.reason).toBe('string');
     expect(r.code).toBe(0);
   });
+
+  it('--agent antigravity output uses the documented continue shape', async () => {
+    const r = await run(msg(MARK), { agent: 'antigravity' });
+    const out = JSON.parse(r.stdout);
+    expect(Object.keys(out).sort()).toEqual(['decision', 'reason']);
+    expect(out.decision).toBe('continue');
+    expect(typeof out.reason).toBe('string');
+    expect(r.code).toBe(0);
+  });
 });
