@@ -50,6 +50,32 @@ codex mcp add agentsync --url https://agentsync.example.com/api/mcp
 
 According to the docs, this command only has the `--url` flag (and OAuth flags). The docs list no flag for a bearer token, so after running it, open `~/.codex/config.toml` and add the line `bearer_token_env_var = "AGENTSYNC_TOKEN"` under `[mcp_servers.agentsync]`.
 
+## 3. Checkpoint hook (optional)
+
+A `Stop` hook reminds the agent to report finished plan steps. It needs Node 20 or newer and the same `AGENTSYNC_URL` and `AGENTSYNC_TOKEN` environment variables (set `AGENTSYNC_URL` to your AgentSync address, for example `https://agentsync.example.com`; the hook does not read `config.toml`).
+
+Add this to `~/.codex/hooks.json` (or `$CODEX_HOME/hooks.json`), using the absolute path to your copy of AgentSync:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/your-name/agentsync/plugins/agentsync/hooks/agentsync-hook.mjs --agent codex",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Then run `/hooks` in Codex, review the hook and trust it. Codex skips new or changed hooks until you do. Set `AGENTSYNC_HOOK=off` to disable the hook. State and logs live in `~/.agentsync`. The `Stop` format comes from learn.chatgpt.com/docs/hooks.md; not tried with a real Codex.
+
 ## Not verified
 
 Written from the Codex docs only: the `url`, `bearer_token_env_var` and `http_headers` keys, the `--url` flag, and the `$HOME/.agents/skills` skills folder. Not tried with a real Codex.

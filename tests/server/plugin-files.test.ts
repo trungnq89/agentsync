@@ -84,4 +84,49 @@ describe('agent plugin files', () => {
     expect(existsSync(join(root, 'codex/README.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'docs/install-agent.md'))).toBe(true);
   });
+
+  it('Claude Code hooks.json runs a Stop hook pointing at the real script', () => {
+    const cfg = JSON.parse(readFileSync(join(root, 'hooks/hooks.json'), 'utf8'));
+    const h = cfg.hooks.Stop[0].hooks[0];
+    expect(h.type).toBe('command');
+    expect(h.timeout).toBe(10);
+    expect(h.command).toContain('${CLAUDE_PLUGIN_ROOT}/hooks/agentsync-hook.mjs');
+    expect(h.command).toContain('--agent claude');
+    expect(existsSync(join(root, 'hooks/agentsync-hook.mjs'))).toBe(true);
+  });
+
+  it('Antigravity hook template points at the real script and is marked untested', () => {
+    const cfg = JSON.parse(readFileSync(join(root, 'antigravity/hooks.json'), 'utf8'));
+    const text = JSON.stringify(cfg);
+    expect(text).toContain('agentsync-hook.mjs');
+    expect(text).toContain('--agent antigravity');
+    expect(existsSync(join(root, 'hooks/agentsync-hook.mjs'))).toBe(true);
+    expect(readFileSync(join(root, 'antigravity/README.md'), 'utf8')).toMatch(/not tested/i);
+  });
+
+  it('member skills print the AGENTSYNC markers', () => {
+    const read = (s: string) => readFileSync(skillPath(s), 'utf8');
+    expect(read('agentsync-plan')).toContain('AGENTSYNC-TASK:');
+    expect(read('agentsync-session')).toContain('AGENTSYNC-TASK:');
+    expect(read('agentsync-session')).toContain('AGENTSYNC-CHECKPOINT:');
+  });
+
+  it('codex README documents the Stop hook', () => {
+    const md = readFileSync(join(root, 'codex/README.md'), 'utf8');
+    expect(md).toContain('hooks.json');
+    expect(md).toContain('/hooks');
+    expect(md).toContain('AGENTSYNC_URL');
+  });
+
+  it('install docs have the Checkpoint hook section in both languages', () => {
+    const en = readFileSync(join(process.cwd(), 'docs/install-agent.md'), 'utf8');
+    const vi = readFileSync(join(process.cwd(), 'docs/install-agent.vi.md'), 'utf8');
+    for (const [md, h] of [[en, '## 5. Checkpoint hook'], [vi, '## 5. Checkpoint hook']] as const) {
+      expect(md).toContain(h);
+      expect(md).toContain('AGENTSYNC_HOOK=off');
+      expect(md).toContain('Node');
+      expect(md).toContain('~/.agentsync');
+      expect(md).toContain('Antigravity');
+    }
+  });
 });

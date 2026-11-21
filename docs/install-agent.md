@@ -65,6 +65,18 @@ bearer_token_env_var = "AGENTSYNC_TOKEN"
 - The default send mode is `review`: the agent lets you approve every submission first. Switch to `auto` on the Settings page.
 - The agent only sends summaries, never code, secrets or customer data.
 
+## 5. Checkpoint hook
+
+An optional `Stop` hook runs after every agent turn. If the agent printed `AGENTSYNC-CHECKPOINT: <step title>` for a step that AgentSync does not yet show as done, the hook asks the agent to send `update_progress` (your send mode still applies: in `review` mode you see the draft first). It also nudges once to finish the task when every step is done. It is a safety net: the skills already tell the agent to report each step right away.
+
+- Requires Node 20 or newer on your machine. The hook is one file with no dependencies: `plugins/agentsync/hooks/agentsync-hook.mjs`.
+- It uses the same `AGENTSYNC_URL` (your AgentSync address, for example `https://agentsync.example.com`) and `AGENTSYNC_TOKEN` variables as section 1. If either is missing, the hook does nothing.
+- Turn it off with `AGENTSYNC_HOOK=off` in the environment.
+- State and logs live in `~/.agentsync` (`state.json`, `hook.log`). No token or code is stored. The hook waits at most 3 seconds for the server and never fails a turn.
+- **Claude Code:** included in the plugin (`hooks/hooks.json`); `--plugin-dir` loads it. Not manually tested: `claude` was not available when this was written.
+- **Codex:** add a `Stop` hook to `~/.codex/hooks.json` and trust it in `/hooks`. See `plugins/agentsync/codex/README.md`. Not tried with a real Codex.
+- **Antigravity:** a template is in `plugins/agentsync/antigravity/` and is **not tested** (never tried on a real Antigravity). The docs name a different stop output (`continue`) than the script prints, so it may not work. Antigravity relies on the skills for now.
+
 ## Verified
 
 Done:

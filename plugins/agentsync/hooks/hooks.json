@@ -1,0 +1,16 @@
+{
+  "description": "AgentSync checkpoint reminder: after each turn, remind the agent to report finished plan steps.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/agentsync-hook.mjs\" --agent claude",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

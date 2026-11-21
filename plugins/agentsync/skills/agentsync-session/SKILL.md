@@ -15,8 +15,20 @@ Call `get_my_settings` to read `sendMode`. If `sendMode` is `review`, EVERY memb
 
 1. Call `get_pending_feedback` and remind the member of pending items (plan change requests, questions, answers, review results). If there is a question for the member, ask them and reply with `answer_question`. After you have passed the manager's answer on to the member, call `resolve_question` (with `questionId`) so the question no longer shows up in `get_pending_feedback`.
 2. Identify the current task: call `list_my_tasks` first. Match the current branch (`git branch --show-current`) against `repoRef.branch`; if that does not match, match the current directory against `cwdHint`. If there is not exactly one matching task (none or several), ask the member to choose. Never guess from task titles.
+   Once you know which task this session is about, print this marker on its own line: `AGENTSYNC-TASK: <taskId>` (keep the English text exactly, whatever language you reply in).
 3. If the manager asked for plan changes, draft a new plan and call `revise_plan` (following the `sendMode` rule).
 4. If the review verdict is `changes_needed`: make the changes from the note, then run `submit_solution_summary` again (resubmitting overwrites the old one) and `set_task_status` with `action` set to `complete`.
+
+## After each finished plan step
+
+When you finish a step of the task's plan, do both of these right away:
+
+1. Print this marker on its own line: `AGENTSYNC-CHECKPOINT: <exact step title>`. Use the step title exactly as written in the plan (see `task_detail` if needed) and keep the English text `AGENTSYNC-CHECKPOINT:` as is. Print one marker per finished step.
+2. Call `update_progress` for that step now, with `stepsCompleted` set to that exact title (following the `sendMode` rule: with `review`, show the draft and wait for the member to agree first).
+
+A stop hook reads these markers and reminds you if the step is still not reported on the server. It is only a safety net: do not wait for the reminder. If a reminder arrives, follow it, still respecting `sendMode`.
+
+Never print a marker as an example or quote; print it only when it is true.
 
 ## When the member says they are done or ends the session
 

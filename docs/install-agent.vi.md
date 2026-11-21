@@ -65,6 +65,18 @@ bearer_token_env_var = "AGENTSYNC_TOKEN"
 - Agent luôn trả lời bạn bằng ngôn ngữ bạn đang dùng. Nội dung agent đọc từ AgentSync theo ngôn ngữ bạn chọn trong Cài đặt (hoặc ngôn ngữ mặc định của hệ thống).
 - Agent chỉ gửi bản tóm tắt, không gửi code, secret hay dữ liệu khách hàng.
 
+## 5. Checkpoint hook
+
+Hook `Stop` tùy chọn chạy sau mỗi lượt của agent. Nếu agent đã in `AGENTSYNC-CHECKPOINT: <tên bước>` cho một bước mà AgentSync chưa ghi là xong, hook nhắc agent gửi `update_progress` (chế độ gửi của bạn vẫn áp dụng: ở chế độ `review` bạn xem bản nháp trước). Hook cũng nhắc một lần để kết thúc việc khi mọi bước đã xong. Đây chỉ là lưới an toàn: skill đã dặn agent báo từng bước ngay khi xong.
+
+- Cần Node 20 trở lên trên máy bạn. Hook là một file không phụ thuộc thư viện: `plugins/agentsync/hooks/agentsync-hook.mjs`.
+- Dùng cùng biến `AGENTSYNC_URL` (địa chỉ AgentSync, ví dụ `https://agentsync.example.com`) và `AGENTSYNC_TOKEN` như mục 1. Thiếu một trong hai thì hook không làm gì.
+- Tắt hook bằng `AGENTSYNC_HOOK=off` trong môi trường.
+- Trạng thái và log nằm trong `~/.agentsync` (`state.json`, `hook.log`). Không lưu token hay code. Hook chờ server tối đa 3 giây và không bao giờ làm hỏng lượt chạy.
+- **Claude Code:** đã nằm trong plugin (`hooks/hooks.json`); `--plugin-dir` sẽ nạp nó. Chưa kiểm tra thủ công: lúc viết không có `claude`.
+- **Codex:** thêm hook `Stop` vào `~/.codex/hooks.json` và duyệt trong `/hooks`. Xem `plugins/agentsync/codex/README.md`. Chưa chạy thử với Codex thật.
+- **Antigravity:** có mẫu trong `plugins/agentsync/antigravity/`, **chưa kiểm tra thực tế** (chưa thử trên Antigravity thật). Tài liệu Antigravity ghi giá trị đầu ra khác (`continue`) so với script đang in, nên có thể không hoạt động. Hiện Antigravity dựa vào skill.
+
 ## Đã kiểm tra
 
 Đã làm:
