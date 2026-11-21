@@ -55,7 +55,10 @@ export async function createUser(
   },
 ): Promise<User> {
   requireAdmin(actor);
-  if (input.managerId) await assertValidManager(db, null, input.managerId);
+  const managerId = input.managerId || null;
+  if (managerId) await assertValidManager(db, null, managerId);
+  const [dup] = await db.select({ id: users.id }).from(users).where(eq(users.username, input.username));
+  if (dup) throw new DomainError('VALIDATION', 'Tên đăng nhập đã tồn tại.');
   const [u] = await db
     .insert(users)
     .values({
@@ -63,7 +66,7 @@ export async function createUser(
       displayName: input.displayName,
       passwordHash: await hashPassword(input.password),
       level: input.level,
-      managerId: input.managerId ?? null,
+      managerId,
       isAdmin: input.isAdmin ?? false,
     })
     .returning();
@@ -87,12 +90,14 @@ export async function updateUser(
   if (!isUuid(id)) throw userNotFound();
   const [existing] = await db.select().from(users).where(eq(users.id, id));
   if (!existing) throw userNotFound();
-  if (patch.managerId) await assertValidManager(db, id, patch.managerId);
+  // '' means "no manager".
+  const managerId = patch.managerId === '' ? null : patch.managerId;
+  if (managerId) await assertValidManager(db, id, managerId);
 
   const set: Partial<typeof users.$inferInsert> = {};
   if (patch.displayName !== undefined) set.displayName = patch.displayName;
   if (patch.level !== undefined) set.level = patch.level;
-  if (patch.managerId !== undefined) set.managerId = patch.managerId;
+  if (managerId !== undefined) set.managerId = managerId;
   if (patch.isAdmin !== undefined) set.isAdmin = patch.isAdmin;
   if (patch.disabled !== undefined) set.disabledAt = patch.disabled ? now : null;
   if (Object.keys(set).length === 0) return existing;

@@ -79,4 +79,26 @@ describe('org', () => {
     const e = await updateUser(testDb, admin, r2.id, { disabled: false });
     expect(e.disabledAt).toBeNull();
   });
+
+  it('empty-string managerId means no manager (create and update)', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    const m = await makeUser({ level: 'manager' });
+    const u = await createUser(testDb, admin, {
+      username: 'nomgr', displayName: 'N', password: 'pw', level: 'member', managerId: '',
+    });
+    expect(u.managerId).toBeNull();
+    const r = await makeUser({ managerId: m.id });
+    const updated = await updateUser(testDb, admin, r.id, { managerId: '' });
+    expect(updated.managerId).toBeNull();
+  });
+
+  it('duplicate username is VALIDATION', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    const input = { username: 'dup', displayName: 'D', password: 'pw', level: 'member' as const };
+    await createUser(testDb, admin, input);
+    await expect(createUser(testDb, admin, input)).rejects.toMatchObject({
+      code: 'VALIDATION',
+      message: 'Tên đăng nhập đã tồn tại.',
+    });
+  });
 });
