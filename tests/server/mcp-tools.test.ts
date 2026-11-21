@@ -82,6 +82,13 @@ describe('mcp tools', () => {
     expect((await call(await connect(() => nu), 'task_detail', { taskId: t.id })).isError).toBeFalsy();
   });
 
+  it('create_task with a non-ISO startDate returns isError mentioning YYYY-MM-DD', async () => {
+    const me = await makeUser();
+    const r = await call(await connect(() => me), 'create_task', { ...newTask, startDate: 'next week' });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toContain('YYYY-MM-DD');
+  });
+
   it('get_my_settings returns sendMode, displayName, level', async () => {
     const me = await makeUser({ displayName: 'Lan', sendMode: 'auto' });
     const r = await call(await connect(() => me), 'get_my_settings');
@@ -93,9 +100,13 @@ describe('mcp tools', () => {
     const c = await connect(() => me);
     const spy = (await import('vitest')).vi.spyOn(console, 'error').mockImplementation(() => {});
     const orig = testDb.select;
-    testDb.select = (() => { throw new Error('SELECT secret FROM sql'); }) as never;
-    const r = await call(c, 'list_my_tasks');
-    testDb.select = orig;
+    let r: Res;
+    try {
+      testDb.select = (() => { throw new Error('SELECT secret FROM sql'); }) as never;
+      r = await call(c, 'list_my_tasks');
+    } finally {
+      testDb.select = orig;
+    }
     expect(r.isError).toBe(true);
     expect(text(r)).not.toContain('secret');
     expect(spy).toHaveBeenCalled();

@@ -32,4 +32,8 @@ async function handle(req: Request): Promise<Response> {
   return transport.handleRequest(req);
 }
 
-export { handle as GET, handle as POST, handle as DELETE };
+const methodNotAllowed = () =>
+  Response.json({ error: 'method_not_allowed' }, { status: 405, headers: { Allow: 'POST' } });
+
+// Stateless server: no SSE stream and no sessions to delete.
+export { handle as POST, methodNotAllowed as GET, methodNotAllowed as DELETE };

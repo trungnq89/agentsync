@@ -2,8 +2,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Db } from '@/db/client';
 import type { User } from '@/db/schema';
+import { isValidIsoDate, BAD_DATE } from '@/server/clock';
 import { DomainError } from '@/server/errors';
-import { levelLabel } from '@/server/labels';
+import { levelLabel, sendModeLabel, statusLabel, verdictLabel } from '@/server/labels';
 import {
   answerQuestion, askQuestion, getPendingFeedback, postUpdate, reviewSolution, submitSolutionSummary,
 } from '@/server/tasks/activity';
@@ -41,6 +42,7 @@ const planStep = z.object({
   title: z.string().describe('Tên bước'),
   status: z.enum(['todo', 'doing', 'done']).describe('Trạng thái bước'),
 });
+const isoDate = z.string().refine(isValidIsoDate, BAD_DATE);
 const taskId = z.string().describe('ID của việc (lấy từ list_my_tasks)');
 const questionId = z.string().describe('ID của câu hỏi');
 
@@ -81,8 +83,8 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       title: z.string().describe('Tên việc'),
       mode: z.enum(['executive', 'project']).describe('executive = không code, project = có code'),
       agreedOutcome: z.string().describe('Kết quả đã thống nhất'),
-      startDate: z.string().describe('Ngày bắt đầu YYYY-MM-DD'),
-      agreedDueDate: z.string().describe('Hạn thống nhất YYYY-MM-DD'),
+      startDate: isoDate.describe('Ngày bắt đầu YYYY-MM-DD'),
+      agreedDueDate: isoDate.describe('Hạn thống nhất YYYY-MM-DD'),
       steps: z.array(z.string()).describe('Các bước của plan'),
       isPrivate: z.boolean().optional().describe('Việc riêng tư, chỉ bạn thấy'),
       repoRef: z.object({ repo: z.string().optional(), branch: z.string().optional() }).optional(),
@@ -98,8 +100,8 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       taskId,
       body: z.string().describe('Nội dung cập nhật'),
       stepsCompleted: z.array(z.string()).optional().describe('Tên các bước vừa xong'),
-      progressPct: z.number().optional().describe('Tiến độ 0-100'),
-      expectedEndDate: z.string().optional().describe('Ngày dự kiến mới YYYY-MM-DD'),
+      progressPct: z.number().int().min(0).max(100).optional().describe('Tiến độ 0-100'),
+      expectedEndDate: isoDate.optional().describe('Ngày dự kiến mới YYYY-MM-DD'),
       source: z.enum(['auto', 'reviewed']).describe('auto = agent tự gửi, reviewed = người dùng đã duyệt'),
       evidence: z.object({
         branch: z.string().optional(), commits: z.number().optional(), prUrl: z.string().optional(),
@@ -115,7 +117,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       taskId,
       steps: z.array(planStep).describe('Toàn bộ các bước của plan mới'),
       reason: z.string().optional().describe('Lý do sửa plan'),
-      expectedEndDate: z.string().optional().describe('Ngày dự kiến mới YYYY-MM-DD'),
+      expectedEndDate: isoDate.optional().describe('Ngày dự kiến mới YYYY-MM-DD'),
     },
     async ({ taskId: id, ...input }, actor) => {
       const t = await changePlan(db, actor, id, input, now());
@@ -130,7 +132,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     },
     async ({ taskId: id, action, reason }, actor) => {
       const t = await setTaskStatus(db, actor, id, action, reason, now());
-      return done(`Việc giờ ở trạng thái: ${t.status}.`, t);
+      return done(`Việc giờ ở trạng thái: ${statusLabel(t.status)}.`, t);
     });
 
   tool('make_task_public', 'Chuyển việc riêng tư thành công khai để quản lý thấy.',
@@ -181,7 +183,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       for (const c of f.changesRequested) lines.push(`- Cần sửa plan **${c.title}** (id: ${c.taskId}): ${c.note}`);
       for (const q of f.questionsForMe) lines.push(`- Câu hỏi cho bạn ở **${q.title}** (câu hỏi id: ${q.questionId}): ${q.body}`);
       for (const a of f.answersToMyQuestions) lines.push(`- Trả lời cho **${a.title}**: ${a.body} → ${a.answer}`);
-      for (const r of f.reviewResults) lines.push(`- Review **${r.title}**: ${r.verdict}${r.note ? ` — ${r.note}` : ''}`);
+      for (const r of f.reviewResults) lines.push(`- Review **${r.title}**: ${verdictLabel(r.verdict)}${r.note ? ` — ${r.note}` : ''}`);
       return done(lines.length === 1 ? 'Không có phản hồi nào đang chờ.' : lines.join('\n'), f);
     });
 
@@ -189,7 +191,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     {},
     async (_a, actor) => {
       const data = { sendMode: actor.sendMode, displayName: actor.displayName, level: actor.level };
-      return done(`${actor.displayName} (${levelLabel(actor.level)}) — chế độ gửi: ${actor.sendMode}.`, data);
+      return done(`${actor.displayName} (${levelLabel(actor.level)}) — chế độ gửi: ${sendModeLabel(actor.sendMode)}.`, data);
     });
 
   // ------------------------------------------------------------ manager
@@ -254,6 +256,6 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     },
     async ({ taskId: id, verdict, note }, actor) => {
       const t = await reviewSolution(db, actor, id, verdict, note, now());
-      return done('Đã review.', t);
+      return done(`${verdictLabel(verdict)}.`, t);
     });
 }

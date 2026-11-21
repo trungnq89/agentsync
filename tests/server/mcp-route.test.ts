@@ -1,13 +1,15 @@
 import { describe, it, expect } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { users } from '@/db/schema';
 import { createAgentToken, revokeAgentToken } from '@/server/auth/tokens';
 import { testDb } from '../helpers/db';
 import { makeUser } from '../helpers/factories';
 
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST;
-const { POST } = await import('../../app/api/mcp/[transport]/route');
+const { POST, GET, DELETE } = await import('../../app/api/mcp/route');
 
 const rpc = (headers: Record<string, string>) =>
-  new Request('http://localhost/api/mcp/mcp', {
+  new Request('http://localhost/api/mcp', {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...headers },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
@@ -27,6 +29,18 @@ describe('mcp route', () => {
     const { token, record } = await createAgentToken(testDb, u.id, 'x');
     await revokeAgentToken(testDb, u.id, record.id);
     expect((await POST(rpc({ authorization: `Bearer ${token}` }))).status).toBe(401);
+  });
+
+  it('401 for a disabled user', async () => {
+    const u = await makeUser();
+    const { token } = await createAgentToken(testDb, u.id, 'x');
+    await testDb.update(users).set({ disabledAt: new Date() }).where(eq(users.id, u.id));
+    expect((await POST(rpc({ authorization: `Bearer ${token}` }))).status).toBe(401);
+  });
+
+  it('GET and DELETE are 405', async () => {
+    expect((await GET()).status).toBe(405);
+    expect((await DELETE()).status).toBe(405);
   });
 
   it('valid token lists tools', async () => {

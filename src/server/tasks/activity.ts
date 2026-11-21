@@ -5,7 +5,7 @@ import {
   type Task,
 } from '@/db/schema';
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
-import { isWithinHours } from '@/server/clock';
+import { BAD_DATE, isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
 import { isUuid } from '@/server/ids';
 import { nextStatus, TERMINAL_STATUSES } from './lifecycle';
@@ -37,6 +37,9 @@ export async function postUpdate(
   if (!input.body.trim()) throw new DomainError('VALIDATION', 'Nội dung cập nhật không được để trống.');
   if (input.progressPct !== undefined && (!Number.isInteger(input.progressPct) || input.progressPct < 0 || input.progressPct > 100)) {
     throw new DomainError('VALIDATION', 'Tiến độ phải là số nguyên từ 0 đến 100.');
+  }
+  if (input.expectedEndDate !== undefined && !isValidIsoDate(input.expectedEndDate)) {
+    throw new DomainError('VALIDATION', BAD_DATE);
   }
   return db.transaction(async (tx) => {
     let task: Task;

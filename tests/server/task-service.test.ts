@@ -208,3 +208,16 @@ describe('task service', () => {
     }
   });
 });
+
+describe('date validation', () => {
+  it('createTask and changePlan reject malformed dates', async () => {
+    const { member } = await pair();
+    await expect(createTask(testDb, member, { ...base, startDate: 'next week' }))
+      .rejects.toMatchObject({ code: 'VALIDATION', message: expect.stringContaining('YYYY-MM-DD') });
+    await expect(createTask(testDb, member, { ...base, agreedDueDate: '2026-02-30' }))
+      .rejects.toMatchObject({ code: 'VALIDATION' });
+    const t = await createTask(testDb, member, base);
+    await expect(changePlan(testDb, member, t.id, { steps: [{ title: 'x', status: 'todo' }], expectedEndDate: 'soon' }))
+      .rejects.toMatchObject({ code: 'VALIDATION' });
+  });
+});

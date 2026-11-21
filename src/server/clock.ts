@@ -27,3 +27,11 @@ export function isWithinHours(start: Date, now: Date, hours: number): boolean {
 export function vnDateString(now: Date): string {
   return new Date(now.getTime() + VN_OFFSET_MS).toISOString().slice(0, 10);
 }
+
+/** Strict YYYY-MM-DD that is a real calendar date. */
+export function isValidIsoDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+export const BAD_DATE = 'Ngày không hợp lệ, dùng định dạng YYYY-MM-DD.';

@@ -5,12 +5,12 @@ import {
   type PlanStep, type Task,
 } from '@/db/schema';
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
-import { isWithinHours } from '@/server/clock';
+import { BAD_DATE, isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
 import { asDb, currentPlan, lifecycleCtx, requireOwner, type PlanVersion } from './internal';
 import { initialStatus, nextStatus, TERMINAL_STATUSES, type TaskAction, type TaskStatus } from './lifecycle';
 
-export type { PlanVersion };
+export type { PlanVersion };;
 
 export interface CreateTaskInput {
   title: string;
@@ -34,6 +34,9 @@ export async function createTask(
   input: CreateTaskInput,
   now: Date = new Date(),
 ): Promise<Task> {
+  if (!isValidIsoDate(input.startDate) || !isValidIsoDate(input.agreedDueDate)) {
+    throw new DomainError('VALIDATION', BAD_DATE);
+  }
   if (input.steps.length === 0) throw new DomainError('VALIDATION', 'Plan cần ít nhất một bước.');
   if (input.agreedDueDate < input.startDate) {
     throw new DomainError('VALIDATION', 'Hạn thống nhất không được trước ngày bắt đầu.');
@@ -126,6 +129,9 @@ export async function changePlan(
   now: Date = new Date(),
 ): Promise<Task> {
   if (input.steps.length === 0) throw new DomainError('VALIDATION', 'Plan cần ít nhất một bước.');
+  if (input.expectedEndDate !== undefined && !isValidIsoDate(input.expectedEndDate)) {
+    throw new DomainError('VALIDATION', BAD_DATE);
+  }
   return db.transaction(async (tx) => {
     const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);

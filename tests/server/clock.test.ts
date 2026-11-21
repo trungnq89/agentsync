@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { businessDaysBetween, isWithinHours, vnDateString } from '@/server/clock';
+import { businessDaysBetween, isValidIsoDate, isWithinHours, vnDateString } from '@/server/clock';
 
 describe('clock', () => {
   it('Fri 17:00 VN to Mon 09:00 VN is 0 business days', () => {
@@ -16,5 +16,15 @@ describe('clock', () => {
   it('vnDateString gives the Asia/Ho_Chi_Minh calendar date', () => {
     expect(vnDateString(new Date('2026-11-20T16:59:59Z'))).toBe('2026-11-20');
     expect(vnDateString(new Date('2026-11-20T17:00:00Z'))).toBe('2026-11-21');
+  });
+});
+
+describe('isValidIsoDate', () => {
+  it('accepts real dates only', () => {
+    expect(isValidIsoDate('2026-11-30')).toBe(true);
+    expect(isValidIsoDate('2028-02-29')).toBe(true);
+    for (const bad of ['next week', '2026-2-3', '2026-02-30', '2026-13-01', '2026-11-30T00:00', '']) {
+      expect(isValidIsoDate(bad)).toBe(false);
+    }
   });
 });

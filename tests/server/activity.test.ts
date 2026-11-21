@@ -133,3 +133,12 @@ describe('activity', () => {
     expect((await getCurrentPlan(testDb, t.id)).steps[0].status).toBe('todo');
   });
 });
+
+describe('postUpdate date validation', () => {
+  it('rejects a malformed expectedEndDate', async () => {
+    const member = await makeUser();
+    const t = await makeTask(member.id, { status: 'in_progress' });
+    await expect(postUpdate(testDb, member, t.id, { body: 'x', source: 'auto', expectedEndDate: 'soon' }, new Date()))
+      .rejects.toMatchObject({ code: 'VALIDATION', message: expect.stringContaining('YYYY-MM-DD') });
+  });
+});
