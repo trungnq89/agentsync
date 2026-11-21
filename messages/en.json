@@ -9,7 +9,8 @@
     "loading": "Loading…",
     "language": "Language",
     "english": "English",
-    "vietnamese": "Vietnamese"
+    "vietnamese": "Vietnamese",
+    "justNow": "just now"
   },
   "nav": {},
   "auth": {},
@@ -209,5 +210,31 @@
     "light": "Light",
     "dark": "Dark",
     "label": "Theme"
+  },
+  "dev": {
+    "title": "UI kit",
+    "buttonLoading": "Loading button",
+    "openDialog": "Open dialog",
+    "dialogTitle": "Delete item?",
+    "dialogDescription": "This cannot be undone.",
+    "dialogConfirm": "Delete",
+    "nameLabel": "Name",
+    "nameHint": "Shown to teammates",
+    "submit": "Submit",
+    "saved": "Saved",
+    "nameError": "Name is required",
+    "longText": "A fairly long sentence that must wrap gracefully on narrow screens without causing scroll",
+    "emptyTitle": "Nothing here",
+    "emptyHint": "Items will appear here.",
+    "menu": "Menu",
+    "tooltip": "More info",
+    "choose": "Choose",
+    "optionA": "Option A",
+    "optionB": "Option B",
+    "agree": "I agree",
+    "destructive": "Destructive",
+    "toast": "Toast",
+    "avatarName": "Ada Lovelace",
+    "progress": "Progress"
   }
 }

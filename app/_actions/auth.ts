@@ -18,7 +18,7 @@ export async function loginAction(_prev: FormState, form: FormData): Promise<For
       maxAge: 14 * 24 * 60 * 60,
     });
   });
-  if (res.error) return res;
+  if (res.error || res.fieldErrors) return res;
   redirect('/');
 }
 

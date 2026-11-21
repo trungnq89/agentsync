@@ -3,7 +3,7 @@ export type Locale = (typeof LOCALES)[number];
 
 export const NAMESPACES = [
   'common', 'nav', 'auth', 'home', 'person', 'task', 'settings', 'admin', 'status', 'health',
-  'level', 'mode', 'attention', 'verdict', 'sendMode', 'action', 'errors', 'mcp', 'theme',
+  'level', 'mode', 'attention', 'verdict', 'sendMode', 'action', 'errors', 'mcp', 'theme', 'dev',
 ] as const;
 
 export const LOCALE_COOKIE = 'locale';

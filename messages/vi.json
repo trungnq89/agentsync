@@ -9,7 +9,8 @@
     "loading": "Đang tải…",
     "language": "Ngôn ngữ",
     "english": "Tiếng Anh",
-    "vietnamese": "Tiếng Việt"
+    "vietnamese": "Tiếng Việt",
+    "justNow": "vừa xong"
   },
   "nav": {},
   "auth": {},
@@ -209,5 +210,31 @@
     "light": "Sáng",
     "dark": "Tối",
     "label": "Giao diện"
+  },
+  "dev": {
+    "title": "Bộ giao diện",
+    "buttonLoading": "Nút đang tải",
+    "openDialog": "Mở hộp thoại",
+    "dialogTitle": "Xóa mục này?",
+    "dialogDescription": "Không thể hoàn tác.",
+    "dialogConfirm": "Xóa",
+    "nameLabel": "Tên",
+    "nameHint": "Hiển thị cho đồng nghiệp",
+    "submit": "Gửi",
+    "saved": "Đã lưu",
+    "nameError": "Cần nhập tên",
+    "longText": "Một câu khá dài phải xuống dòng gọn gàng trên màn hình hẹp mà không gây cuộn ngang",
+    "emptyTitle": "Chưa có gì",
+    "emptyHint": "Các mục sẽ xuất hiện ở đây.",
+    "menu": "Menu",
+    "tooltip": "Thông tin thêm",
+    "choose": "Chọn",
+    "optionA": "Lựa chọn A",
+    "optionB": "Lựa chọn B",
+    "agree": "Tôi đồng ý",
+    "destructive": "Nguy hiểm",
+    "toast": "Thông báo",
+    "avatarName": "Ada Lovelace",
+    "progress": "Tiến độ"
   }
 }

@@ -8,7 +8,7 @@ const HOUR = 60 * MIN;
 
 describe('formatRelative vi', () => {
   const f = (d: Date, n = now) => formatRelative(d, n, 'vi');
-  it('under a minute', () => expect(f(ago(30_000))).toBe('bây giờ'));
+  it('under a minute', () => expect(f(ago(30_000))).toBe('vừa xong'));
   it('minutes', () => expect(f(ago(5 * MIN))).toBe('5 phút trước'));
   it('hours', () => expect(f(ago(2 * HOUR))).toBe('2 giờ trước'));
   it('yesterday by Vietnam calendar day', () => expect(f(ago(25 * HOUR))).toBe('hôm qua'));
@@ -16,14 +16,14 @@ describe('formatRelative vi', () => {
   it('uses Vietnam timezone for the day boundary', () => {
     const n = new Date('2026-11-21T18:00:00Z'); // 22/11 01:00 VN
     expect(f(new Date('2026-11-21T10:00:00Z'), n)).toBe('8 giờ trước');
-    expect(f(new Date('2026-11-20T10:00:00Z'), n)).toBe('hôm kia'); // UTC days would say 1 ("hôm qua")
+    expect(f(new Date('2026-11-20T10:00:00Z'), n)).toBe('2 ngày trước'); // UTC days would say 1 ("hôm qua")
   });
-  it('future dates count as just now', () => expect(f(new Date(now.getTime() + HOUR))).toBe('bây giờ'));
+  it('future dates count as just now', () => expect(f(new Date(now.getTime() + HOUR))).toBe('vừa xong'));
 });
 
 describe('formatRelative en', () => {
   const f = (d: Date, n = now) => formatRelative(d, n, 'en');
-  it('under a minute', () => expect(f(ago(30_000))).toBe('now'));
+  it('under a minute', () => expect(f(ago(30_000))).toBe('just now'));
   it('minutes', () => expect(f(ago(5 * MIN))).toBe('5 minutes ago'));
   it('hours', () => expect(f(ago(2 * HOUR))).toBe('2 hours ago'));
   it('yesterday', () => expect(f(ago(25 * HOUR))).toBe('yesterday'));

@@ -1,5 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { NextIntlClientProvider } from 'next-intl';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { themeInitScript } from '@/ui/theme';
 import { logoutAction } from './_actions/auth';
 import { getOptionalActor } from './_lib/actor';
 import '@fontsource-variable/inter';
@@ -14,8 +18,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const user = await getOptionalActor();
   const link = 'rounded px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800';
   return (
-    <html lang="vi" className="h-full antialiased">
+    <html lang="vi" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="flex min-h-full flex-col bg-background text-foreground">
+        <NextIntlClientProvider>
+        <TooltipProvider>
         {user && (
           <header className="border-b border-neutral-200 dark:border-neutral-800">
             <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
@@ -34,6 +43,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </header>
         )}
         <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</div>
+        </TooltipProvider>
+        <Toaster />
+        </NextIntlClientProvider>
       </body>
     </html>
   );
