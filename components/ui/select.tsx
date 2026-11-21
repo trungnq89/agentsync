@@ -5,7 +5,10 @@ import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFieldContext } from './form-field';
 
-export const Select = SelectPrimitive.Root;
+export function Select(props: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root>) {
+  const f = useFieldContext();
+  return <SelectPrimitive.Root {...props} name={f?.name ?? props.name} />;
+}
 export const SelectValue = SelectPrimitive.Value;
 export const SelectGroup = SelectPrimitive.Group;
 
@@ -17,14 +20,14 @@ export const SelectTrigger = React.forwardRef<
   return (
     <SelectPrimitive.Trigger
       ref={ref}
-      id={f?.id}
-      aria-invalid={f?.invalid || undefined}
-      aria-describedby={f?.describedBy}
       className={cn(
         'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 aria-[invalid=true]:border-danger [&>span]:truncate',
         className,
       )}
       {...props}
+      id={f?.id ?? props.id}
+      aria-invalid={f?.invalid || props['aria-invalid'] || undefined}
+      aria-describedby={f?.describedBy ?? props['aria-describedby']}
     >
       {children}
       <SelectPrimitive.Icon asChild>

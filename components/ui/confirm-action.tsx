@@ -54,7 +54,7 @@ export function ConfirmAction({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent {...(description ? {} : { 'aria-describedby': undefined })}>
         <ActionForm action={wrapped} className="grid gap-4">
           <AlertDialogHeader>
             <AlertDialogTitle>{title}</AlertDialogTitle>

@@ -10,7 +10,8 @@
     "language": "Ngôn ngữ",
     "english": "Tiếng Anh",
     "vietnamese": "Tiếng Việt",
-    "justNow": "vừa xong"
+    "justNow": "vừa xong",
+    "notifications": "Thông báo"
   },
   "nav": {},
   "auth": {},

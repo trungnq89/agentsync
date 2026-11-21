@@ -35,6 +35,7 @@ test.describe('ui kit', () => {
     await form.getByRole('button', { name: 'Gửi' }).click();
     await expect(form.getByText('Cần nhập tên')).toBeVisible();
     await expect(form.getByLabel('Tên').first()).toHaveAttribute('aria-invalid', 'true');
+    await expect(form.getByLabel('Tên').first()).toBeFocused();
     await form.getByLabel('Tên').first().fill('Ada');
     await form.getByRole('button', { name: 'Gửi' }).click();
     await expect(page.locator('[data-sonner-toast]')).toContainText('Đã lưu');

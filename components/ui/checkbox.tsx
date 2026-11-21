@@ -13,15 +13,15 @@ export const Checkbox = React.forwardRef<
   return (
     <CheckboxPrimitive.Root
       ref={ref}
-      id={f?.id}
-      name={f?.name}
-      aria-invalid={f?.invalid || undefined}
-      aria-describedby={f?.describedBy}
       className={cn(
         'peer h-4 w-4 shrink-0 rounded-sm border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground aria-[invalid=true]:border-danger',
         className,
       )}
       {...props}
+      id={f?.id ?? props.id}
+      name={f?.name ?? props.name}
+      aria-invalid={f?.invalid || props['aria-invalid'] || undefined}
+      aria-describedby={f?.describedBy ?? props['aria-describedby']}
     >
       <CheckboxPrimitive.Indicator className="flex items-center justify-center">
         <Check className="h-3 w-3" aria-hidden />

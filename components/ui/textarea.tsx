@@ -10,12 +10,12 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
     return (
       <textarea
         ref={ref}
-        id={f?.id}
-        name={f?.name}
-        aria-invalid={f?.invalid || undefined}
-        aria-describedby={f?.describedBy}
         className={cn(inputClass, 'h-auto min-h-20 py-2', className)}
         {...props}
+        id={f?.id ?? props.id}
+        name={f?.name ?? props.name}
+        aria-invalid={f?.invalid || props['aria-invalid'] || undefined}
+        aria-describedby={f?.describedBy ?? props['aria-describedby']}
       />
     );
   },

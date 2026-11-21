@@ -20,6 +20,7 @@ export function Avatar({ name, src, className }: { name: string; src?: string; c
     >
       {src && <AvatarPrimitive.Image src={src} alt={name} className="h-full w-full object-cover" />}
       <AvatarPrimitive.Fallback
+        role="img"
         aria-label={name}
         className="flex h-full w-full items-center justify-center text-xs font-bold text-foreground"
       >

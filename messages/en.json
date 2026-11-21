@@ -10,7 +10,8 @@
     "language": "Language",
     "english": "English",
     "vietnamese": "Vietnamese",
-    "justNow": "just now"
+    "justNow": "just now",
+    "notifications": "Notifications"
   },
   "nav": {},
   "auth": {},

@@ -59,7 +59,7 @@ export function FormField({
         </p>
       )}
       {message && (
-        <p id={errorId} className="text-xs text-danger-foreground">
+        <p id={errorId} aria-live="polite" className="text-xs text-danger-foreground">
           {message}
         </p>
       )}

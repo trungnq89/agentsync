@@ -29,14 +29,20 @@ export function ActionForm({
   render?: (state: FormState) => React.ReactNode;
 }) {
   const [state, formAction] = useActionState(action, {});
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (state.ok) toast.success(successToast ?? state.ok);
     // Each submission yields a new state object, so depend on it rather than on the message.
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // After a failed submit with field errors, move focus to the first invalid field.
+  useEffect(() => {
+    if (state.fieldErrors) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [state]);
+
   return (
-    <form action={formAction} className={className} data-testid={testId}>
+    <form ref={formRef} action={formAction} className={className} data-testid={testId}>
       {state.error && (
         <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger-foreground">
           {state.error}

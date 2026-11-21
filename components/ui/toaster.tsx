@@ -1,10 +1,13 @@
 'use client';
+import { useTranslations } from 'next-intl';
 import { Toaster as Sonner } from 'sonner';
 
 /** Sonner toaster wired to design tokens (follows the app's light/dark tokens, not the OS). */
 export function Toaster() {
+  const t = useTranslations('common');
   return (
     <Sonner
+      containerAriaLabel={t('notifications')}
       position="bottom-right"
       style={
         {
