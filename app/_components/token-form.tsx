@@ -1,8 +1,39 @@
 'use client';
+import { useRef } from 'react';
+import { Copy } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
+import { ActionForm } from '@/components/ui/action-form';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
 import { createTokenAction } from '../_actions/settings';
-import { ActionForm, button, card, input } from './ui';
+
+const codeBox = 'overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-surface-muted p-2 text-xs';
 
 export function TokenForm({ mcpUrl }: { mcpUrl: string }) {
+  const t = useTranslations('settings');
+  const tokenRef = useRef<HTMLElement>(null);
+
+  async function copy(token: string) {
+    try {
+      await navigator.clipboard.writeText(token);
+      toast.success(t('tokenCopied'));
+    } catch {
+      // Clipboard unavailable (insecure context, denied permission): select the text so Ctrl+C works.
+      const el = tokenRef.current;
+      if (el) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+      toast.error(t('copyFailed'));
+    }
+  }
+
   return (
     <ActionForm
       action={createTokenAction}
@@ -10,26 +41,34 @@ export function TokenForm({ mcpUrl }: { mcpUrl: string }) {
       testId="token-form"
       render={(s) =>
         s.token ? (
-          <div className={`${card} mt-3 space-y-3`} data-testid="new-token">
-            <p className="text-sm font-medium">Token mới (chỉ hiện một lần, hãy copy ngay):</p>
-            <code data-testid="token-plaintext" className="block break-all rounded bg-neutral-100 p-2 text-sm dark:bg-neutral-800">
-              {s.token}
-            </code>
-            <p className="text-sm">Claude Code:</p>
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 text-xs dark:bg-neutral-800">{`claude mcp add --transport http agentsync ${mcpUrl} --header "Authorization: Bearer ${s.token}"`}</pre>
-            <p className="text-sm">Hoặc cấu hình JSON:</p>
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-neutral-100 p-2 text-xs dark:bg-neutral-800">{JSON.stringify(
+          <Card className="mt-3 space-y-3 p-4" data-testid="new-token">
+            <p className="text-sm font-medium">{t('newTokenTitle')}</p>
+            <div className="flex flex-wrap items-start gap-2">
+              <code ref={tokenRef} data-testid="token-plaintext" className={`${codeBox} min-w-0 flex-1 text-sm`}>
+                {s.token}
+              </code>
+              <Button type="button" variant="outline" size="sm" data-testid="copy-token" onClick={() => copy(s.token!)}>
+                <Copy className="h-4 w-4" aria-hidden />
+                {t('copyToken')}
+              </Button>
+            </div>
+            <p className="text-sm">{t('claudeCode')}</p>
+            <pre className={codeBox}>{`claude mcp add --transport http agentsync ${mcpUrl} --header "Authorization: Bearer ${s.token}"`}</pre>
+            <p className="text-sm">{t('orJson')}</p>
+            <pre className={codeBox}>{JSON.stringify(
               { mcpServers: { agentsync: { type: 'http', url: mcpUrl, headers: { Authorization: `Bearer ${s.token}` } } } },
               null,
               2,
             )}</pre>
-          </div>
+          </Card>
         ) : null
       }
     >
-      <div className="flex flex-wrap gap-2">
-        <input name="label" placeholder="Nhãn (vd: Laptop công ty)" aria-label="Nhãn token" required className={`${input} min-w-0 flex-1`} />
-        <button type="submit" className={button}>Tạo token</button>
+      <div className="flex flex-wrap items-end gap-2">
+        <FormField name="label" label={t('tokenLabel')} className="min-w-0 flex-1">
+          <Input placeholder={t('tokenLabelPlaceholder')} required />
+        </FormField>
+        <Button type="submit">{t('createToken')}</Button>
       </div>
     </ActionForm>
   );

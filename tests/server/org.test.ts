@@ -64,7 +64,7 @@ describe('org', () => {
     const gone = await makeUser({ level: 'manager', disabledAt: new Date() });
     const u = await makeUser();
     await expect(updateUser(testDb, admin, u.id, { managerId: gone.id })).rejects.toMatchObject({
-      code: 'VALIDATION', key: 'managerDisabled',
+      code: 'VALIDATION', key: 'managerDisabled', params: { field: 'managerId' },
     });
     await expect(
       createUser(testDb, admin, { username: 'dm', displayName: 'D', password: 'password-1', level: 'member', managerId: gone.id }),
@@ -116,19 +116,23 @@ describe('org', () => {
     await expect(createUser(testDb, admin, input)).rejects.toMatchObject({
       code: 'VALIDATION',
       key: 'usernameTaken',
+      params: { field: 'username' },
     });
   });
 
   it('validates password length, level and displayName', async () => {
     const admin = await makeUser({ isAdmin: true });
     const base = { username: 'v1', displayName: 'V', password: 'long-enough-pw', level: 'member' as const };
-    await expect(createUser(testDb, admin, { ...base, password: 'short' })).rejects.toMatchObject({ code: 'VALIDATION' });
-    await expect(createUser(testDb, admin, { ...base, level: 'boss' as never })).rejects.toMatchObject({ code: 'VALIDATION' });
-    await expect(createUser(testDb, admin, { ...base, displayName: '   ' })).rejects.toMatchObject({ code: 'VALIDATION' });
+    const tooShort = { code: 'VALIDATION', key: 'passwordTooShort', params: { min: 8, field: 'password' } };
+    const badLevel = { code: 'VALIDATION', key: 'invalidLevel', params: { field: 'level' } };
+    const noName = { code: 'VALIDATION', key: 'displayNameRequired', params: { field: 'displayName' } };
+    await expect(createUser(testDb, admin, { ...base, password: 'short' })).rejects.toMatchObject(tooShort);
+    await expect(createUser(testDb, admin, { ...base, level: 'boss' as never })).rejects.toMatchObject(badLevel);
+    await expect(createUser(testDb, admin, { ...base, displayName: '   ' })).rejects.toMatchObject(noName);
     const u = await createUser(testDb, admin, base);
-    await expect(updateUser(testDb, admin, u.id, { level: 'boss' as never })).rejects.toMatchObject({ code: 'VALIDATION' });
-    await expect(updateUser(testDb, admin, u.id, { displayName: ' ' })).rejects.toMatchObject({ code: 'VALIDATION' });
-    await expect(setPassword(testDb, admin, u.id, 'short')).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(updateUser(testDb, admin, u.id, { level: 'boss' as never })).rejects.toMatchObject(badLevel);
+    await expect(updateUser(testDb, admin, u.id, { displayName: ' ' })).rejects.toMatchObject(noName);
+    await expect(setPassword(testDb, admin, u.id, 'short')).rejects.toMatchObject(tooShort);
   });
 
   it('setPassword signs the user out everywhere', async () => {

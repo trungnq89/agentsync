@@ -1,10 +1,18 @@
 import Link from 'next/link';
+import { SearchX } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getTranslations('common');
   return (
-    <main className="space-y-3">
-      <h1 className="text-xl font-semibold">Không tìm thấy trang này hoặc bạn không có quyền xem.</h1>
-      <Link href="/" className="text-sm underline">← Về trang chủ</Link>
+    <main>
+      <EmptyState
+        icon={<SearchX className="h-8 w-8" aria-hidden />}
+        title={t('notFoundTitle')}
+        action={<Button asChild variant="outline"><Link href="/">{t('backHome')}</Link></Button>}
+      />
     </main>
   );
 }

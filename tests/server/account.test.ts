@@ -33,8 +33,12 @@ describe('account', () => {
 
   it('changeMyPassword requires the current password and a long enough new one', async () => {
     const a = await makeUser({ passwordHash: await hashPassword('old-password') });
-    await expect(changeMyPassword(testDb, a, 'wrong', 'new-password-1')).rejects.toMatchObject({ code: 'VALIDATION' });
-    await expect(changeMyPassword(testDb, a, 'old-password', 'short')).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(changeMyPassword(testDb, a, 'wrong', 'new-password-1')).rejects.toMatchObject({
+      code: 'VALIDATION', key: 'wrongCurrentPassword', params: { field: 'current' },
+    });
+    await expect(changeMyPassword(testDb, a, 'old-password', 'short')).rejects.toMatchObject({
+      code: 'VALIDATION', key: 'passwordTooShort', params: { min: 8, field: 'next' },
+    });
     await changeMyPassword(testDb, a, 'old-password', 'new-password-1');
     const [row] = await testDb.select().from(users).where(eq(users.id, a.id));
     expect(await verifyPassword(row.passwordHash, 'new-password-1')).toBe(true);
@@ -66,7 +70,9 @@ describe('admin lists and settings', () => {
     const m = await makeUser();
     expect(await getStaleBusinessDays(testDb)).toBe(3);
     await expect(setStaleBusinessDays(testDb, m, 5)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(setStaleBusinessDays(testDb, admin, 0)).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(setStaleBusinessDays(testDb, admin, 0)).rejects.toMatchObject({
+      code: 'VALIDATION', key: 'staleDaysRange', params: { field: 'days' },
+    });
     await expect(setStaleBusinessDays(testDb, admin, 1.5)).rejects.toMatchObject({ code: 'VALIDATION' });
     await setStaleBusinessDays(testDb, admin, 5);
     expect(await getStaleBusinessDays(testDb)).toBe(5);

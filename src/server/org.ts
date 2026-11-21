@@ -10,10 +10,10 @@ type Level = User['level'];
 const LEVELS: readonly string[] = ['director', 'manager', 'leader', 'member'];
 
 function assertLevel(level: string) {
-  if (!LEVELS.includes(level)) throw new DomainError('VALIDATION', 'invalidLevel');
+  if (!LEVELS.includes(level)) throw new DomainError('VALIDATION', 'invalidLevel', { field: 'level' });
 }
 function assertDisplayName(name: string) {
-  if (!name.trim()) throw new DomainError('VALIDATION', 'displayNameRequired');
+  if (!name.trim()) throw new DomainError('VALIDATION', 'displayNameRequired', { field: 'displayName' });
 }
 
 function requireAdmin(actor: Actor) {
@@ -36,16 +36,16 @@ export async function listAllUsers(db: Db, actor: Actor): Promise<User[]> {
 }
 
 async function assertValidManager(db: Db, userId: string | null, managerId: string) {
-  if (!isUuid(managerId)) throw new DomainError('VALIDATION', 'invalidManager');
+  if (!isUuid(managerId)) throw new DomainError('VALIDATION', 'invalidManager', { field: 'managerId' });
   if (userId !== null && managerId === userId) {
-    throw new DomainError('VALIDATION', 'selfManager');
+    throw new DomainError('VALIDATION', 'selfManager', { field: 'managerId' });
   }
   // Walk up the manager chain from the new manager; meeting userId means a cycle.
   const seen = new Set<string>();
   let cur: string | null = managerId;
   while (cur) {
     if (userId !== null && cur === userId) {
-      throw new DomainError('VALIDATION', 'managerCycle');
+      throw new DomainError('VALIDATION', 'managerCycle', { field: 'managerId' });
     }
     if (seen.has(cur)) break;
     seen.add(cur);
@@ -53,9 +53,9 @@ async function assertValidManager(db: Db, userId: string | null, managerId: stri
       .select({ managerId: users.managerId, disabledAt: users.disabledAt })
       .from(users)
       .where(eq(users.id, cur));
-    if (!row) throw new DomainError('VALIDATION', 'managerNotFound');
+    if (!row) throw new DomainError('VALIDATION', 'managerNotFound', { field: 'managerId' });
     if (cur === managerId && row.disabledAt) {
-      throw new DomainError('VALIDATION', 'managerDisabled');
+      throw new DomainError('VALIDATION', 'managerDisabled', { field: 'managerId' });
     }
     cur = row.managerId;
   }
@@ -80,7 +80,7 @@ export async function createUser(
   const managerId = input.managerId || null;
   if (managerId) await assertValidManager(db, null, managerId);
   const [dup] = await db.select({ id: users.id }).from(users).where(eq(users.username, input.username));
-  if (dup) throw new DomainError('VALIDATION', 'usernameTaken');
+  if (dup) throw new DomainError('VALIDATION', 'usernameTaken', { field: 'username' });
   const [u] = await db
     .insert(users)
     .values({

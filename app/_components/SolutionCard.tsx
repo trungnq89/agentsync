@@ -69,7 +69,7 @@ export function SolutionCard({
                 <>
                   <input type="hidden" name="taskId" value={taskId} />
                   <input type="hidden" name="verdict" value="changes_needed" />
-                  <FormField name="note" label={t('note')}><Textarea rows={3} /></FormField>
+                  <FormField name="note" label={t('note')}><Textarea rows={3} aria-required="true" /></FormField>
                 </>
               }
             />

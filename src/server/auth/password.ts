@@ -3,9 +3,10 @@ import { DomainError } from '../errors';
 
 export const MIN_PASSWORD_LENGTH = 8;
 
-export function assertPasswordLength(pw: string): void {
+/** `field` names the form field that carries the password, so the UI can show the error under it. */
+export function assertPasswordLength(pw: string, field = 'password'): void {
   if (pw.length < MIN_PASSWORD_LENGTH) {
-    throw new DomainError('VALIDATION', 'passwordTooShort', { min: MIN_PASSWORD_LENGTH });
+    throw new DomainError('VALIDATION', 'passwordTooShort', { min: MIN_PASSWORD_LENGTH, field });
   }
 }
 

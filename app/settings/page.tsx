@@ -1,83 +1,138 @@
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { getDb } from '@/db';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ActionForm } from '@/components/ui/action-form';
+import { ConfirmAction } from '@/components/ui/confirm-action';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { listMyTokens } from '@/server/account';
+import { isTheme } from '@/ui/theme';
 import { getActor } from '../_lib/actor';
 import { changePasswordAction, revokeTokenAction, sendModeAction } from '../_actions/settings';
+import { PreferencesForm } from '../_components/PreferencesForm';
 import { TokenForm } from '../_components/token-form';
-import { ActionForm, button, buttonQuiet, card, input } from '../_components/ui';
 
-export const metadata = { title: 'Cài đặt · AgentSync' };
+export async function generateMetadata() {
+  const t = await getTranslations('settings');
+  return { title: `${t('title')} · AgentSync` };
+}
 export const dynamic = 'force-dynamic';
-
-const fmt = (d: Date | null) =>
-  d ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(d) : 'Chưa dùng';
 
 export default async function SettingsPage() {
   const actor = await getActor();
-  const tSendMode = await getTranslations('sendMode');
+  const [t, tSendMode, tc, locale] = await Promise.all([
+    getTranslations('settings'),
+    getTranslations('sendMode'),
+    getTranslations('common'),
+    getLocale(),
+  ]);
   const tokens = await listMyTokens(getDb(), actor);
   const mcpUrl = `${(process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')}/api/mcp`;
+  const fmt = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' });
   return (
-    <main className="space-y-8">
-      <h1 className="text-xl font-semibold">Cài đặt</h1>
+    <main className="space-y-6">
+      <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
 
-      <section className="space-y-3">
-        <h2 className="font-medium">Token cho agent</h2>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Dùng token để kết nối Claude Code hoặc Codex với AgentSync qua MCP.
-        </p>
-        <TokenForm mcpUrl={mcpUrl} />
-        <ul className="space-y-2" data-testid="token-list">
-          {tokens.length === 0 && <li className="text-sm text-neutral-500">Chưa có token nào.</li>}
-          {tokens.map((t) => (
-            <li key={t.id} className={`${card} flex flex-wrap items-center gap-x-4 gap-y-2 text-sm`}>
-              <div className="min-w-0 flex-1">
-                <div className="font-medium">{t.label}</div>
-                <div className="text-neutral-500">
-                  <code>{t.prefix}…</code> · Dùng gần nhất: {fmt(t.lastUsedAt)}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('preferences')}</CardTitle>
+          <CardDescription>{t('preferencesDesc')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PreferencesForm theme={isTheme(actor.theme) ? actor.theme : 'system'} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('sendModeTitle')}</CardTitle>
+          <CardDescription>{t('sendModeDesc')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ActionForm action={sendModeAction} className="space-y-3">
+            <div role="radiogroup" aria-label={t('sendModeTitle')} className="space-y-2">
+              {(['review', 'auto'] as const).map((m) => (
+                <div key={m} className="flex items-center gap-2">
+                  <input
+                    id={`send-mode-${m}`}
+                    type="radio"
+                    name="sendMode"
+                    value={m}
+                    defaultChecked={actor.sendMode === m}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <Label htmlFor={`send-mode-${m}`}>{tSendMode(m)}</Label>
                 </div>
-              </div>
-              {t.revokedAt ? (
-                <span className="text-neutral-500">Đã thu hồi</span>
-              ) : (
-                <ActionForm action={revokeTokenAction}>
-                  <input type="hidden" name="tokenId" value={t.id} />
-                  <button type="submit" className={buttonQuiet}>Thu hồi</button>
-                </ActionForm>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
+              ))}
+            </div>
+            <Button type="submit">{tc('save')}</Button>
+          </ActionForm>
+        </CardContent>
+      </Card>
 
-      <section className="space-y-3">
-        <h2 className="font-medium">Chế độ gửi cập nhật</h2>
-        <ActionForm action={sendModeAction} className="space-y-3">
-          {(['review', 'auto'] as const).map((m) => (
-            <label key={m} className="flex items-center gap-2 text-sm">
-              <input type="radio" name="sendMode" value={m} defaultChecked={actor.sendMode === m} />
-              {tSendMode(m)}
-            </label>
-          ))}
-          <button type="submit" className={button}>Lưu</button>
-        </ActionForm>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('passwordTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ActionForm action={changePasswordAction} className="max-w-sm space-y-4">
+            <FormField name="current" label={t('currentPassword')}>
+              <Input type="password" autoComplete="current-password" required />
+            </FormField>
+            <FormField name="next" label={t('newPassword')}>
+              <Input type="password" autoComplete="new-password" required />
+            </FormField>
+            <FormField name="confirm" label={t('confirmPassword')}>
+              <Input type="password" autoComplete="new-password" required />
+            </FormField>
+            <Button type="submit">{t('changePassword')}</Button>
+          </ActionForm>
+        </CardContent>
+      </Card>
 
-      <section className="space-y-3">
-        <h2 className="font-medium">Đổi mật khẩu</h2>
-        <ActionForm action={changePasswordAction} className="max-w-sm space-y-3">
-          <label className="block text-sm">Mật khẩu hiện tại
-            <input name="current" type="password" autoComplete="current-password" required className={`${input} mt-1`} />
-          </label>
-          <label className="block text-sm">Mật khẩu mới
-            <input name="next" type="password" autoComplete="new-password" required className={`${input} mt-1`} />
-          </label>
-          <label className="block text-sm">Nhập lại mật khẩu mới
-            <input name="confirm" type="password" autoComplete="new-password" required className={`${input} mt-1`} />
-          </label>
-          <button type="submit" className={button}>Đổi mật khẩu</button>
-        </ActionForm>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('tokensTitle')}</CardTitle>
+          <CardDescription>{t('tokensDesc')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <TokenForm mcpUrl={mcpUrl} />
+          {tokens.length === 0 ? (
+            <EmptyState title={t('noTokens')} />
+          ) : (
+            <ul className="space-y-2" data-testid="token-list">
+              {tokens.map((tok) => (
+                <li key={tok.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-border p-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div className="break-words font-medium">{tok.label}</div>
+                    <div className="break-words text-muted-foreground">
+                      <code>{tok.prefix}…</code> ·{' '}
+                      {t('lastUsed', { when: tok.lastUsedAt ? fmt.format(tok.lastUsedAt) : t('neverUsed') })}
+                    </div>
+                  </div>
+                  {tok.revokedAt ? (
+                    <Badge tone="neutral">{t('revoked')}</Badge>
+                  ) : (
+                    <ConfirmAction
+                      title={t('revokeTitle')}
+                      description={t('revokeDesc', { label: tok.label })}
+                      confirmLabel={t('revoke')}
+                      tone="destructive"
+                      action={revokeTokenAction}
+                      trigger={<Button variant="outline" size="sm">{t('revoke')}</Button>}
+                      fields={<input type="hidden" name="tokenId" value={tok.id} />}
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }

@@ -53,7 +53,7 @@ export function TaskHeader({
         {late > 0 && <Badge tone="warning">{t('late', { count: late })}</Badge>}
       </div>
       <div className="flex items-center gap-3">
-        <Progress value={progress} className="flex-1" aria-label={`${progress}%`} />
+        <Progress value={progress} className="flex-1" aria-label={t('progress')} />
         <span data-testid="task-progress" className="text-sm font-semibold tabular-nums">{progress}%</span>
       </div>
       <div className="text-xs text-muted-foreground">{t('updated', { when: formatRelative(lastActivityAt, now, locale) })}</div>
@@ -73,7 +73,7 @@ export function TaskHeader({
             fields={
               <>
                 <input type="hidden" name="taskId" value={task.id} />
-                <FormField name="note" label={t('note')}><Textarea rows={3} /></FormField>
+                <FormField name="note" label={t('note')}><Textarea rows={3} aria-required="true" /></FormField>
               </>
             }
           />

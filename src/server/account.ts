@@ -38,9 +38,9 @@ export async function changeMyPassword(
 ): Promise<void> {
   const [row] = await db.select({ hash: users.passwordHash }).from(users).where(eq(users.id, actor.id));
   if (!row || !(await verifyPassword(row.hash, current))) {
-    throw new DomainError('VALIDATION', 'wrongCurrentPassword');
+    throw new DomainError('VALIDATION', 'wrongCurrentPassword', { field: 'current' });
   }
-  assertPasswordLength(next);
+  assertPasswordLength(next, 'next');
   await db.update(users).set({ passwordHash: await hashPassword(next) }).where(eq(users.id, actor.id));
   await db
     .delete(sessions)

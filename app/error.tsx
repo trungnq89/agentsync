@@ -1,11 +1,19 @@
 'use client';
-import { button } from './_components/ui';
+import { TriangleAlert } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const t = useTranslations('common');
   return (
-    <main className="space-y-3">
-      <h1 className="text-xl font-semibold">Đã xảy ra lỗi. Vui lòng thử lại.</h1>
-      <button type="button" onClick={reset} className={button}>Thử lại</button>
+    <main>
+      <EmptyState
+        icon={<TriangleAlert className="h-8 w-8" aria-hidden />}
+        title={t('errorTitle')}
+        description={t('errorDesc')}
+        action={<Button type="button" onClick={reset}>{t('retry')}</Button>}
+      />
     </main>
   );
 }

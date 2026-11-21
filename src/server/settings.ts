@@ -12,7 +12,7 @@ export async function getStaleBusinessDays(db: Db): Promise<number> {
 export async function setStaleBusinessDays(db: Db, actor: Actor, days: number): Promise<void> {
   if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'adminOnly');
   if (!Number.isInteger(days) || days < 1 || days > 30) {
-    throw new DomainError('VALIDATION', 'staleDaysRange');
+    throw new DomainError('VALIDATION', 'staleDaysRange', { field: 'days' });
   }
   await db
     .insert(appSettings)
