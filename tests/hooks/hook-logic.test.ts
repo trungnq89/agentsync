@@ -7,7 +7,15 @@ import {
   reasonFor,
 } from '../../plugins/agentsync/hooks/agentsync-hook.mjs';
 
-const base = () => ({ claimed: [] as string[], reminded: [] as string[], outstanding: false, updatedAt: '2026-01-01T00:00:00.000Z', taskId: 't1' });
+type Session = Parameters<typeof decide>[0];
+type TS = { claimed: string[]; reminded: string[]; completionRemindedAt?: string };
+const base = (ts: Partial<TS> = {}, outstanding = false): Session => ({
+  currentTaskId: 't1',
+  tasks: { t1: { claimed: [], reminded: [], ...ts } as TS } as Record<string, TS>,
+  outstanding,
+  updatedAt: '2026-01-01T00:00:00.000Z',
+});
+const t1 = (r: { session: Session }) => r.session.tasks.t1;
 const plan = (steps: [string, string][], over: Record<string, unknown> = {}) => ({
   id: 't1', status: 'in_progress', mode: 'project', statusChangedAt: '2026-01-01T00:00:00.000Z',
   steps: steps.map(([title, status]) => ({ title, status })), ...over,
@@ -21,7 +29,7 @@ describe('parseMarkers', () => {
   });
   it('parseMarkers ignores markers not at line start', () => {
     const r = parseMarkers('see AGENTSYNC-CHECKPOINT: x\nuse AGENTSYNC-TASK: y');
-    expect(r).toEqual({ taskIds: [], checkpoints: [] });
+    expect(r).toEqual({ taskIds: [], checkpoints: [], events: [] });
   });
 });
 
@@ -42,19 +50,33 @@ describe('turnAssistantTexts', () => {
 });
 
 describe('applyTurn', () => {
-  it('last task marker wins; switching task resets state', () => {
-    const s = { ...base(), claimed: ['A'], reminded: ['A'], completionRemindedAt: 'z', outstanding: true };
-    const r = applyTurn(s, { taskIds: ['t2'], checkpoints: ['B'] });
-    expect(r.session.taskId).toBe('t2');
-    expect(r.session.claimed).toEqual(['B']);
-    expect(r.session.reminded).toEqual([]);
-    expect(r.session.completionRemindedAt).toBeUndefined();
-    expect(r.session.outstanding).toBe(false);
-    expect(r.newCheckpoints).toEqual(['B']);
+  it('switching task keeps per-task state; last task marker wins', () => {
+    let s = base({ claimed: ['A'], reminded: ['A'] }, true);
+    s = applyTurn(s, parseMarkers('AGENTSYNC-TASK: t2\nAGENTSYNC-CHECKPOINT: B')).session;
+    expect(s.currentTaskId).toBe('t2');
+    expect(s.outstanding).toBe(false);
+    expect(s.tasks.t2.claimed).toEqual(['B']);
+    s = applyTurn(s, parseMarkers('AGENTSYNC-TASK: t1')).session;
+    expect(s.currentTaskId).toBe('t1');
+    expect(s.tasks.t1).toEqual({ claimed: ['A'], reminded: ['A'] });
+  });
+  it('checkpoints attach to the most recent preceding task marker, in textual order', () => {
+    const r = applyTurn(
+      base(),
+      parseMarkers('AGENTSYNC-CHECKPOINT: X\nAGENTSYNC-TASK: t2\nAGENTSYNC-CHECKPOINT: Y\nAGENTSYNC-TASK: t1\nAGENTSYNC-CHECKPOINT: Z'),
+    );
+    expect(r.session.tasks.t1.claimed).toEqual(['X', 'Z']);
+    expect(r.session.tasks.t2.claimed).toEqual(['Y']);
+    expect(r.newCheckpoints).toEqual(['X', 'Z']);
+  });
+  it('checkpoint with no task at all is ignored', () => {
+    const r = applyTurn({ tasks: {}, outstanding: false, updatedAt: 'x' }, parseMarkers('AGENTSYNC-CHECKPOINT: X'));
+    expect(r.session.tasks).toEqual({});
+    expect(r.newCheckpoints).toEqual([]);
   });
   it('same task keeps state; only unseen checkpoints are new', () => {
-    const r = applyTurn({ ...base(), claimed: ['A'] }, { taskIds: ['t1'], checkpoints: ['A', 'B'] });
-    expect(r.session.claimed).toEqual(['A', 'B']);
+    const r = applyTurn(base({ claimed: ['A'] }), parseMarkers('AGENTSYNC-TASK: t1\nAGENTSYNC-CHECKPOINT: A\nAGENTSYNC-CHECKPOINT: B'));
+    expect(t1(r).claimed).toEqual(['A', 'B']);
     expect(r.newCheckpoints).toEqual(['B']);
   });
 });
@@ -62,62 +84,132 @@ describe('applyTurn', () => {
 describe('decide', () => {
   const p = plan([['A', 'pending'], ['B', 'pending']]);
   it('decide: new checkpoint not done on server → remindSteps with that step; reminded updated; outstanding true', () => {
-    const r = decide({ ...base(), claimed: ['A'] }, p, { stopHookActive: false });
+    const r = decide(base({ claimed: ['A'] }), p, { stopHookActive: false });
     expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'] });
-    expect(r.session.reminded).toEqual(['A']);
+    expect(t1(r).reminded).toEqual(['A']);
     expect(r.session.outstanding).toBe(true);
   });
   it('decide: placeholder title not in plan → none', () => {
-    const r = decide({ ...base(), claimed: ['<step title>'] }, p, { stopHookActive: false });
+    const r = decide(base({ claimed: ['<step title>'] }), p, { stopHookActive: false });
     expect(r.action).toEqual({ type: 'none' });
     expect(r.session.outstanding).toBe(false);
   });
   it('decide: same pending step already reminded and no new one → none', () => {
-    const r = decide({ ...base(), claimed: ['A'], reminded: ['A'], outstanding: true }, p, { stopHookActive: false });
+    const r = decide(base({ claimed: ['A'], reminded: ['A'] }, true), p, { stopHookActive: false });
     expect(r.action).toEqual({ type: 'none' });
-    expect(r.session.outstanding).toBe(false);
+    expect(r.session.outstanding).toBe(true);
   });
   it('decide: new checkpoint plus previously reminded pending → remindSteps lists both', () => {
-    const r = decide({ ...base(), claimed: ['A', 'B'], reminded: ['A'] }, p, { stopHookActive: false });
+    const r = decide(base({ claimed: ['A', 'B'], reminded: ['A'] }), p, { stopHookActive: false });
     expect(r.action).toEqual({ type: 'remindSteps', steps: ['A', 'B'] });
-    expect(r.session.reminded).toEqual(['A', 'B']);
+    expect(t1(r).reminded).toEqual(['A', 'B']);
   });
   it('decide: status awaiting_review/paused/done → none', () => {
     for (const status of ['awaiting_review', 'paused', 'done']) {
-      const r = decide({ ...base(), claimed: ['A'] }, plan([['A', 'pending']], { status }), { stopHookActive: false });
+      const r = decide(base({ claimed: ['A'] }), plan([['A', 'pending']], { status }), { stopHookActive: false });
       expect(r.action).toEqual({ type: 'none' });
     }
   });
   it('decide: allowed statuses pending_confirmation/changes_requested still remind', () => {
     for (const status of ['pending_confirmation', 'changes_requested']) {
-      const r = decide({ ...base(), claimed: ['A'] }, plan([['A', 'pending']], { status }), { stopHookActive: false });
+      const r = decide(base({ claimed: ['A'] }), plan([['A', 'pending']], { status }), { stopHookActive: false });
       expect(r.action.type).toBe('remindSteps');
     }
   });
   it('decide: stopHookActive → none but claimed kept', () => {
-    const r = decide({ ...base(), claimed: ['A'] }, p, { stopHookActive: true });
+    const r = decide(base({ claimed: ['A'] }, true), p, { stopHookActive: true });
     expect(r.action).toEqual({ type: 'none' });
-    expect(r.session.claimed).toEqual(['A']);
-    expect(r.session.reminded).toEqual([]);
+    expect(t1(r).claimed).toEqual(['A']);
+    expect(t1(r).reminded).toEqual([]);
+    expect(r.session.outstanding).toBe(true);
   });
   it('decide: plan null → none, session unchanged', () => {
-    const s = { ...base(), claimed: ['A'], outstanding: true };
+    const s = base({ claimed: ['A'] }, true);
     const r = decide(s, null, { stopHookActive: false });
     expect(r.action).toEqual({ type: 'none' });
     expect(r.session).toEqual(s);
   });
   const done = plan([['A', 'done'], ['B', 'done']]);
   it('decide: all steps done, in_progress, not reminded for this statusChangedAt → remindComplete(project)', () => {
-    const r = decide({ ...base(), claimed: ['A', 'B'], reminded: ['A', 'B'] }, done, { stopHookActive: false });
+    const r = decide(base({ claimed: ['A', 'B'], reminded: ['A', 'B'] }), done, { stopHookActive: false });
     expect(r.action).toEqual({ type: 'remindComplete', mode: 'project' });
-    expect(r.session.completionRemindedAt).toBe(done.statusChangedAt);
+    expect(t1(r).completionRemindedAt).toBe(done.statusChangedAt);
     expect(r.session.outstanding).toBe(true);
   });
   it('decide: completion already reminded for same statusChangedAt → none; new statusChangedAt → remindComplete again', () => {
-    const s = { ...base(), completionRemindedAt: done.statusChangedAt, outstanding: true };
+    const s = base({ completionRemindedAt: done.statusChangedAt }, true);
     expect(decide(s, done, { stopHookActive: false }).action).toEqual({ type: 'none' });
     const later = plan([['A', 'done'], ['B', 'done']], { statusChangedAt: '2026-02-01T00:00:00.000Z' });
     expect(decide(s, later, { stopHookActive: false }).action).toEqual({ type: 'remindComplete', mode: 'project' });
+  });
+});
+
+describe('decide: multi-turn and edge cases', () => {
+  const T0 = '2026-01-01T00:00:00.000Z';
+  const T1 = '2026-02-01T00:00:00.000Z';
+  const run = (s: Session, p: ReturnType<typeof plan> | null, hook = false) => decide(s, p, { stopHookActive: hook });
+
+  it('(a) complete -> awaiting_review keeps outstanding -> rejected with new statusChangedAt reminds again', () => {
+    let r = run(base({ claimed: ['A'], reminded: ['A'] }), plan([['A', 'done']], { statusChangedAt: T0 }));
+    expect(r.action.type).toBe('remindComplete');
+    r = run(r.session, plan([['A', 'done']], { status: 'awaiting_review', statusChangedAt: T0 }));
+    expect(r.action).toEqual({ type: 'none' });
+    expect(r.session.outstanding).toBe(true);
+    r = run(r.session, plan([['A', 'done']], { status: 'in_progress', statusChangedAt: T1 }));
+    expect(r.action).toEqual({ type: 'remindComplete', mode: 'project' });
+  });
+  it('(b) last step reminded but draft pending -> none, outstanding; step later done -> remindComplete', () => {
+    let r = run(base({ claimed: ['A'] }), plan([['A', 'pending']]));
+    expect(r.action.type).toBe('remindSteps');
+    r = run(r.session, plan([['A', 'pending']]));
+    expect(r.action).toEqual({ type: 'none' });
+    expect(r.session.outstanding).toBe(true);
+    r = run(r.session, plan([['A', 'done']]));
+    expect(r.action.type).toBe('remindComplete');
+  });
+  it('outstanding stays true for non-allowed status while work remains, false when terminal', () => {
+    expect(run(base({ claimed: ['A'] }), plan([['A', 'pending']], { status: 'paused' })).session.outstanding).toBe(true);
+    expect(run(base({ claimed: ['A'] }, true), plan([['A', 'done']], { status: 'done' })).session.outstanding).toBe(false);
+    expect(run(base({ claimed: ['A'] }, true), plan([['A', 'done']], { status: 'closed' })).session.outstanding).toBe(false);
+  });
+  it('stopHookActive refreshes outstanding from the plan without blocking', () => {
+    const r = run(base({ claimed: ['A'] }, true), plan([['A', 'done'], ['B', 'pending']]), true);
+    expect(r.action).toEqual({ type: 'none' });
+    expect(r.session.outstanding).toBe(false);
+    expect(run(base({ claimed: ['A'] }), plan([['A', 'pending']]), true).session.outstanding).toBe(true);
+  });
+  it('executive mode gives remindComplete(executive)', () => {
+    const r = run(base({ claimed: ['A'], reminded: ['A'] }), plan([['A', 'done']], { mode: 'executive' }));
+    expect(r.action).toEqual({ type: 'remindComplete', mode: 'executive' });
+  });
+  it('empty-step plan never reminds completion', () => {
+    const r = run(base(), plan([]));
+    expect(r.action).toEqual({ type: 'none' });
+    expect(r.session.outstanding).toBe(false);
+  });
+  it('matches trimmed titles but lists the server original title', () => {
+    const r = run(base({ claimed: ['Write API'] }), plan([['  Write API ', 'pending']]));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['  Write API '] });
+  });
+  it('duplicate plan titles count as done only if all are done', () => {
+    expect(run(base({ claimed: ['A'] }), plan([['A', 'done'], ['A', 'pending']])).action.type).toBe('remindSteps');
+    const r = run(base({ claimed: ['A'], reminded: ['A'] }), plan([['A', 'done'], ['A', 'done']]));
+    expect(r.action.type).toBe('remindComplete');
+  });
+});
+
+describe('turnAssistantTexts: meta and sidechain', () => {
+  it('ignores isMeta user lines and isSidechain lines', () => {
+    const L = (o: object) => JSON.stringify(o);
+    const t = [
+      L({ type: 'user', message: { role: 'user', content: 'real' } }),
+      L({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'keep1' }] } }),
+      L({ type: 'user', isMeta: true, message: { role: 'user', content: 'meta caveat' } }),
+      L({ type: 'user', isSidechain: true, message: { role: 'user', content: 'sub prompt' } }),
+      L({ type: 'assistant', isSidechain: true, message: { role: 'assistant', content: [{ type: 'text', text: 'SUB' }] } }),
+      L({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'keep2' }] } }),
+    ].join('\n');
+    expect(turnAssistantTexts(t)).toEqual(['keep1', 'keep2']);
   });
 });
 

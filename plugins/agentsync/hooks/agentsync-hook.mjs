@@ -2,27 +2,42 @@
 // This part: pure decision logic. IO/main lives elsewhere.
 
 /**
- * @typedef {{ taskId?: string, claimed: string[], reminded: string[], completionRemindedAt?: string, outstanding: boolean, updatedAt: string }} Session
+ * @typedef {{ claimed: string[], reminded: string[], completionRemindedAt?: string }} TaskState
+ * @typedef {{ currentTaskId?: string, tasks: Record<string, TaskState>, outstanding: boolean, updatedAt: string }} Session
  * @typedef {{ id: string, status: string, mode: string, statusChangedAt: string, steps: { title: string, status: string }[] }} Plan
  * @typedef {{ type: 'none' } | { type: 'remindSteps', steps: string[] } | { type: 'remindComplete', mode: 'project' | 'executive' }} Action
+ * @typedef {{ taskIds: string[], checkpoints: string[], events: { kind: 'task' | 'checkpoint', value: string }[] }} Markers
  */
 
 const REMIND_STATUSES = ['pending_confirmation', 'in_progress', 'changes_requested'];
+const TERMINAL_STATUSES = ['done', 'closed', 'cancelled'];
 
 /**
  * @param {string} text
- * @returns {{ taskIds: string[], checkpoints: string[] }}
+ * @returns {Markers}
  */
 export function parseMarkers(text) {
   const taskIds = [];
   const checkpoints = [];
-  for (const m of String(text ?? '').matchAll(/^[ \t]*AGENTSYNC-TASK:[ \t]*(\S+)[ \t]*\r?$/gm)) taskIds.push(m[1]);
-  for (const m of String(text ?? '').matchAll(/^[ \t]*AGENTSYNC-CHECKPOINT:[ \t]*(.+?)[ \t]*\r?$/gm)) checkpoints.push(m[1]);
-  return { taskIds, checkpoints };
+  /** @type {Markers['events']} */
+  const events = [];
+  const re = /^[ \t]*AGENTSYNC-(TASK|CHECKPOINT):[ \t]*(.+?)[ \t]*\r?$/gm;
+  for (const m of String(text ?? '').matchAll(re)) {
+    if (m[1] === 'TASK') {
+      if (/\s/.test(m[2])) continue;
+      taskIds.push(m[2]);
+      events.push({ kind: 'task', value: m[2] });
+    } else {
+      checkpoints.push(m[2]);
+      events.push({ kind: 'checkpoint', value: m[2] });
+    }
+  }
+  return { taskIds, checkpoints, events };
 }
 
 /**
  * Assistant text blocks since the most recent real user message of a Claude Code JSONL transcript.
+ * Meta and sidechain lines are ignored.
  * @param {string} transcript
  * @returns {string[]}
  */
@@ -37,7 +52,8 @@ export function turnAssistantTexts(transcript) {
     } catch {
       continue;
     }
-    const msg = obj && typeof obj === 'object' ? obj.message : null;
+    if (!obj || typeof obj !== 'object' || obj.isMeta === true || obj.isSidechain === true) continue;
+    const msg = obj.message;
     if (!msg || typeof msg !== 'object') continue;
     const content = msg.content;
     if (obj.type === 'user') {
@@ -57,26 +73,37 @@ export function turnAssistantTexts(transcript) {
 }
 
 /**
+ * Apply markers in textual order: a checkpoint belongs to the most recent task marker before it
+ * (or the session's current task). Per-task state is kept across task switches.
  * @param {Session} session
- * @param {{ taskIds: string[], checkpoints: string[] }} markers
+ * @param {Markers} markers
  * @returns {{ session: Session, newCheckpoints: string[] }}
  */
 export function applyTurn(session, markers) {
-  let s = { ...session };
-  const last = markers.taskIds.length ? markers.taskIds[markers.taskIds.length - 1] : undefined;
-  if (last && last !== s.taskId) {
-    s = { ...s, taskId: last, claimed: [], reminded: [], completionRemindedAt: undefined, outstanding: false };
-  }
-  const claimed = [...s.claimed];
-  const newCheckpoints = [];
-  for (const c of markers.checkpoints) {
-    const t = c.trim();
-    if (t && !claimed.includes(t)) {
-      claimed.push(t);
-      newCheckpoints.push(t);
+  /** @type {Record<string, TaskState>} */
+  const tasks = { ...session.tasks };
+  let current = session.currentTaskId;
+  let outstanding = session.outstanding;
+  /** @type {Record<string, string[]>} */
+  const added = {};
+  for (const ev of markers.events) {
+    if (ev.kind === 'task') {
+      if (ev.value !== current) outstanding = false;
+      current = ev.value;
+      if (!tasks[current]) tasks[current] = { claimed: [], reminded: [] };
+    } else if (current) {
+      const t = ev.value.trim();
+      const st = tasks[current] ?? { claimed: [], reminded: [] };
+      if (t && !st.claimed.includes(t)) {
+        tasks[current] = { ...st, claimed: [...st.claimed, t] };
+        (added[current] ??= []).push(t);
+      }
     }
   }
-  return { session: { ...s, claimed }, newCheckpoints };
+  return {
+    session: { ...session, currentTaskId: current, tasks, outstanding },
+    newCheckpoints: current ? (added[current] ?? []) : [],
+  };
 }
 
 /**
@@ -86,31 +113,44 @@ export function applyTurn(session, markers) {
  * @returns {{ session: Session, action: Action }}
  */
 export function decide(session, plan, opts) {
-  if (plan === null || opts.stopHookActive) return { session, action: { type: 'none' } };
-  const none = () => ({ session: { ...session, outstanding: false }, action: /** @type {Action} */ ({ type: 'none' }) });
-  const status = plan.status;
-  if (!REMIND_STATUSES.includes(status)) return none();
+  const none = { type: /** @type {const} */ ('none') };
+  const id = session.currentTaskId;
+  if (plan === null || !id) return { session, action: none };
+  const ts = session.tasks[id] ?? { claimed: [], reminded: [] };
 
-  const done = new Map(plan.steps.map((st) => [st.title.trim(), st.status === 'done']));
-  const pending = session.claimed.filter((c) => done.has(c.trim()) && !done.get(c.trim()));
-  if (pending.some((c) => !session.reminded.includes(c))) {
-    const reminded = [...session.reminded];
-    for (const c of pending) if (!reminded.includes(c)) reminded.push(c);
-    return { session: { ...session, reminded, outstanding: true }, action: { type: 'remindSteps', steps: pending } };
+  /** @type {Map<string, { original: string, done: boolean }>} */
+  const byTitle = new Map();
+  for (const st of plan.steps) {
+    const key = st.title.trim();
+    const prev = byTitle.get(key);
+    byTitle.set(key, { original: prev ? prev.original : st.title, done: (prev ? prev.done : true) && st.status === 'done' });
   }
-  if (
-    pending.length === 0 &&
-    status === 'in_progress' &&
-    plan.steps.length > 0 &&
-    plan.steps.every((st) => st.status === 'done') &&
-    session.completionRemindedAt !== plan.statusChangedAt
-  ) {
-    return {
-      session: { ...session, completionRemindedAt: plan.statusChangedAt, outstanding: true },
-      action: { type: 'remindComplete', mode: plan.mode === 'executive' ? 'executive' : 'project' },
-    };
+  const pendingKeys = ts.claimed.filter((c) => byTitle.has(c) && !byTitle.get(c)?.done);
+  const allDone = plan.steps.length > 0 && plan.steps.every((st) => st.status === 'done');
+  const outstanding = pendingKeys.length > 0 || (allDone && !TERMINAL_STATUSES.includes(plan.status));
+  const keptReminded = ts.reminded.filter((r) => pendingKeys.includes(r));
+
+  /** @param {Partial<TaskState>} patch @param {Action} action */
+  const out = (patch, action) => ({
+    session: { ...session, outstanding, tasks: { ...session.tasks, [id]: { ...ts, reminded: keptReminded, ...patch } } },
+    action,
+  });
+
+  if (opts.stopHookActive || !REMIND_STATUSES.includes(plan.status)) return out({}, none);
+
+  if (pendingKeys.some((c) => !ts.reminded.includes(c))) {
+    return out({ reminded: [...pendingKeys] }, {
+      type: 'remindSteps',
+      steps: pendingKeys.map((c) => byTitle.get(c)?.original ?? c),
+    });
   }
-  return none();
+  if (pendingKeys.length === 0 && plan.status === 'in_progress' && allDone && ts.completionRemindedAt !== plan.statusChangedAt) {
+    return out({ completionRemindedAt: plan.statusChangedAt }, {
+      type: 'remindComplete',
+      mode: plan.mode === 'executive' ? 'executive' : 'project',
+    });
+  }
+  return out({}, none);
 }
 
 /**
