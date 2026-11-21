@@ -363,3 +363,17 @@ export async function listMyTasks(
     repoRef: t.repoRef ?? null, cwdHint: t.cwdHint ?? null,
   }));
 }
+
+/** Owner-only read of the current plan, for agent hooks. Non-owners get NOT_FOUND. */
+export async function getOwnTaskPlan(db: Db, actor: Actor, taskId: string) {
+  const { task } = await loadTaskForViewer(db, actor, taskId);
+  if (task.ownerId !== actor.id) throw new DomainError('NOT_FOUND', 'notFoundTask');
+  const plan = await currentPlan(db, task.id);
+  return {
+    id: task.id,
+    status: task.status,
+    mode: task.mode,
+    statusChangedAt: task.statusChangedAt.toISOString(),
+    steps: plan.steps.map((s) => ({ title: s.title, status: s.status })),
+  };
+}

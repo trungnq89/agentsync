@@ -195,3 +195,16 @@ describe('listMyTasks', () => {
     expect(t.cwdHint).toBe('/work/x');
   });
 });
+
+describe('getOwnTaskPlan', () => {
+  it('returns current plan for the owner only', async () => {
+    const { getOwnTaskPlan } = await import('@/server/tasks/queries');
+    const { manager, member } = await chain();
+    const t = await makeTask(member.id, { status: 'in_progress', steps: ['A', 'B'] });
+    const plan = await getOwnTaskPlan(testDb, member, t.id);
+    expect(Object.keys(plan)).toEqual(['id', 'status', 'mode', 'statusChangedAt', 'steps']);
+    expect(plan.steps).toEqual([{ title: 'A', status: 'todo' }, { title: 'B', status: 'todo' }]);
+    expect(plan.statusChangedAt).toBe(t.statusChangedAt.toISOString());
+    await expect(getOwnTaskPlan(testDb, manager, t.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
