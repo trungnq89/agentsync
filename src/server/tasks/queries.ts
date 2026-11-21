@@ -313,3 +313,22 @@ export async function weeklyDigest(db: Db, actor: Actor, now: Date = new Date())
   }
   return { people };
 }
+
+// ---------------------------------------------------------------- listMyTasks
+
+export async function listMyTasks(
+  db: Db,
+  actor: Actor,
+  opts: { includeDone?: boolean } = {},
+  now: Date = new Date(),
+): Promise<TimelineTask[]> {
+  const rows = (await tasksOf(db, [actor.id]))
+    .filter((t) => isActive(t) || (opts.includeDone && (DONE_STATUSES.includes(t.status) || t.status === 'cancelled')))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const metrics = await loadMetrics(db, rows, now);
+  return rows.map((t) => ({
+    id: t.id, title: t.title, status: t.status, startDate: t.startDate,
+    agreedDueDate: t.agreedDueDate, expectedEndDate: t.expectedEndDate,
+    progress: metrics.get(t.id)!.progress, health: metrics.get(t.id)!.health,
+  }));
+}

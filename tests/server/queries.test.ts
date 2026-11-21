@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { tasks, updates, questions, planVersions } from '@/db/schema';
 import {
-  needsAttention, personTimeline, taskDetail, teamOverview, weeklyDigest,
+  listMyTasks, needsAttention, personTimeline, taskDetail, teamOverview, weeklyDigest,
 } from '@/server/tasks/queries';
 import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
@@ -150,5 +150,21 @@ describe('weeklyDigest', () => {
     expect(p.slipped).toEqual([{ title: 'Trễ', from: '2026-12-01', to: '2026-12-10' }]);
     const all = JSON.stringify(d);
     expect(all).not.toContain('Riêng');
+  });
+});
+
+describe('listMyTasks', () => {
+  it('lists only own active tasks by default, done ones with includeDone', async () => {
+    const me = await makeUser();
+    const other = await makeUser();
+    const active = await makeTask(me.id, { title: 'Đang làm', status: 'in_progress' });
+    const done = await makeTask(me.id, { title: 'Đã xong', status: 'done', completedAt: NOW });
+    await makeTask(other.id, { title: 'Của người khác' });
+    const def = await listMyTasks(testDb, me, {}, NOW);
+    expect(def.map((t) => t.id)).toEqual([active.id]);
+    expect(def[0]).toMatchObject({ title: 'Đang làm', status: 'in_progress', progress: 0, startDate: '2026-11-23', agreedDueDate: '2026-11-30' });
+    expect(def[0].health).toBeTruthy();
+    const all = await listMyTasks(testDb, me, { includeDone: true }, NOW);
+    expect(all.map((t) => t.id).sort()).toEqual([active.id, done.id].sort());
   });
 });
