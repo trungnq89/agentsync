@@ -13,7 +13,15 @@
     "justNow": "just now",
     "notifications": "Notifications"
   },
-  "nav": {},
+  "nav": {
+    "home": "Home",
+    "settings": "Settings",
+    "admin": "Admin",
+    "logout": "Log out",
+    "menu": "Menu",
+    "account": "Account",
+    "main": "Main navigation"
+  },
   "auth": {},
   "home": {},
   "person": {},

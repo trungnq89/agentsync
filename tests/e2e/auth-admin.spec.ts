@@ -10,6 +10,11 @@ async function login(page: Page, username: string, password: string) {
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
 }
 
+async function logout(page: Page) {
+  await page.getByTestId('user-menu').click();
+  await page.getByTestId('logout').click();
+}
+
 async function createUser(page: Page, f: { username: string; name: string; level: string; manager?: string }) {
   const form = page.getByTestId('create-user');
   await form.getByLabel('Tên đăng nhập').fill(f.username);
@@ -38,22 +43,22 @@ test('wrong password shows an error', async ({ page }) => {
 test('admin creates users, leader logs in and creates a token shown once', async ({ page }) => {
   await login(page, ADMIN.username, ADMIN.password);
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('link', { name: 'Quản trị' })).toBeVisible();
+  await expect(page.getByTestId('nav-admin')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Quản trị' }).click();
+  await page.getByTestId('nav-admin').click();
   await createUser(page, { username: 'manager1', name: 'Manager Một', level: 'Manager' });
   await createUser(page, { username: 'leader1', name: 'Leader Một', level: 'Leader', manager: 'Manager Một' });
   const mgrId = await page.getByTestId('user-manager1').locator('input[name=userId]').first().inputValue();
   await expect(page.getByTestId('user-leader1').getByLabel('Quản lý')).toHaveValue(mgrId);
 
-  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await logout(page);
   await expect(page).toHaveURL(/\/login$/);
 
   await login(page, 'leader1', 'user-password-1');
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('link', { name: 'Quản trị' })).toHaveCount(0);
+  await expect(page.getByTestId('nav-admin')).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Cài đặt' }).click();
+  await page.getByTestId('nav-settings').click();
   await page.getByLabel('Nhãn token').fill('Laptop');
   await page.getByRole('button', { name: 'Tạo token' }).click();
   const plaintext = page.getByTestId('token-plaintext');
@@ -71,9 +76,9 @@ test('admin creates users, leader logs in and creates a token shown once', async
 
 test('non-admin cannot open /admin', async ({ page }) => {
   await login(page, ADMIN.username, ADMIN.password);
-  await page.getByRole('link', { name: 'Quản trị' }).click();
+  await page.getByTestId('nav-admin').click();
   await createUser(page, { username: 'plain', name: 'Plain', level: 'Thành viên' });
-  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await logout(page);
   await login(page, 'plain', 'user-password-1');
   await expect(page).toHaveURL('/');
   await page.goto('/admin');
@@ -100,7 +105,7 @@ test('no horizontal scroll at 375px', async ({ page }) => {
 
 test('saving a report keeps a disabled manager selected', async ({ page }) => {
   await login(page, ADMIN.username, ADMIN.password);
-  await page.getByRole('link', { name: 'Quản trị' }).click();
+  await page.getByTestId('nav-admin').click();
   await createUser(page, { username: 'mgr', name: 'Sếp', level: 'Manager' });
   await createUser(page, { username: 'rep', name: 'Nhân viên', level: 'Leader', manager: 'Sếp' });
   const mgrId = await page.getByTestId('user-mgr').locator('input[name=userId]').first().inputValue();

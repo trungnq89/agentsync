@@ -6,10 +6,11 @@ import { cookieSecure } from '@/server/auth/cookie';
 import { login, logout } from '@/server/auth/session';
 import { run, str, type FormState } from '../_lib/action';
 import { SESSION_COOKIE } from '../_lib/actor';
+import { writeLocaleCookie, writeThemeCookie } from '../_lib/preference-cookies';
 
 export async function loginAction(_prev: FormState, form: FormData): Promise<FormState> {
   const res = await run(async () => {
-    const { sessionId } = await login(getDb(), str(form, 'username'), String(form.get('password') ?? ''));
+    const { sessionId, user } = await login(getDb(), str(form, 'username'), String(form.get('password') ?? ''));
     (await cookies()).set(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       sameSite: 'lax',
@@ -17,6 +18,9 @@ export async function loginAction(_prev: FormState, form: FormData): Promise<For
       path: '/',
       maxAge: 14 * 24 * 60 * 60,
     });
+    // DB preferences win over whatever the browser had.
+    if (user.locale) await writeLocaleCookie(user.locale);
+    await writeThemeCookie(user.theme);
   });
   if (res.error || res.fieldErrors) return res;
   redirect('/');

@@ -13,7 +13,15 @@
     "justNow": "vừa xong",
     "notifications": "Thông báo"
   },
-  "nav": {},
+  "nav": {
+    "home": "Trang chủ",
+    "settings": "Cài đặt",
+    "admin": "Quản trị",
+    "logout": "Đăng xuất",
+    "menu": "Menu",
+    "account": "Tài khoản",
+    "main": "Điều hướng chính"
+  },
   "auth": {},
   "home": {},
   "person": {},

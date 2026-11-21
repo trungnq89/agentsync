@@ -5,7 +5,12 @@ import { LOCALE_COOKIE } from './config';
 import { resolveLocale } from './resolve';
 
 export default getRequestConfig(async () => {
-  const [user, cookieStore, headerStore] = await Promise.all([getOptionalActor(), cookies(), headers()]);
+  const [user, cookieStore, headerStore] = await Promise.all([
+    // A DB failure must not break rendering: fall back to cookie / Accept-Language.
+    getOptionalActor().catch(() => null),
+    cookies(),
+    headers(),
+  ]);
   const locale = resolveLocale({
     user: user?.locale,
     cookie: cookieStore.get(LOCALE_COOKIE)?.value,
