@@ -116,6 +116,7 @@ describe('taskDetail', () => {
     const asMgr = await taskDetail(testDb, manager, t.id, NOW);
     expect(asMgr.updates.map((u) => u.body)).toEqual(['mới', 'cũ']);
     expect(asMgr).toMatchObject({ canReview: true, canConfirm: false, canEdit: false });
+    expect(asMgr.lastActivityAt).toEqual(new Date('2026-11-25T00:00:00Z'));
     expect(asMgr.planHistory[0]).toMatchObject({ version: 1, kind: 'initial' });
     const asOwner = await taskDetail(testDb, leader, t.id, NOW);
     expect(asOwner).toMatchObject({ canReview: false, canEdit: true });

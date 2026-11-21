@@ -29,7 +29,7 @@ test('director sees manager tier with blocked badge, not the leader', async ({ p
   await expect(page.getByText('Minh Leader')).toHaveCount(0);
 
   await page.goto(`/people/${ids.leaderId}`);
-  await expect(page.getByText('This page could not be found')).toBeVisible();
+  await expect(page.getByText('Không tìm thấy trang này hoặc bạn không có quyền xem.')).toBeVisible();
 });
 
 test('director opens manager timeline', async ({ page }) => {

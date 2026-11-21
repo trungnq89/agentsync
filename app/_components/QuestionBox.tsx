@@ -14,7 +14,7 @@ export function QuestionBox({
   questions: Question[];
   now: Date;
 }) {
-  const open = questions.filter((q) => q.status === 'open');
+  const open = questions.filter((q) => q.status !== 'resolved');
   const canAnswer = (q: Question) =>
     q.direction === 'manager_to_member' ? viewerId === ownerId : isCurrentManager;
   return (
@@ -30,7 +30,16 @@ export function QuestionBox({
           <div className="mt-1 text-xs opacity-60">
             {q.direction === 'manager_to_member' ? 'Quản lý hỏi' : `${ownerName} hỏi`} · {relativeTime(q.createdAt, now)}
           </div>
-          {canAnswer(q) && (
+          {q.status === 'answered' && q.answer && (
+            <div data-testid="answer" className="mt-2 border-l-2 border-neutral-300 pl-3 dark:border-neutral-700">
+              <div className="break-words whitespace-pre-wrap">{q.answer}</div>
+              <div className="mt-1 text-xs opacity-60">
+                {q.answeredById === q.authorId ? 'Người hỏi' : q.direction === 'manager_to_member' ? ownerName : 'Quản lý'} đã trả lời
+                {q.answeredAt && <> · {relativeTime(q.answeredAt, now)}</>}
+              </div>
+            </div>
+          )}
+          {q.status === 'open' && canAnswer(q) && (
             <ActionForm action={answerAction} className="mt-2 space-y-2">
               <input type="hidden" name="taskId" value={taskId} />
               <input type="hidden" name="questionId" value={q.id} />

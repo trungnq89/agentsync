@@ -244,6 +244,9 @@ export async function reviewSolution(
   note?: string,
   now: Date = new Date(),
 ): Promise<Task> {
+  if (verdict === 'changes_needed' && !note?.trim()) {
+    throw new DomainError('VALIDATION', 'Cần nhập ghi chú khi yêu cầu chỉnh sửa.');
+  }
   return db.transaction(async (tx) => {
     const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     const role = isCurrentManagerOf(actor, owner) && actor.id !== task.ownerId ? 'manager' : 'owner';

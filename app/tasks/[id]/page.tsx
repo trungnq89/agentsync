@@ -26,15 +26,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   }
   const { task, owner } = d;
   const isCurrentManager = user.id !== task.ownerId && owner.managerId === user.id;
-  const lastActivityAt = new Date(Math.max(
-    task.createdAt.getTime(), task.statusChangedAt.getTime(), d.updates[0]?.createdAt.getTime() ?? 0,
-  ));
   return (
     <main className="space-y-5">
       <Link href="/" className="text-sm opacity-70 hover:underline">← Trang chủ</Link>
       <TaskHeader
         task={task} ownerName={owner.displayName} progress={d.progress} health={d.health}
-        lastActivityAt={lastActivityAt} canConfirm={d.canConfirm} now={now}
+        lastActivityAt={d.lastActivityAt} canConfirm={d.canConfirm} now={now}
       />
       <section className={card}>
         <h2 className="text-sm font-medium">Kết quả đã thống nhất</h2>

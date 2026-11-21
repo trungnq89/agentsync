@@ -265,6 +265,7 @@ export async function taskDetail(db: Db, actor: Actor, taskId: string, now: Date
     owner,
     plan,
     progress: m.progress,
+    lastActivityAt: m.lastActivityAt,
     health: { health: m.health, overdue: m.overdue, stale: m.stale },
     updates: updateRows,
     questions: questionRows,

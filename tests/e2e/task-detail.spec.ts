@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { createDb } from '../../src/db/client';
 import { users } from '../../src/db/schema';
-import { getPendingFeedback, postUpdate, submitSolutionSummary } from '../../src/server/tasks/activity';
+import { answerQuestion, getPendingFeedback, postUpdate, submitSolutionSummary } from '../../src/server/tasks/activity';
 import { confirmTask, createTask, setTaskStatus } from '../../src/server/tasks/service';
 import { resetE2eDb, seedOrg } from '../helpers/e2e-db';
 
@@ -87,6 +87,9 @@ test('manager question reaches the leader', async ({ page }) => {
   await expect(page.getByTestId('question-box')).toContainText('Khi nào xong phần 1?');
   const fb = await withDb((db, { leader }) => getPendingFeedback(db, leader));
   expect(fb.questionsForMe.map((q) => q.body)).toContain('Khi nào xong phần 1?');
+  await withDb((db, { leader }) => answerQuestion(db, leader, fb.questionsForMe[0].questionId, 'Thứ Sáu này xong'));
+  await page.reload();
+  await expect(page.getByTestId('answer')).toContainText('Thứ Sáu này xong');
 });
 
 test('activity shows 3 latest by default, rest behind "Xem thêm"; no overflow at 375px', async ({ page }) => {
@@ -115,5 +118,7 @@ test('activity shows 3 latest by default, rest behind "Xem thêm"; no overflow a
 test('unknown or non-viewable task is 404', async ({ page }) => {
   await login(page, 'manager1', PW);
   await page.goto('/tasks/00000000-0000-0000-0000-000000000000');
-  await expect(page.getByText('This page could not be found')).toBeVisible();
+  await expect(page.getByText('Không tìm thấy trang này hoặc bạn không có quyền xem.')).toBeVisible();
+  await page.goto('/tasks/abc');
+  await expect(page.getByText('Không tìm thấy trang này hoặc bạn không có quyền xem.')).toBeVisible();
 });
