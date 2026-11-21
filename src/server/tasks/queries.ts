@@ -13,6 +13,12 @@ import { currentPlan, type PlanVersion } from './internal';
 import { ACTIVE_STATUSES, DONE_STATUSES } from './lifecycle';
 import { getPendingFeedback } from './activity';
 
+/** The only user fields that may leave the server layer via queries. */
+export type PublicUser = Pick<User, 'id' | 'displayName' | 'avatarUrl' | 'level' | 'managerId'>;
+const publicUser = (u: User): PublicUser => ({
+  id: u.id, displayName: u.displayName, avatarUrl: u.avatarUrl, level: u.level, managerId: u.managerId,
+});
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LEVEL_ORDER = ['director', 'manager', 'leader', 'member'] as const;
 type Level = (typeof LEVEL_ORDER)[number];
@@ -227,7 +233,7 @@ export async function personTimeline(
   actor: Actor,
   userId: string,
   now: Date = new Date(),
-): Promise<{ person: User; tasks: TimelineTask[] }> {
+): Promise<{ person: PublicUser; tasks: TimelineTask[] }> {
   const notFound = () => new DomainError('NOT_FOUND', 'Không tìm thấy người này.');
   if (!isUuid(userId)) throw notFound();
   const [person] = await db.select().from(users).where(eq(users.id, userId));
@@ -237,7 +243,7 @@ export async function personTimeline(
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
   const metrics = await loadMetrics(db, rows, now);
   return {
-    person,
+    person: publicUser(person),
     tasks: rows.map((t) => ({
       id: t.id, title: t.title, status: t.status, startDate: t.startDate,
       agreedDueDate: t.agreedDueDate, expectedEndDate: t.expectedEndDate,
@@ -249,7 +255,9 @@ export async function personTimeline(
 // ---------------------------------------------------------------- taskDetail
 
 export async function taskDetail(db: Db, actor: Actor, taskId: string, now: Date = new Date()) {
-  const { task, owner } = await loadTaskForViewer(db, actor, taskId);
+  const { task: fullTask, owner: ownerRow } = await loadTaskForViewer(db, actor, taskId);
+  const task: Task = actor.id === fullTask.ownerId ? fullTask : { ...fullTask, repoRef: null, cwdHint: null };
+  const owner = publicUser(ownerRow);
   const [plan, planRows, updateRows, questionRows, [solution], [latestReview], metrics] = await Promise.all([
     currentPlan(db, taskId),
     db.select().from(planVersions).where(eq(planVersions.taskId, taskId)).orderBy(asc(planVersions.version)),
@@ -260,7 +268,7 @@ export async function taskDetail(db: Db, actor: Actor, taskId: string, now: Date
     loadMetrics(db, [task], now),
   ]);
   const m = metrics.get(task.id)!;
-  const isMgr = isCurrentManagerOf(actor, owner) && actor.id !== task.ownerId;
+  const isMgr = isCurrentManagerOf(actor, ownerRow) && actor.id !== task.ownerId;
   return {
     task,
     owner,

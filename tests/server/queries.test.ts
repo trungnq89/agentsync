@@ -124,6 +124,24 @@ describe('taskDetail', () => {
     const p = await makeTask(leader.id, { isPrivate: true });
     await expect(taskDetail(testDb, manager, p.id, NOW)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
+  it('exposes only a public owner projection and hides repoRef/cwdHint from the manager', async () => {
+    const { leader, manager } = await chain();
+    const t = await makeTask(leader.id, {
+      status: 'in_progress', repoRef: { repo: 'r', branch: 'b' }, cwdHint: '/x',
+    });
+    const asMgr = await taskDetail(testDb, manager, t.id, NOW);
+    expect(Object.keys(asMgr.owner).sort()).toEqual(['avatarUrl', 'displayName', 'id', 'level', 'managerId']);
+    expect(asMgr.task.repoRef).toBeNull();
+    expect(asMgr.task.cwdHint).toBeNull();
+    const asOwner = await taskDetail(testDb, leader, t.id, NOW);
+    expect(asOwner.task.repoRef).toEqual({ repo: 'r', branch: 'b' });
+    expect(asOwner.task.cwdHint).toBe('/x');
+  });
+  it('personTimeline returns a public person projection', async () => {
+    const { leader, manager } = await chain();
+    const r = await personTimeline(testDb, manager, leader.id, NOW);
+    expect(Object.keys(r.person).sort()).toEqual(['avatarUrl', 'displayName', 'id', 'level', 'managerId']);
+  });
   it('canConfirm for pending_confirmation', async () => {
     const { leader, manager } = await chain();
     const t = await makeTask(leader.id, { status: 'pending_confirmation' });
