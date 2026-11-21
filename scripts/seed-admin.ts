@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createInterface } from 'node:readline/promises';
 import { eq } from 'drizzle-orm';
 import { createDb, type Db } from '../src/db/client';
 import { users } from '../src/db/schema';
@@ -22,11 +23,25 @@ function arg(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
-if (process.argv[1]?.endsWith('seed-admin.ts')) {
+/** Password source: SEED_ADMIN_PASSWORD (preferred), --password (discouraged: visible in ps/history), else stdin. */
+async function resolvePassword(): Promise<string | undefined> {
+  const fromEnv = process.env.SEED_ADMIN_PASSWORD;
+  if (fromEnv) return fromEnv;
+  const fromArg = arg('password');
+  if (fromArg) return fromArg;
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    return (await rl.question('Mật khẩu admin: ')).trim() || undefined;
+  } finally {
+    rl.close();
+  }
+}
+
+async function main() {
   const username = arg('username');
-  const password = arg('password');
+  const password = username ? await resolvePassword() : undefined;
   if (!username || !password) {
-    console.error('Usage: pnpm seed:admin --username <u> --password <p>');
+    console.error('Usage: SEED_ADMIN_PASSWORD=<p> pnpm seed:admin --username <u>   (or enter the password when prompted)');
     process.exit(1);
   }
   const db = createDb(process.env.DATABASE_URL!);
@@ -42,3 +57,5 @@ if (process.argv[1]?.endsWith('seed-admin.ts')) {
     },
   );
 }
+
+if (process.argv[1]?.endsWith('seed-admin.ts')) void main();

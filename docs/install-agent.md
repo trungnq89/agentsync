@@ -36,11 +36,12 @@ claude --plugin-dir /Users/ten-ban/agentsync/plugins/agentsync
 
 Kiểm tra: gõ `/mcp`, thấy server AgentSync đã kết nối. Tên có thể hiện là `agentsync` hoặc `plugin:agentsync:agentsync`.
 
-Cách thay thế (chưa kiểm tra): copy plugin vào thư mục skill cá nhân để tự tải mỗi phiên.
+Cách thay thế (chưa kiểm tra thủ công): không dùng `--plugin-dir`, copy từng skill vào thư mục skill cá nhân và thêm MCP server bằng lệnh:
 
 ```bash
 mkdir -p ~/.claude/skills
-cp -R /Users/ten-ban/agentsync/plugins/agentsync ~/.claude/skills/agentsync
+cp -R /Users/ten-ban/agentsync/plugins/agentsync/skills/* ~/.claude/skills/
+claude mcp add --transport http agentsync https://agentsync.example.com/api/mcp --header "Authorization: Bearer $AGENTSYNC_TOKEN"
 ```
 
 ## 3. Codex

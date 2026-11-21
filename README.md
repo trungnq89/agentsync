@@ -17,7 +17,7 @@ cp .env.example .env          # sửa DB_PORT và các DATABASE_URL* nếu cổn
 pnpm install
 docker compose up -d db       # Postgres (kèm hai DB test: agentsync_test, agentsync_e2e)
 pnpm db:migrate
-pnpm seed:admin --username admin --password 'mat-khau-dai-hon-12-ky-tu'
+SEED_ADMIN_PASSWORD='mat-khau-dai-hon-12-ky-tu' pnpm seed:admin --username admin
 pnpm dev                      # http://localhost:3000
 ```
 
@@ -33,6 +33,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 - Container `app` tự chạy migration khi khởi động rồi mới start server. Cổng db không mở ra ngoài; dữ liệu nằm trong volume `pgdata`.
 - Bắt buộc: `POSTGRES_PASSWORD`. Tùy chọn: `APP_URL`, `APP_PORT` (mặc định 3000), `ALLOWED_ORIGINS`. Không cần `SESSION_SECRET` (phiên đăng nhập là id ngẫu nhiên lưu trong DB).
+- HTTPS rất nên dùng. Cookie phiên có cờ `Secure` khi `APP_URL` bắt đầu bằng `https://`; đặt `COOKIE_SECURE=false` chỉ để thử nội bộ qua HTTP thuần (nếu không, trình duyệt sẽ không giữ cookie và đăng nhập bị lặp), hoặc `COOKIE_SECURE=true` để ép bật.
 - Không có dịch vụ ngoài lúc chạy: không CDN, không analytics, dùng font hệ thống.
 - Đặt sau reverse proxy (nginx, Caddy, ...): cấp HTTPS ở proxy và chuyển tiếp tới cổng app. Nếu proxy đổi header `Host` so với `Origin` của trình duyệt, server actions sẽ bị từ chối; khi đó đặt `ALLOWED_ORIGINS` (các host cách nhau bằng dấu phẩy, ví dụ `agentsync.example.com`). Biến này được nhúng lúc build: đổi giá trị thì phải chạy lại `docker compose -f docker-compose.prod.yml up -d --build`.
 - Container chạy bằng user `node` (không phải root) và có healthcheck. Nếu `app` cứ khởi động lại liên tục, xem log: `docker compose -f docker-compose.prod.yml logs app`.
@@ -40,9 +41,11 @@ docker compose -f docker-compose.prod.yml up -d --build
 ## Tạo admin đầu tiên
 
 ```bash
-docker compose -f docker-compose.prod.yml exec app \
-  sh -c 'cd /tools && node_modules/.bin/tsx scripts/seed-admin.ts --username admin --password "mat-khau-dai-hon-12-ky-tu"'
+docker compose -f docker-compose.prod.yml exec -e SEED_ADMIN_PASSWORD='mat-khau-dai-hon-12-ky-tu' app \
+  sh -c 'cd /tools && node_modules/.bin/tsx scripts/seed-admin.ts --username admin'
 ```
+
+Nếu không đặt `SEED_ADMIN_PASSWORD`, script sẽ hỏi mật khẩu ở stdin. Cờ `--password` vẫn dùng được nhưng không khuyến khích (mật khẩu lộ trong lịch sử shell và danh sách tiến trình).
 
 Đăng nhập web bằng tài khoản này, vào **Quản trị** để tạo người dùng và gán quản lý, mỗi người vào **Cài đặt** để tạo token agent.
 

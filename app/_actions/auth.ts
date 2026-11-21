@@ -2,6 +2,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getDb } from '@/db';
+import { cookieSecure } from '@/server/auth/cookie';
 import { login, logout } from '@/server/auth/session';
 import { run, str, type FormState } from '../_lib/action';
 import { SESSION_COOKIE } from '../_lib/actor';
@@ -12,7 +13,7 @@ export async function loginAction(_prev: FormState, form: FormData): Promise<For
     (await cookies()).set(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: cookieSecure(),
       path: '/',
       maxAge: 14 * 24 * 60 * 60,
     });
