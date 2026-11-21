@@ -43,6 +43,7 @@ describe('design tokens', () => {
   it.each(['light', 'dark'])('%s: AA contrast for required pairs', (mode) => {
     const v = tokens(mode);
     for (const [fg, bg] of [['foreground', 'background'], ['muted-foreground', 'background'], ['foreground', 'surface'],
+      ['muted-foreground', 'surface'], ['muted-foreground', 'surface-muted'],
       ['primary-foreground', 'primary'], ['success-foreground', 'success-soft'], ['warning-foreground', 'warning-soft'],
       ['danger-foreground', 'danger-soft'], ['info-foreground', 'info-soft']]) {
       expect(contrast(v[fg], v[bg]), `${mode} ${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
