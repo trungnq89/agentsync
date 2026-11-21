@@ -35,7 +35,10 @@ export function scanJsx(src: string): string[] {
     const before = code[(m.index ?? 0) - 1];
     if (before === '=' || before === '-') continue; // arrow function `=>`, `->`
     const text = m[1].trim();
-    if (/[;=?]/.test(text)) continue; // code (comparison / ternary / statement), not prose
+    const prose = text.replace(/&(?:#\d+|#x[\da-f]+|\w+);/gi, ' '); // HTML entities are text, not statements
+    if (/[;=]/.test(prose)) continue; // code (comparison / statement), not prose
+    // Lone ternary condition shapes only: `a ?` or `a ? b :`; real questions ("Are you sure?") have spaces/words.
+    if (/^[\w.!()]+\s*\?$/.test(text) || /^[\w.!()]+\s*\?\s*[\w.()'"]+\s*:/.test(text)) continue;
     if (JSX_TEXT_ALLOWLIST[text]) continue;
     out.push(`text "${text}"`);
   }
@@ -58,8 +61,8 @@ describe('hardcoded strings guard', () => {
   });
 
   it('scanner self-test reports text, text before {expr}, and attribute strings', () => {
-    const fixture = '<p>Total: {n}</p>\n<button>Save (draft)</button>\n<input placeholder="Search" />';
-    expect(scanJsx(fixture)).toEqual(['text "Total:"', 'text "Save (draft)"', 'attr placeholder="Search"']);
+    const fixture = '<p>Total: {n}</p>\n<button>Save (draft)</button>\n<input placeholder="Search" />\n<p>Are you sure?</p>\n<p>Settings &amp; more</p>\n<p>Delete?\n This cannot be undone.</p>';
+    expect(scanJsx(fixture)).toEqual(['text "Total:"', 'text "Save (draft)"', 'text "Are you sure?"', 'text "Settings &amp; more"', 'text "Delete?\n This cannot be undone."', 'attr placeholder="Search"']);
   });
 
   it('SKILL.md bodies are English', () => {
