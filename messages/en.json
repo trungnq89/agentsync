@@ -1,0 +1,39 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied",
+    "loading": "Loading…",
+    "language": "Language",
+    "english": "English",
+    "vietnamese": "Vietnamese"
+  },
+  "nav": {},
+  "auth": {},
+  "home": {},
+  "person": {},
+  "task": {},
+  "settings": {},
+  "admin": {},
+  "status": {},
+  "health": {},
+  "level": {},
+  "mode": {},
+  "attention": {},
+  "verdict": {},
+  "sendMode": {},
+  "action": {},
+  "errors": {
+    "invalidPreference": "Invalid preference value."
+  },
+  "mcp": {},
+  "theme": {
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark",
+    "label": "Theme"
+  }
+}

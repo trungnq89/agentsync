@@ -31,9 +31,14 @@ export const users = pgTable('users', {
   managerId: uuid('manager_id').references((): AnyPgColumn => users.id),
   isAdmin: boolean('is_admin').notNull().default(false),
   sendMode: sendMode('send_mode').notNull().default('review'),
+  locale: text('locale'),
+  theme: text('theme').notNull().default('system'),
   disabledAt: ts('disabled_at'),
   createdAt: createdAt(),
-});
+}, (t) => [
+  check('users_locale_check', sql`${t.locale} in ('en','vi')`),
+  check('users_theme_check', sql`${t.theme} in ('system','light','dark')`),
+]);
 
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),

@@ -1,0 +1,39 @@
+{
+  "common": {
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "confirm": "Xác nhận",
+    "close": "Đóng",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "loading": "Đang tải…",
+    "language": "Ngôn ngữ",
+    "english": "Tiếng Anh",
+    "vietnamese": "Tiếng Việt"
+  },
+  "nav": {},
+  "auth": {},
+  "home": {},
+  "person": {},
+  "task": {},
+  "settings": {},
+  "admin": {},
+  "status": {},
+  "health": {},
+  "level": {},
+  "mode": {},
+  "attention": {},
+  "verdict": {},
+  "sendMode": {},
+  "action": {},
+  "errors": {
+    "invalidPreference": "Giá trị tùy chọn không hợp lệ."
+  },
+  "mcp": {},
+  "theme": {
+    "system": "Theo hệ thống",
+    "light": "Sáng",
+    "dark": "Tối",
+    "label": "Giao diện"
+  }
+}
