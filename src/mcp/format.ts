@@ -1,5 +1,5 @@
 import { healthLabel, levelLabel, statusLabel } from '@/server/labels';
-import type { AttentionItem, DigestPerson, PersonCard, TimelineTask, taskDetail } from '@/server/tasks/queries';
+import type { ListedTask, AttentionItem, DigestPerson, PersonCard, TimelineTask, taskDetail } from '@/server/tasks/queries';
 
 const KIND_LABEL: Record<AttentionItem['kind'], string> = {
   pending_confirmation: 'Chờ xác nhận',
@@ -12,13 +12,15 @@ const KIND_LABEL: Record<AttentionItem['kind'], string> = {
   question_for_me: 'Có câu hỏi cho bạn',
 };
 
-export function formatTaskList(list: TimelineTask[]): string {
+export function formatTaskList(list: ListedTask[]): string {
   if (list.length === 0) return 'Không có việc nào.';
   return [
     '## Việc của bạn',
     ...list.map(
       (t) =>
-        `- **${t.title}** (id: ${t.id}) — ${statusLabel(t.status)}, ${t.progress}%, ${healthLabel(t.health)}, dự kiến ${t.expectedEndDate} (hạn ${t.agreedDueDate})`,
+        `- **${t.title}** (id: ${t.id}) — ${statusLabel(t.status)}, ${t.progress}%, ${healthLabel(t.health)}, dự kiến ${t.expectedEndDate} (hạn ${t.agreedDueDate})` +
+        (t.repoRef?.branch ? `, branch: ${t.repoRef.branch}` : '') +
+        (t.cwdHint ? `, thư mục: ${t.cwdHint}` : ''),
     ),
   ].join('\n');
 }

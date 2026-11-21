@@ -317,12 +317,15 @@ export async function weeklyDigest(db: Db, actor: Actor, now: Date = new Date())
 
 // ---------------------------------------------------------------- listMyTasks
 
+/** Owner's own tasks only, so repoRef/cwdHint are safe to expose here. */
+export type ListedTask = TimelineTask & { repoRef: { repo?: string; branch?: string } | null; cwdHint: string | null };
+
 export async function listMyTasks(
   db: Db,
   actor: Actor,
   opts: { includeDone?: boolean } = {},
   now: Date = new Date(),
-): Promise<TimelineTask[]> {
+): Promise<ListedTask[]> {
   const rows = (await tasksOf(db, [actor.id]))
     .filter((t) => isActive(t) || (opts.includeDone && (DONE_STATUSES.includes(t.status) || t.status === 'cancelled')))
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -331,5 +334,6 @@ export async function listMyTasks(
     id: t.id, title: t.title, status: t.status, startDate: t.startDate,
     agreedDueDate: t.agreedDueDate, expectedEndDate: t.expectedEndDate,
     progress: metrics.get(t.id)!.progress, health: metrics.get(t.id)!.health,
+    repoRef: t.repoRef ?? null, cwdHint: t.cwdHint ?? null,
   }));
 }

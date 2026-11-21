@@ -121,4 +121,13 @@ describe('mcp tools', () => {
     expect(r.isError).toBe(true);
     expect(text(r)).toContain('ghi chú');
   });
+
+  it('list_my_tasks shows repoRef.branch and cwdHint in markdown and data', async () => {
+    const me = await makeUser();
+    await makeTask(me.id, { status: 'in_progress', repoRef: { branch: 'feat/api-x' }, cwdHint: '/work/api' });
+    const r = await call(await connect(() => me), 'list_my_tasks');
+    expect(text(r)).toContain('feat/api-x');
+    expect(text(r)).toContain('/work/api');
+    expect(JSON.parse(r.content[1].text)[0]).toMatchObject({ repoRef: { branch: 'feat/api-x' }, cwdHint: '/work/api' });
+  });
 });

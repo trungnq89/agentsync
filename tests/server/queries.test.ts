@@ -168,4 +168,12 @@ describe('listMyTasks', () => {
     const all = await listMyTasks(testDb, me, { includeDone: true }, NOW);
     expect(all.map((t) => t.id).sort()).toEqual([active.id, done.id].sort());
   });
+
+  it('includes repoRef and cwdHint for the owner\'s tasks', async () => {
+    const me = await makeUser();
+    await makeTask(me.id, { status: 'in_progress', repoRef: { branch: 'feat/x' }, cwdHint: '/work/x' });
+    const [t] = await listMyTasks(testDb, me, {}, NOW);
+    expect(t.repoRef).toEqual({ branch: 'feat/x' });
+    expect(t.cwdHint).toBe('/work/x');
+  });
 });
