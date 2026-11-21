@@ -49,8 +49,14 @@ async function assertValidManager(db: Db, userId: string | null, managerId: stri
     }
     if (seen.has(cur)) break;
     seen.add(cur);
-    const [row] = await db.select({ managerId: users.managerId }).from(users).where(eq(users.id, cur));
+    const [row] = await db
+      .select({ managerId: users.managerId, disabledAt: users.disabledAt })
+      .from(users)
+      .where(eq(users.id, cur));
     if (!row) throw new DomainError('VALIDATION', 'Không tìm thấy quản lý được chọn.');
+    if (cur === managerId && row.disabledAt) {
+      throw new DomainError('VALIDATION', 'Không thể chọn người đã bị vô hiệu hóa làm quản lý.');
+    }
     cur = row.managerId;
   }
 }
@@ -122,7 +128,8 @@ export async function updateUser(
   }
   // '' means "no manager".
   const managerId = patch.managerId === '' ? null : patch.managerId;
-  if (managerId) await assertValidManager(db, id, managerId);
+  // An unchanged (possibly now-disabled) manager stays valid when other fields are saved.
+  if (managerId && managerId !== existing.managerId) await assertValidManager(db, id, managerId);
 
   const set: Partial<typeof users.$inferInsert> = {};
   if (patch.displayName !== undefined) set.displayName = patch.displayName.trim();

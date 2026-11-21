@@ -1,5 +1,6 @@
 import { taskStatus, taskMode } from '@/db/schema';
 import { DomainError } from '@/server/errors';
+import { actionLabel, statusLabel } from '@/server/labels';
 
 export type TaskStatus = (typeof taskStatus.enumValues)[number];
 export type TaskMode = (typeof taskMode.enumValues)[number];
@@ -50,10 +51,10 @@ export function nextStatus(ctx: Ctx, action: TaskAction, role: Role): TaskStatus
     ? (TERMINAL_STATUSES.includes(ctx.status) ? undefined : CANCEL)
     : TABLE[ctx.status]?.[action];
   if (!rule) {
-    throw new DomainError('INVALID_TRANSITION', `Không thể thực hiện "${action}" khi việc đang ở trạng thái "${ctx.status}".`);
+    throw new DomainError('INVALID_TRANSITION', `Không thể thực hiện "${actionLabel(action)}" khi việc đang ở trạng thái "${statusLabel(ctx.status)}".`);
   }
   if (rule.role !== role) {
-    throw new DomainError('FORBIDDEN', `Chỉ ${rule.role === 'manager' ? 'quản lý' : 'chủ việc'} mới được thực hiện "${action}".`);
+    throw new DomainError('FORBIDDEN', `Chỉ ${rule.role === 'manager' ? 'quản lý' : 'chủ việc'} mới được thực hiện "${actionLabel(action)}".`);
   }
   return rule.to(ctx);
 }

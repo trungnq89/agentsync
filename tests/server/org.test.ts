@@ -59,6 +59,21 @@ describe('org', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
+  it('rejects a disabled user as new manager, but keeps an existing disabled manager', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    const gone = await makeUser({ level: 'manager', disabledAt: new Date() });
+    const u = await makeUser();
+    await expect(updateUser(testDb, admin, u.id, { managerId: gone.id })).rejects.toMatchObject({
+      code: 'VALIDATION', message: 'Không thể chọn người đã bị vô hiệu hóa làm quản lý.',
+    });
+    await expect(
+      createUser(testDb, admin, { username: 'dm', displayName: 'D', password: 'password-1', level: 'member', managerId: gone.id }),
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
+    const kept = await makeUser({ managerId: gone.id });
+    const r = await updateUser(testDb, admin, kept.id, { displayName: 'Mới', managerId: gone.id });
+    expect(r.managerId).toBe(gone.id);
+  });
+
   it('non-uuid or unknown managerId is VALIDATION', async () => {
     const admin = await makeUser({ isAdmin: true });
     const u = await makeUser();

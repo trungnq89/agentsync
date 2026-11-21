@@ -8,6 +8,7 @@ import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/auth
 import { BAD_DATE, isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
 import { asDb, currentPlan, lifecycleCtx, requireOwner, type PlanVersion } from './internal';
+import { statusLabel } from '@/server/labels';
 import { initialStatus, nextStatus, TERMINAL_STATUSES, type TaskAction, type TaskStatus } from './lifecycle';
 
 export type { PlanVersion };;
@@ -136,7 +137,7 @@ export async function changePlan(
     const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);
     if (TERMINAL_STATUSES.includes(task.status)) {
-      throw new DomainError('INVALID_TRANSITION', `Không thể sửa plan khi việc đang ở trạng thái "${task.status}".`);
+      throw new DomainError('INVALID_TRANSITION', `Không thể sửa plan khi việc đang ở trạng thái "${statusLabel(task.status)}".`);
     }
     const current = await currentPlan(tx, taskId);
     const reason = input.reason?.trim() || null;
@@ -236,7 +237,7 @@ export async function makePublic(
     requireOwner(actor, task);
     if (!task.isPrivate) throw new DomainError('VALIDATION', 'Việc này đã công khai.');
     if (TERMINAL_STATUSES.includes(task.status)) {
-      throw new DomainError('INVALID_TRANSITION', `Không thể công khai việc đang ở trạng thái "${task.status}".`);
+      throw new DomainError('INVALID_TRANSITION', `Không thể công khai việc đang ở trạng thái "${statusLabel(task.status)}".`);
     }
     const hasManager = owner.managerId !== null;
     const [updated] = await tx

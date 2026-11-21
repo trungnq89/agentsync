@@ -57,3 +57,17 @@ export const ATTENTION_KIND_LABEL: Record<string, string> = {
 };
 
 export const attentionKindLabel = (s: string) => ATTENTION_KIND_LABEL[s] ?? s;
+
+export const ACTION_LABEL: Record<string, string> = {
+  confirm: 'Xác nhận',
+  request_changes: 'Yêu cầu sửa plan',
+  resubmit: 'Gửi lại plan',
+  complete: 'Hoàn thành',
+  approve_review: 'Duyệt giải pháp',
+  reject_review: 'Yêu cầu sửa giải pháp',
+  pause: 'Tạm dừng',
+  resume: 'Tiếp tục',
+  cancel: 'Hủy việc',
+};
+
+export const actionLabel = (s: string) => ACTION_LABEL[s] ?? s;

@@ -71,3 +71,16 @@ describe('status groups', () => {
     expect([...TERMINAL_STATUSES]).toEqual(['done', 'closed', 'cancelled']);
   });
 });
+
+describe('Vietnamese error messages', () => {
+  it('invalid transition and forbidden messages use labels, not raw ids', () => {
+    const ctx = { status: 'paused', mode: 'executive', hasManager: true, isPrivate: false } as never;
+    let msg = '';
+    try { nextStatus(ctx, 'complete', 'owner'); } catch (e) { msg = (e as Error).message; }
+    expect(msg).toContain('Hoàn thành');
+    expect(msg).toContain('Tạm dừng');
+    expect(msg).not.toMatch(/complete|paused/);
+    try { nextStatus({ ...(ctx as object), status: 'awaiting_review' } as never, 'approve_review', 'owner'); } catch (e) { msg = (e as Error).message; }
+    expect(msg).not.toMatch(/approve_review/);
+  });
+});
