@@ -23,15 +23,15 @@ export interface CreateTaskInput {
   cwdHint?: string;
 }
 
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 // A transaction exposes the same query API; authz helpers only use that.
-const asDb = (tx: Tx) => tx as unknown as Db;
+export const asDb = (tx: Tx) => tx as unknown as Db;
 
-function lifecycleCtx(task: Task, managerId: string | null) {
+export function lifecycleCtx(task: Task, managerId: string | null) {
   return { status: task.status, mode: task.mode, hasManager: managerId !== null, isPrivate: task.isPrivate };
 }
 
-async function currentPlan(tx: Tx | Db, taskId: string): Promise<PlanVersion> {
+export async function currentPlan(tx: Tx | Db, taskId: string): Promise<PlanVersion> {
   const [v] = await tx
     .select()
     .from(planVersions)
@@ -136,7 +136,7 @@ export function requestChanges(
   return managerAction(db, actor, taskId, 'request_changes', now, note);
 }
 
-function requireOwner(actor: Actor, task: Task) {
+export function requireOwner(actor: Actor, task: Task) {
   if (actor.id !== task.ownerId) throw new DomainError('FORBIDDEN', 'Chỉ chủ việc mới được thực hiện thao tác này.');
 }
 
