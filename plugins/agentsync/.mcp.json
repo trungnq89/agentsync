@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agentsync": {
+      "type": "http",
+      "url": "${AGENTSYNC_URL}/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${AGENTSYNC_TOKEN}"
+      }
+    }
+  }
+}

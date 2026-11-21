@@ -112,4 +112,13 @@ describe('mcp tools', () => {
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });
+
+  it('review_solution changes_needed without note returns isError', async () => {
+    const mgr = await makeUser({ level: 'manager' });
+    const me = await makeUser({ managerId: mgr.id });
+    const t = await makeTask(me.id, { status: 'awaiting_review' });
+    const r = await call(await connect(() => mgr), 'review_solution', { taskId: t.id, verdict: 'changes_needed' });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toContain('ghi chú');
+  });
 });

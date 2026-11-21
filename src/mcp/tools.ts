@@ -248,11 +248,11 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done('Đã gửi câu hỏi.', q);
     });
 
-  tool('review_solution', 'Review tóm tắt giải pháp: approved hoặc changes_needed.',
+  tool('review_solution', 'Review tóm tắt giải pháp: approved hoặc changes_needed. note là bắt buộc khi verdict là changes_needed.',
     {
       taskId,
       verdict: z.enum(['approved', 'changes_needed']),
-      note: z.string().optional(),
+      note: z.string().optional().describe('Bắt buộc khi verdict là changes_needed'),
     },
     async ({ taskId: id, verdict, note }, actor) => {
       const t = await reviewSolution(db, actor, id, verdict, note, now());

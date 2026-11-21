@@ -1,0 +1,6 @@
+{
+  "name": "agentsync",
+  "version": "0.1.0",
+  "description": "AgentSync: đồng bộ plan và tiến độ công việc giữa agent của member và quản lý qua MCP.",
+  "author": { "name": "AgentSync" }
+}
