@@ -1,4 +1,4 @@
-const VN_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Ho_Chi_Minh, no DST
+export const VN_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Ho_Chi_Minh, no DST
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**

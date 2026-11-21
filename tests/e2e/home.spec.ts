@@ -39,6 +39,7 @@ test('director opens manager timeline', async ({ page }) => {
   const row = page.getByTestId('timeline-row').filter({ hasText: 'Đàm phán đối tác X' });
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute('href', /\/tasks\//);
+  await expect(row).toContainText('Đang kẹt');
   await expect(page.getByTestId('timeline-today')).toBeVisible();
 });
 
@@ -49,7 +50,7 @@ test('manager attention list never contains the leader private task', async ({ p
   expect(body).not.toContain('Việc riêng tư bí mật');
   expect(body).not.toContain('Vướng riêng tư');
   await page.goto(`/people/${ids.leaderId}`);
-  await expect(page.getByTestId('timeline-row')).toHaveCount(1);
+  await expect(page.getByTestId('timeline-row')).toHaveCount(2);
   await expect(page.getByText('Việc riêng tư bí mật')).toHaveCount(0);
 });
 
@@ -59,7 +60,8 @@ test('no horizontal scroll at 375px', async ({ page }) => {
   const overflow = () => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(await overflow()).toBe(false);
   await page.goto(`/people/${ids.leaderId}`);
-  await expect(page.getByTestId('timeline-row')).toHaveCount(1);
+  await expect(page.getByTestId('timeline-row')).toHaveCount(2);
+  await expect(page.getByTestId('timeline-today')).toHaveCount(1);
   expect(await overflow()).toBe(false);
 });
 

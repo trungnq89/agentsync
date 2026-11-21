@@ -55,6 +55,9 @@ export async function seedOrg(): Promise<{ directorId: string; managerId: string
     await confirmTask(db, manager, leaderTask.id);
     const priv = await createTask(db, leader, input('Việc riêng tư bí mật', true));
     await askQuestion(db, leader, priv.id, 'Vướng riêng tư', { isBlocker: true });
+    // Long overdue task (started ~5 months ago, expected end long before today).
+    const old = await createTask(db, leader, { ...input('Việc quá hạn lâu'), startDate: isoDay(-150), agreedDueDate: isoDay(-100) });
+    await confirmTask(db, manager, old.id);
     await createUser(db, admin, { username: 'loner1', displayName: 'Người mới', password: 'user-password-1', level: 'member' });
     return { directorId: admin.id, managerId: manager.id, leaderId: leader.id };
   } finally {

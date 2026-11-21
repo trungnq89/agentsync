@@ -1,6 +1,7 @@
+import { VN_OFFSET_MS } from '@/server/clock';
+
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-const VN_OFFSET_MS = 7 * HOUR; // Asia/Ho_Chi_Minh has no DST
 
 const vnDay = (d: Date) => Math.floor((d.getTime() + VN_OFFSET_MS) / (24 * HOUR));
 
