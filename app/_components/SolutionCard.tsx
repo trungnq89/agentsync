@@ -1,15 +1,21 @@
+import { useTranslations } from 'next-intl';
 import type { SolutionSummary } from '@/server/tasks/activity';
+import { ActionForm } from '@/components/ui/action-form';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmAction } from '@/components/ui/confirm-action';
+import { FormField } from '@/components/ui/form-field';
+import { Textarea } from '@/components/ui/textarea';
 import { reviewAction } from '../_actions/task';
-import { ActionForm, button, buttonQuiet, card, input } from './ui';
 
-const FIELDS: [keyof SolutionSummary, string][] = [
-  ['problem', 'Vấn đề'],
-  ['solution', 'Giải pháp'],
-  ['rejectedAlternatives', 'Phương án đã loại'],
-  ['keyChanges', 'Thay đổi chính'],
-  ['risks', 'Rủi ro'],
-  ['testing', 'Kiểm thử'],
-];
+const FIELDS = [
+  ['problem', 'problem'],
+  ['solution', 'solutionText'],
+  ['rejectedAlternatives', 'rejectedAlternatives'],
+  ['keyChanges', 'keyChanges'],
+  ['risks', 'risks'],
+  ['testing', 'testing'],
+] as const satisfies readonly (readonly [keyof SolutionSummary, string])[];
 
 export function SolutionCard({
   taskId, solution, canReview,
@@ -18,50 +24,58 @@ export function SolutionCard({
   solution: SolutionSummary | undefined;
   canReview: boolean;
 }) {
+  const t = useTranslations('task');
+  const tVerdict = useTranslations('verdict');
+  const tAction = useTranslations('action');
   return (
-    <section data-testid="solution-card" className={card}>
-      <h2 className="text-sm font-medium">Tóm tắt giải pháp</h2>
-      {!solution ? (
-        <p className="mt-2 text-sm opacity-60">Chưa có tóm tắt giải pháp.</p>
-      ) : (
-        <dl className="mt-2 space-y-2 text-sm">
-          {FIELDS.map(([k, label]) => (
-            <div key={k}>
-              <dt className="text-xs opacity-60">{label}</dt>
-              <dd className="break-words whitespace-pre-wrap">{String(solution[k])}</dd>
-            </div>
-          ))}
-          {solution.prUrl && (
-            <div>
-              <dt className="text-xs opacity-60">Pull request</dt>
-              <dd className="break-all">
-                <a href={solution.prUrl} target="_blank" rel="noreferrer" className="underline">{solution.prUrl}</a>
-              </dd>
-            </div>
-          )}
-        </dl>
-      )}
-      {canReview && (
-        <div className="mt-4 flex flex-wrap items-start gap-2">
-          <ActionForm action={reviewAction}>
-            <input type="hidden" name="taskId" value={taskId} />
-            <input type="hidden" name="verdict" value="approved" />
-            <button className={button}>Đã review, ổn</button>
-          </ActionForm>
-          <details className="w-full sm:w-auto">
-            <summary data-testid="open-changes" className={`${buttonQuiet} inline-block cursor-pointer`}>Cần sửa</summary>
-            <ActionForm action={reviewAction} className="mt-2 space-y-2">
+    <Card data-testid="solution-card">
+      <CardHeader><CardTitle>{t('solution')}</CardTitle></CardHeader>
+      <CardContent>
+        {!solution ? (
+          <p className="text-sm text-muted-foreground">{t('noSolution')}</p>
+        ) : (
+          <dl className="space-y-3 text-sm">
+            {FIELDS.map(([k, label]) => (
+              <div key={k}>
+                <dt className="text-xs font-semibold text-muted-foreground">{t(label)}</dt>
+                <dd className="break-words whitespace-pre-wrap">{String(solution[k])}</dd>
+              </div>
+            ))}
+            {solution.prUrl && (
+              <div>
+                <dt className="text-xs font-semibold text-muted-foreground">{t('pullRequest')}</dt>
+                <dd className="break-all">
+                  <a href={solution.prUrl} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">{solution.prUrl}</a>
+                </dd>
+              </div>
+            )}
+          </dl>
+        )}
+        {canReview && (
+          <div className="mt-4 flex flex-wrap items-start gap-2">
+            <ActionForm action={reviewAction}>
               <input type="hidden" name="taskId" value={taskId} />
-              <input type="hidden" name="verdict" value="changes_needed" />
-              <label className="block text-sm">
-                Ghi chú
-                <textarea name="note" required rows={3} className={`${input} mt-1`} />
-              </label>
-              <button className={button}>Gửi yêu cầu sửa</button>
+              <input type="hidden" name="verdict" value="approved" />
+              <Button type="submit">{tVerdict('approved')}</Button>
             </ActionForm>
-          </details>
-        </div>
-      )}
-    </section>
+            <ConfirmAction
+              title={tAction('reject_review')}
+              description={t('reviewChangesDesc')}
+              confirmLabel={t('sendRequest')}
+              tone="primary"
+              action={reviewAction}
+              trigger={<Button variant="outline" data-testid="open-changes">{tVerdict('changes_needed')}</Button>}
+              fields={
+                <>
+                  <input type="hidden" name="taskId" value={taskId} />
+                  <input type="hidden" name="verdict" value="changes_needed" />
+                  <FormField name="note" label={t('note')}><Textarea rows={3} /></FormField>
+                </>
+              }
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

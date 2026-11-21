@@ -67,7 +67,7 @@ test('manager asks "Cần sửa" on a project review with a note', async ({ page
   await expect(page.getByTestId('task-status')).toContainText('chờ review');
   await expect(page.getByText('Giải pháp S')).toBeVisible();
   await page.getByTestId('open-changes').click();
-  await page.getByLabel('Ghi chú').fill('Thiếu test cho case rỗng');
+  await page.getByRole('alertdialog').getByLabel('Ghi chú').fill('Thiếu test cho case rỗng');
   await page.getByRole('button', { name: 'Gửi yêu cầu sửa' }).click();
   await expect(page.getByTestId('task-status')).toContainText('Đang làm');
   const fb = await withDb((db, { leader }) => getPendingFeedback(db, leader));
@@ -110,8 +110,11 @@ test('activity shows 3 latest by default, rest behind "Xem thêm"; no overflow a
   await expect(page.locator('[data-testid=activity-item]:visible')).toHaveCount(3);
   await expect(page.getByText('Cập nhật số 5')).toBeVisible();
   await expect(page.getByText('Cập nhật số 1')).toBeHidden();
-  await page.getByText('Xem thêm').click();
+  await page.getByRole('button', { name: 'Xem thêm' }).click();
   await expect(page.locator('[data-testid=activity-item]:visible')).toHaveCount(5);
+  await expect(page.getByRole('button', { name: 'Thu gọn' })).toBeVisible();
+  await page.getByRole('button', { name: 'Thu gọn' }).click();
+  await expect(page.locator('[data-testid=activity-item]:visible')).toHaveCount(3);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
@@ -122,3 +125,72 @@ test('unknown or non-viewable task is 404', async ({ page }) => {
   await page.goto('/tasks/abc');
   await expect(page.getByText('Không tìm thấy trang này hoặc bạn không có quyền xem.')).toBeVisible();
 });
+
+const LONG_TITLE = 'Một tiêu đề công việc rất dài '.repeat(6) + 'x'.repeat(60);
+const LONG_PR = `https://example.com/org/repo/pull/${'9'.repeat(90)}`;
+
+test.describe('English', () => {
+  test.use({ locale: 'en-US' });
+
+  test('request changes: empty note shows an English field error, then succeeds with a toast', async ({ page }) => {
+    const task = await withDb((db, { leader }) => createTask(db, leader, base('Pending task')));
+    await page.goto('/login');
+    await page.getByLabel('Username').fill('manager1');
+    await page.getByLabel('Password').fill(PW);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/tasks/${task.id}`);
+    await page.getByTestId('open-request-changes').click();
+    const dialog = page.getByRole('alertdialog');
+    await dialog.getByRole('button', { name: 'Send request' }).click();
+    await expect(dialog.getByText('A note is required when requesting changes.')).toBeVisible();
+    await expect(dialog.getByLabel('Note')).toHaveAttribute('aria-invalid', 'true');
+    await dialog.getByLabel('Note').fill('Please split step 1');
+    await dialog.getByRole('button', { name: 'Send request' }).click();
+    await expect(page.getByTestId('task-status')).toContainText(/changes requested/i);
+    await expect(page.getByText('Changes requested', { exact: true })).toBeVisible();
+    await expect(dialog).toBeHidden();
+  });
+
+  test('show more toggles to Collapse', async ({ page }) => {
+    const task = await withDb(async (db, { manager, leader }) => {
+      const t = await createTask(db, leader, base('Busy task'));
+      await confirmTask(db, manager, t.id);
+      for (let i = 1; i <= 4; i++) await postUpdate(db, leader, t.id, { body: `Update ${i}`, source: 'auto' }, new Date(Date.now() - (5 - i) * 3_600_000));
+      return t;
+    });
+    await page.goto('/login');
+    await page.getByLabel('Username').fill('manager1');
+    await page.getByLabel('Password').fill(PW);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/tasks/${task.id}`);
+    await page.getByRole('button', { name: 'Show more' }).click();
+    await expect(page.getByRole('button', { name: 'Collapse' })).toBeVisible();
+  });
+});
+
+for (const locale of ['vi-VN', 'en-US']) {
+  test(`375px with long title and PR url, no horizontal scroll (${locale})`, async ({ browser }) => {
+    const task = await withDb(async (db, { manager, leader }) => {
+      const t = await createTask(db, leader, { ...base(LONG_TITLE, 'project'), agreedOutcome: 'y'.repeat(120) });
+      await confirmTask(db, manager, t.id);
+      await submitSolutionSummary(db, leader, t.id, {
+        problem: 'p'.repeat(100), solution: 's', rejectedAlternatives: 'r', keyChanges: 'k', risks: 'r', testing: 't', prUrl: LONG_PR,
+      });
+      await setTaskStatus(db, leader, t.id, 'complete');
+      return t;
+    });
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 800 }, locale, baseURL: 'http://localhost:3100' });
+    const page = await ctx.newPage();
+    await page.goto('/login');
+    await page.getByLabel(locale === 'vi-VN' ? 'Tên đăng nhập' : 'Username').fill('manager1');
+    await page.getByLabel(locale === 'vi-VN' ? 'Mật khẩu' : 'Password').fill(PW);
+    await page.getByRole('button', { name: locale === 'vi-VN' ? 'Đăng nhập' : 'Sign in' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/tasks/${task.id}`);
+    await expect(page.getByTestId('solution-card')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+    await ctx.close();
+  });
+}

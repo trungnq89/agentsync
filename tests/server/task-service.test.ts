@@ -66,6 +66,9 @@ describe('task service', () => {
   it('request changes then changePlan resubmits and consumes feedback', async () => {
     const { manager, member } = await pair();
     const t = await createTask(testDb, member, base);
+    await expect(() => requestChanges(testDb, manager, t.id, '  ')).toThrowError(
+      expect.objectContaining({ code: 'VALIDATION', key: 'noteRequiredForChanges', params: { field: 'note' } }),
+    );
     const r = await requestChanges(testDb, manager, t.id, 'Thêm bước test');
     expect(r.status).toBe('changes_requested');
     const [fb] = await testDb.select().from(managerFeedback).where(eq(managerFeedback.taskId, t.id));

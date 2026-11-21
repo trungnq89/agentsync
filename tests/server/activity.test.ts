@@ -114,8 +114,8 @@ describe('activity', () => {
     const { manager, member } = await pair();
     const t = await makeTask(member.id, { status: 'awaiting_review', mode: 'project', completedAt: T0 });
     await expect(reviewSolution(testDb, member, t.id, 'approved', undefined, T0)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(reviewSolution(testDb, manager, t.id, 'changes_needed', '  ', T0)).rejects.toMatchObject({ code: 'VALIDATION' });
-    await expect(reviewSolution(testDb, manager, t.id, 'changes_needed', undefined, T0)).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(reviewSolution(testDb, manager, t.id, 'changes_needed', '  ', T0)).rejects.toMatchObject({ code: 'VALIDATION', key: 'noteRequiredForChanges', params: { field: 'note' } });
+    await expect(reviewSolution(testDb, manager, t.id, 'changes_needed', undefined, T0)).rejects.toMatchObject({ code: 'VALIDATION', params: { field: 'note' } });
     const r = await reviewSolution(testDb, manager, t.id, 'changes_needed', 'Thiếu test', T0);
     expect(r.status).toBe('in_progress');
     expect(r.completedAt).toBeNull();

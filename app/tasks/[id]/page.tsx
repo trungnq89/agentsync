@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { getDb } from '@/db';
 import { DomainError } from '@/server/errors';
@@ -8,13 +10,14 @@ import { PlanSummary } from '../../_components/PlanSummary';
 import { QuestionBox } from '../../_components/QuestionBox';
 import { SolutionCard } from '../../_components/SolutionCard';
 import { TaskHeader } from '../../_components/TaskHeader';
-import { card } from '../../_components/ui';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getActor } from '../../_lib/actor';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getActor();
+  const t = await getTranslations('task');
   const { id } = await params;
   const now = new Date();
   let d;
@@ -27,16 +30,19 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const { task, owner } = d;
   const isCurrentManager = user.id !== task.ownerId && owner.managerId === user.id;
   return (
-    <main className="space-y-5">
-      <Link href="/" className="text-sm opacity-70 hover:underline">← Trang chủ</Link>
+    <main className="space-y-4">
+      <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" aria-hidden />
+        {t('back')}
+      </Link>
       <TaskHeader
         task={task} ownerName={owner.displayName} progress={d.progress} health={d.health}
         lastActivityAt={d.lastActivityAt} canConfirm={d.canConfirm} now={now}
       />
-      <section className={card}>
-        <h2 className="text-sm font-medium">Kết quả đã thống nhất</h2>
-        <p className="mt-1 text-sm break-words whitespace-pre-wrap">{task.agreedOutcome}</p>
-      </section>
+      <Card>
+        <CardHeader><CardTitle>{t('agreedOutcome')}</CardTitle></CardHeader>
+        <CardContent><p className="break-words whitespace-pre-wrap text-sm">{task.agreedOutcome}</p></CardContent>
+      </Card>
       <QuestionBox
         taskId={task.id} ownerId={task.ownerId} ownerName={owner.displayName} viewerId={user.id}
         isCurrentManager={isCurrentManager} questions={d.questions} now={now}

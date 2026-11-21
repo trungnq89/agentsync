@@ -117,7 +117,7 @@ export function requestChanges(
   note: string,
   now: Date = new Date(),
 ): Promise<Task> {
-  if (!note.trim()) throw new DomainError('VALIDATION', 'noteRequiredForChanges');
+  if (!note.trim()) throw new DomainError('VALIDATION', 'noteRequiredForChanges', { field: 'note' });
   return managerAction(db, actor, taskId, 'request_changes', now, note);
 }
 

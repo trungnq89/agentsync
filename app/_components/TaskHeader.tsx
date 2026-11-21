@@ -1,12 +1,21 @@
 import type { Task } from '@/db/schema';
 import { useLocale, useTranslations } from 'next-intl';
 import type { Locale } from '@/i18n/config';
+import type { TaskStatus } from '@/server/tasks/lifecycle';
+import type { Health } from '@/server/tasks/health';
+import { toneForHealth, toneForStatus } from '@/ui/tone';
+import { ActionForm } from '@/components/ui/action-form';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ConfirmAction } from '@/components/ui/confirm-action';
+import { FormField } from '@/components/ui/form-field';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { confirmAction, requestChangesAction } from '../_actions/task';
-import { formatRelative } from '../_lib/format';
-import { ActionForm, button, buttonQuiet, input } from './ui';
+import { formatDate, formatRelative } from '../_lib/format';
 
 const DAY_MS = 86_400_000;
-const fmt = (iso: string) => iso.split('-').reverse().join('/');
 const lateDays = (t: Task) =>
   t.expectedEndDate > t.agreedDueDate
     ? Math.round((Date.parse(t.expectedEndDate) - Date.parse(t.agreedDueDate)) / DAY_MS)
@@ -24,44 +33,52 @@ export function TaskHeader({
   now: Date;
 }) {
   const locale = useLocale() as Locale;
+  const t = useTranslations('task');
   const tStatus = useTranslations('status');
   const tHealth = useTranslations('health');
+  const tAction = useTranslations('action');
   const late = lateDays(task);
   return (
-    <header>
-      <h1 className="text-xl font-semibold break-words">{task.title}</h1>
-      <div className="mt-1 text-sm opacity-70">{ownerName}</div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-        <span data-testid="task-status" className="rounded-full border border-neutral-300 px-2 py-0.5 dark:border-neutral-700">
-          {tStatus(task.status)}
-        </span>
-        {health.health !== 'on_track' && <span className="opacity-80">{tHealth(health.health)}</span>}
-        <span data-testid="task-progress">{progress}%</span>
-        <span className="opacity-80">
-          Dự kiến {fmt(task.expectedEndDate)}
-          {late > 0 && <span className="text-red-600 dark:text-red-400"> · trễ {late} ngày</span>}
-        </span>
+    <Card className="space-y-3 p-4">
+      <div className="min-w-0">
+        <h1 className="break-words text-xl font-semibold tracking-tight">{task.title}</h1>
+        <div className="mt-0.5 break-words text-sm text-muted-foreground">{ownerName}</div>
       </div>
-      <div className="mt-1 text-xs opacity-60">Cập nhật {formatRelative(lastActivityAt, now, locale)}</div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Badge data-testid="task-status" tone={toneForStatus(task.status as TaskStatus)}>{tStatus(task.status)}</Badge>
+        {health.health !== 'on_track' && (
+          <Badge tone={toneForHealth(health.health as Health)}>{tHealth(health.health)}</Badge>
+        )}
+        <span className="text-muted-foreground">{t('expected', { date: formatDate(task.expectedEndDate, locale) })}</span>
+        {late > 0 && <Badge tone="warning">{t('late', { count: late })}</Badge>}
+      </div>
+      <div className="flex items-center gap-3">
+        <Progress value={progress} className="flex-1" aria-label={`${progress}%`} />
+        <span data-testid="task-progress" className="text-sm font-semibold tabular-nums">{progress}%</span>
+      </div>
+      <div className="text-xs text-muted-foreground">{t('updated', { when: formatRelative(lastActivityAt, now, locale) })}</div>
       {canConfirm && (
-        <div className="mt-4 flex flex-wrap items-start gap-2">
+        <div className="flex flex-wrap items-start gap-2 pt-1">
           <ActionForm action={confirmAction}>
             <input type="hidden" name="taskId" value={task.id} />
-            <button className={button}>Xác nhận</button>
+            <Button type="submit">{t('confirm')}</Button>
           </ActionForm>
-          <details data-testid="changes-box" className="w-full sm:w-auto">
-            <summary className={`${buttonQuiet} inline-block cursor-pointer`}>Yêu cầu sửa</summary>
-            <ActionForm action={requestChangesAction} className="mt-2 space-y-2">
-              <input type="hidden" name="taskId" value={task.id} />
-              <label className="block text-sm">
-                Ghi chú
-                <textarea name="note" required rows={3} className={`${input} mt-1`} />
-              </label>
-              <button className={button}>Gửi yêu cầu sửa</button>
-            </ActionForm>
-          </details>
+          <ConfirmAction
+            title={tAction('request_changes')}
+            description={t('requestChangesDesc')}
+            confirmLabel={t('sendRequest')}
+            tone="primary"
+            action={requestChangesAction}
+            trigger={<Button variant="outline" data-testid="open-request-changes">{t('requestChanges')}</Button>}
+            fields={
+              <>
+                <input type="hidden" name="taskId" value={task.id} />
+                <FormField name="note" label={t('note')}><Textarea rows={3} /></FormField>
+              </>
+            }
+          />
         </div>
       )}
-    </header>
+    </Card>
   );
 }

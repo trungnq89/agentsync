@@ -246,7 +246,7 @@ export async function reviewSolution(
   now: Date = new Date(),
 ): Promise<Task> {
   if (verdict === 'changes_needed' && !note?.trim()) {
-    throw new DomainError('VALIDATION', 'noteRequiredForChanges');
+    throw new DomainError('VALIDATION', 'noteRequiredForChanges', { field: 'note' });
   }
   return db.transaction(async (tx) => {
     const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
