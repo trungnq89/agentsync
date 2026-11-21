@@ -15,6 +15,7 @@ export type Update = typeof updates.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type SolutionSummary = typeof solutionSummaries.$inferSelect;
 
+const TERMINAL_TASK = 'Việc này đã đóng/hủy. Dùng list_my_tasks để chọn việc đang mở.';
 const NOT_FOUND_TASK =
   'Không tìm thấy việc này hoặc bạn không phải người phụ trách. Dùng list_my_tasks để xem việc của bạn.';
 
@@ -51,7 +52,7 @@ export async function postUpdate(
     }
     if (actor.id !== task.ownerId) throw new DomainError('NOT_FOUND', NOT_FOUND_TASK);
     if (TERMINAL_STATUSES.includes(task.status)) {
-      throw new DomainError('INVALID_TRANSITION', 'Việc này đã đóng/hủy. Dùng list_my_tasks để chọn việc đang mở.');
+      throw new DomainError('INVALID_TRANSITION', TERMINAL_TASK);
     }
     const done = input.stepsCompleted ?? [];
     if (done.length > 0) {
@@ -141,6 +142,7 @@ export async function askQuestion(
   if (!body.trim()) throw new DomainError('VALIDATION', 'Nội dung câu hỏi không được để trống.');
   return db.transaction(async (tx) => {
     const { task } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
+    if (TERMINAL_STATUSES.includes(task.status)) throw new DomainError('INVALID_TRANSITION', TERMINAL_TASK);
     const isOwner = actor.id === task.ownerId;
     const [row] = await tx
       .insert(questions)
@@ -221,6 +223,7 @@ export async function submitSolutionSummary(
   return db.transaction(async (tx) => {
     const { task } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);
+    if (TERMINAL_STATUSES.includes(task.status)) throw new DomainError('INVALID_TRANSITION', TERMINAL_TASK);
     if (task.mode !== 'project') {
       throw new DomainError('VALIDATION', 'Chỉ việc mode project mới có tóm tắt giải pháp.');
     }

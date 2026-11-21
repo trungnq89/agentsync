@@ -82,6 +82,46 @@ describe('mcp tools', () => {
     expect((await call(await connect(() => nu), 'task_detail', { taskId: t.id })).isError).toBeFalsy();
   });
 
+  it('task_detail never leaks user secrets or the owner-only repo fields', async () => {
+    const mgr = await makeUser({ level: 'manager' });
+    const m = await makeUser({ managerId: mgr.id, passwordHash: 'SECRETHASH' });
+    const t = await makeTask(m.id, { status: 'in_progress', cwdHint: '/secret/dir' });
+    const r = await call(await connect(() => mgr), 'task_detail', { taskId: t.id });
+    const all = text(r);
+    expect(all).not.toMatch(/passwordHash|password_hash|SECRETHASH|"username"|isAdmin|disabledAt|sendMode/);
+    expect(all).not.toContain('/secret/dir');
+  });
+
+  it('task_detail and weekly_digest hide a private task from the manager', async () => {
+    const mgr = await makeUser({ level: 'manager' });
+    const m = await makeUser({ managerId: mgr.id });
+    const t = await makeTask(m.id, { title: 'Bí mật', isPrivate: true, status: 'in_progress' });
+    const c = await connect(() => mgr);
+    expect((await call(c, 'task_detail', { taskId: t.id })).isError).toBe(true);
+    expect(text(await call(c, 'weekly_digest'))).not.toContain('Bí mật');
+  });
+
+  it('NOT_FOUND errors point at list_my_tasks', async () => {
+    const me = await makeUser();
+    const r = await call(await connect(() => me), 'task_detail', { taskId: '3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b' });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toContain('list_my_tasks');
+  });
+
+  it('answered question leaves get_pending_feedback after resolve_question', async () => {
+    const mgr = await makeUser({ level: 'manager' });
+    const m = await makeUser({ managerId: mgr.id });
+    const t = await makeTask(m.id, { status: 'in_progress' });
+    const mc = await connect(() => m);
+    const q = JSON.parse((await call(mc, 'ask_manager', { taskId: t.id, body: 'Hỏi?' })).content[1].text);
+    await call(await connect(() => mgr), 'answer_blocker', { questionId: q.id, answer: 'Đáp' });
+    const before = JSON.parse((await call(mc, 'get_pending_feedback')).content[1].text);
+    expect(before.answersToMyQuestions).toHaveLength(1);
+    expect((await call(mc, 'resolve_question', { questionId: q.id })).isError).toBeFalsy();
+    const after = JSON.parse((await call(mc, 'get_pending_feedback')).content[1].text);
+    expect(after.answersToMyQuestions).toHaveLength(0);
+  });
+
   it('create_task with a non-ISO startDate returns isError mentioning YYYY-MM-DD', async () => {
     const me = await makeUser();
     const r = await call(await connect(() => me), 'create_task', { ...newTask, startDate: 'next week' });

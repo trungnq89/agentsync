@@ -7,11 +7,11 @@ description: Use when starting or resuming work on an existing AgentSync task, a
 
 ## Quy tắc đầu tiên: chế độ gửi
 
-Gọi `get_my_settings` để biết `sendMode`. Nếu `sendMode` là `review`, MỌI lần gửi từ phía member (`create_task`, `update_progress`, `revise_plan`, `report_blocker`, `ask_manager`, `answer_question`, `submit_solution_summary`, `set_task_status`) đều phải hiện bản nháp và CHỜ member đồng ý rồi mới gọi tool. Nếu là `auto` thì gửi luôn, sau đó báo lại nội dung đã gửi.
+Gọi `get_my_settings` để biết `sendMode`. Nếu `sendMode` là `review`, MỌI lần gửi từ phía member (`create_task`, `update_progress`, `revise_plan`, `report_blocker`, `ask_manager`, `answer_question`, `resolve_question`, `submit_solution_summary`, `set_task_status`) đều phải hiện bản nháp và CHỜ member đồng ý rồi mới gọi tool. Nếu là `auto` thì gửi luôn, sau đó báo lại nội dung đã gửi.
 
 ## Khi bắt đầu hoặc tiếp tục một việc
 
-1. Gọi `get_pending_feedback` và nhắc member các mục đang chờ (yêu cầu sửa plan, câu hỏi, câu trả lời, kết quả review). Có câu hỏi dành cho member thì hỏi member rồi trả lời bằng `answer_question`.
+1. Gọi `get_pending_feedback` và nhắc member các mục đang chờ (yêu cầu sửa plan, câu hỏi, câu trả lời, kết quả review). Có câu hỏi dành cho member thì hỏi member rồi trả lời bằng `answer_question`. Sau khi đã chuyển câu trả lời của quản lý cho member, gọi `resolve_question` (với `questionId`) để câu hỏi không hiện lại trong `get_pending_feedback`.
 2. Xác định việc đang làm: gọi `list_my_tasks` trước. Đối chiếu branch hiện tại (`git branch --show-current`) với `repoRef.branch`; nếu không khớp thì đối chiếu thư mục hiện tại với `cwdHint`. Nếu không có đúng một việc khớp, hỏi member chọn. Không bao giờ đoán từ tên việc.
 3. Nếu quản lý yêu cầu sửa plan, soạn plan mới rồi gọi `revise_plan` (theo quy tắc `sendMode`).
 4. Nếu kết quả review là `changes_needed`: sửa theo ghi chú, rồi chạy lại `submit_solution_summary` (gửi lại sẽ ghi đè bản cũ) và `set_task_status` với `action` là `complete`.

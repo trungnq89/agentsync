@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { tasks, updates } from '@/db/schema';
+import { questions, tasks, updates } from '@/db/schema';
 import {
   answerQuestion, askQuestion, deleteUpdate, editUpdate, getPendingFeedback, postUpdate,
   reviewSolution, submitSolutionSummary,
@@ -37,6 +37,23 @@ describe('activity', () => {
     const t = await makeTask(member.id, { status: 'cancelled' });
     await expect(postUpdate(testDb, member, t.id, upd, T0)).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
     expect(await testDb.select().from(updates)).toHaveLength(0);
+  });
+
+  it('askQuestion on a cancelled task → INVALID_TRANSITION with list_my_tasks hint', async () => {
+    const { member } = await pair();
+    const t = await makeTask(member.id, { status: 'cancelled' });
+    await expect(askQuestion(testDb, member, t.id, 'Vướng', { isBlocker: true }, T0)).rejects.toMatchObject({
+      code: 'INVALID_TRANSITION', message: expect.stringContaining('list_my_tasks'),
+    });
+    expect(await testDb.select().from(questions)).toHaveLength(0);
+  });
+
+  it('submitSolutionSummary on a closed task does not overwrite', async () => {
+    const { member } = await pair();
+    const t = await makeTask(member.id, { status: 'closed', mode: 'project' });
+    await expect(submitSolutionSummary(testDb, member, t.id, summary, T0)).rejects.toMatchObject({
+      code: 'INVALID_TRANSITION', message: expect.stringContaining('list_my_tasks'),
+    });
   });
 
   it('stepsCompleted marks steps done in current plan; progress and end date saved', async () => {

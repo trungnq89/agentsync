@@ -6,7 +6,7 @@ import { isValidIsoDate, BAD_DATE } from '@/server/clock';
 import { DomainError } from '@/server/errors';
 import { levelLabel, sendModeLabel, statusLabel, verdictLabel } from '@/server/labels';
 import {
-  answerQuestion, askQuestion, getPendingFeedback, postUpdate, reviewSolution, submitSolutionSummary,
+  answerQuestion, askQuestion, getPendingFeedback, postUpdate, resolveQuestion, reviewSolution, submitSolutionSummary,
 } from '@/server/tasks/activity';
 import {
   changePlan, confirmTask, createTask, makePublic, requestChanges, setTaskStatus,
@@ -61,7 +61,11 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         const { markdown, data } = await run(args, ctx.getActor());
         return reply(markdown, data);
       } catch (e) {
-        if (e instanceof DomainError) return errorReply(e.message);
+        if (e instanceof DomainError) {
+          const hint = e.code === 'NOT_FOUND' && !e.message.includes('list_my_tasks')
+            ? ' Dùng list_my_tasks để xem việc của bạn.' : '';
+          return errorReply(e.message + hint);
+        }
         console.error(`[mcp] tool ${name} failed`, e);
         return errorReply(GENERIC_ERROR);
       }
@@ -161,6 +165,13 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     async ({ questionId: id, answer }, actor) => {
       const q = await answerQuestion(db, actor, id, answer, now());
       return done('Đã trả lời.', q);
+    });
+
+  tool('resolve_question', 'Đánh dấu câu hỏi bạn đã hỏi là đã giải quyết (sau khi đã đọc câu trả lời).',
+    { questionId },
+    async ({ questionId: id }, actor) => {
+      const q = await resolveQuestion(db, actor, id);
+      return done('Đã đánh dấu đã giải quyết.', q);
     });
 
   tool('submit_solution_summary', 'Nộp tóm tắt giải pháp (việc mode project) để chờ review.',
