@@ -50,6 +50,16 @@ describe('design tokens', () => {
     }
   });
 
+  it.each(['light', 'dark'])('%s: timeline track outlines reach 3:1 against the background', (mode) => {
+    const v = tokens(mode);
+    // Tracks are outlined (ring-1) with these tokens, see BAR in app/_components/Timeline.tsx.
+    for (const ring of ['muted-foreground', 'primary', 'success', 'warning', 'danger', 'info']) {
+      expect(contrast(v[ring], v.background), `${mode} ${ring} on background`).toBeGreaterThanOrEqual(3);
+    }
+    // The today line is foreground with a 1px background halo, so over a danger bar the halo must separate it.
+    expect(contrast(v.background, v.danger), `${mode} today-line halo on danger bar`).toBeGreaterThanOrEqual(3);
+  });
+
   it('primary is indigo per spec', () => {
     expect(tokens('light').primary.toLowerCase()).toBe('#4f46e5');
     expect(tokens('dark').primary.toLowerCase()).toBe('#818cf8');

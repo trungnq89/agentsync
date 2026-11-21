@@ -1,28 +1,29 @@
 import Link from 'next/link';
 import { Inbox } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import type { Locale } from '@/i18n/config';
 import { vnDateString } from '@/server/clock';
 import type { TimelineTask } from '@/server/tasks/queries';
 import { toneForHealth, toneForStatus, type Tone } from '@/ui/tone';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { TaskStatus } from '@/server/tasks/lifecycle';
 import type { Health } from '@/server/tasks/health';
+import { formatDate } from '../_lib/format';
 import { barSpan, computeAxis, position } from '../_lib/timeline';
 
-const fmt = (t: number) => {
-  const d = new Date(t);
-  return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
-};
+const isoOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-// Bar fills use the solid token; the status text label next to each row keeps colour from being the only signal.
+// Tracks are outlined with the solid tone (>= 3:1 vs background, see tokens.test.ts) so the span stays visible;
+// the status text label next to each row keeps colour from being the only signal.
 const BAR: Record<Tone, { track: string; fill: string }> = {
-  neutral: { track: 'bg-surface-muted', fill: 'bg-muted-foreground' },
-  primary: { track: 'bg-surface-muted', fill: 'bg-primary' },
-  success: { track: 'bg-success-soft', fill: 'bg-success' },
-  warning: { track: 'bg-warning-soft', fill: 'bg-warning' },
-  danger: { track: 'bg-danger-soft', fill: 'bg-danger' },
-  info: { track: 'bg-info-soft', fill: 'bg-info' },
+  neutral: { track: 'bg-surface-muted ring-1 ring-muted-foreground', fill: 'bg-muted-foreground' },
+  primary: { track: 'bg-surface-muted ring-1 ring-primary', fill: 'bg-primary' },
+  success: { track: 'bg-success-soft ring-1 ring-success', fill: 'bg-success' },
+  warning: { track: 'bg-warning-soft ring-1 ring-warning', fill: 'bg-warning' },
+  danger: { track: 'bg-danger-soft ring-1 ring-danger', fill: 'bg-danger' },
+  info: { track: 'bg-info-soft ring-1 ring-info', fill: 'bg-info' },
 };
+const TODAY_LINE = 'bg-foreground shadow-[0_0_0_1px_var(--background)]';
 
 const isDone = (t: TimelineTask) => t.status === 'done' || t.status === 'closed';
 const isRisky = (t: TimelineTask) => t.health === 'blocked' || t.health === 'at_risk';
@@ -37,6 +38,7 @@ export function Timeline({ tasks, now = new Date() }: { tasks: TimelineTask[]; n
   const tStatus = useTranslations('status');
   const tHealth = useTranslations('health');
   const t = useTranslations('person');
+  const locale = useLocale() as Locale;
   if (tasks.length === 0) {
     return <EmptyState icon={<Inbox className="h-6 w-6" aria-hidden />} title={t('timelineEmpty')} />;
   }
@@ -55,14 +57,14 @@ export function Timeline({ tasks, now = new Date() }: { tasks: TimelineTask[]; n
     : nearRight
       ? { right: `${100 - todayPct}%` }
       : { left: `${todayPct}%`, transform: 'translateX(-50%)' };
-  const todayLabel = t('todayWithDate', { date: fmt(Date.parse(`${todayStr}T00:00:00Z`)) });
+  const todayLabel = t('todayWithDate', { date: formatDate(todayStr, locale) });
 
   return (
     <div data-testid="timeline">
       <div className="relative mb-2 h-4 overflow-hidden text-[10px] text-muted-foreground md:ml-44">
-        {!nearLeft && <span className="absolute left-0">{fmt(axis.min)}</span>}
+        {!nearLeft && <span className="absolute left-0 hidden sm:inline">{formatDate(isoOf(axis.min), locale)}</span>}
         <span className="absolute whitespace-nowrap" style={todayStyle}>{todayLabel}</span>
-        {!nearRight && <span className="absolute right-0">{fmt(axis.max)}</span>}
+        {!nearRight && <span className="absolute right-0 hidden sm:inline">{formatDate(isoOf(axis.max), locale)}</span>}
       </div>
       <div className="relative">
         {tasks.map((task) => {
@@ -90,7 +92,7 @@ export function Timeline({ tasks, now = new Date() }: { tasks: TimelineTask[]; n
                 {slipped && (
                   <div
                     data-testid="timeline-agreed"
-                    title={t('agreedDue', { date: task.agreedDueDate })}
+                    title={t('agreedDue', { date: formatDate(task.agreedDueDate, locale) })}
                     className="absolute -bottom-0.5 -top-0.5 border-l-2 border-dashed border-muted-foreground"
                     style={{ left: `${position(task.agreedDueDate, axis)}%` }}
                   />
@@ -98,7 +100,7 @@ export function Timeline({ tasks, now = new Date() }: { tasks: TimelineTask[]; n
                 {/* Today line lives inside each bar area so it never crosses the row text (stacked on mobile). */}
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-y-0 w-0.5 bg-danger"
+                  className={`pointer-events-none absolute inset-y-0 w-0.5 ${TODAY_LINE}`}
                   style={{ left: `${todayPct}%` }}
                 />
               </div>
@@ -112,7 +114,7 @@ export function Timeline({ tasks, now = new Date() }: { tasks: TimelineTask[]; n
           role="img"
           aria-label={t('today')}
           title={t('today')}
-          className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-danger"
+          className={`absolute inset-y-0 w-0.5 -translate-x-1/2 ${TODAY_LINE}`}
           style={{ left: `${todayPct}%` }}
         />
       </div>

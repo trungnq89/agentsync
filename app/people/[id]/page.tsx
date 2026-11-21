@@ -31,7 +31,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         {t('back')}
       </Link>
       <div className="my-4 flex items-center gap-3">
-        <Avatar name={data.person.displayName} src={data.person.avatarUrl ?? undefined} className="h-11 w-11" />
+        <Avatar decorative name={data.person.displayName} src={data.person.avatarUrl ?? undefined} className="h-11 w-11" />
         <div className="min-w-0">
           <h1 className="break-words text-xl font-semibold tracking-tight">{data.person.displayName}</h1>
           <Badge className="mt-1">{tLevel(data.person.level)}</Badge>

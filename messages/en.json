@@ -35,8 +35,6 @@
     "attentionTitle": "Needs your attention",
     "emptyTitle": "Nothing to show yet",
     "emptyHint": "There are no tasks or people to display. Follow the agent setup guide (Settings, create a token, then install the skill for Claude Code or Codex) so your agent can start syncing work.",
-    "blockedBadge": "Blocked",
-    "reviewBadge": "Awaiting review",
     "doneActive": "{done} done · {active} in progress",
     "updated": "updated {when}"
   },

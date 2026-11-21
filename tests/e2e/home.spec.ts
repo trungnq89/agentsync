@@ -23,7 +23,7 @@ test('director sees manager tier with blocked badge, not the leader', async ({ p
   await login(page, ADMIN.username, ADMIN.password);
   await expect(page.getByTestId('tier-manager')).toBeVisible();
   const card = page.getByTestId('person-card').filter({ hasText: 'Hà Manager' });
-  await expect(card).toContainText('Kẹt');
+  await expect(card).toContainText('Đang kẹt');
   await expect(card).toContainText('việc đang làm');
   await expect(page.getByTestId('attention')).toContainText('Đàm phán đối tác X');
   await expect(page.getByText('Minh Leader')).toHaveCount(0);

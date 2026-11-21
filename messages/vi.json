@@ -35,8 +35,6 @@
     "attentionTitle": "Cần anh chú ý",
     "emptyTitle": "Chưa có gì để hiển thị",
     "emptyHint": "Chưa có việc hay người nào để hiển thị. Hãy làm theo hướng dẫn cài đặt agent (Cài đặt, tạo token, rồi cài skill cho Claude Code hoặc Codex) để agent bắt đầu đồng bộ công việc.",
-    "blockedBadge": "Kẹt",
-    "reviewBadge": "Chờ review",
     "doneActive": "{done} việc xong · {active} việc đang làm",
     "updated": "cập nhật {when}"
   },

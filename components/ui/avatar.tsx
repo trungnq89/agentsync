@@ -13,15 +13,26 @@ const initials = (name: string) =>
     .join('');
 
 /** Circular avatar; shows the image when given, else the name's initials. */
-export function Avatar({ name, src, className }: { name: string; src?: string; className?: string }) {
+export function Avatar({
+  name,
+  src,
+  className,
+  decorative,
+}: {
+  name: string;
+  src?: string;
+  className?: string;
+  /** Hide from assistive tech when the name is already visible next to the avatar. */
+  decorative?: boolean;
+}) {
   return (
     <AvatarPrimitive.Root
+      aria-hidden={decorative || undefined}
       className={cn('relative inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-full bg-surface-muted', className)}
     >
-      {src && <AvatarPrimitive.Image src={src} alt={name} className="h-full w-full object-cover" />}
+      {src && <AvatarPrimitive.Image src={src} alt={decorative ? '' : name} className="h-full w-full object-cover" />}
       <AvatarPrimitive.Fallback
-        role="img"
-        aria-label={name}
+        {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name })}
         className="flex h-full w-full items-center justify-center text-xs font-bold text-foreground"
       >
         {initials(name)}
