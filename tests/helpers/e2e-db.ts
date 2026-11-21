@@ -64,3 +64,22 @@ export async function seedOrg(): Promise<{ directorId: string; managerId: string
     await db.$client.end();
   }
 }
+
+/** Adds an unbroken 40-char-named leader under manager1 (worst case for card/timeline layout). */
+export async function seedLongNamedLeader(): Promise<{ id: string; name: string }> {
+  const db = createDb(url!);
+  try {
+    const [admin] = await db.select().from(schema.users).where(eq(schema.users.username, 'admin'));
+    const [manager] = await db.select().from(schema.users).where(eq(schema.users.username, 'manager1'));
+    const name = 'N'.repeat(40);
+    const u = await createUser(db, admin, { username: 'longname1', displayName: name, password: 'user-password-1', level: 'leader', managerId: manager.id });
+    const t = await createTask(db, u, {
+      title: 'T'.repeat(60), mode: 'executive', agreedOutcome: 'Kết quả', isPrivate: false,
+      startDate: isoDay(-5), agreedDueDate: isoDay(10), steps: ['Bước 1'],
+    });
+    await confirmTask(db, manager, t.id);
+    return { id: u.id, name };
+  } finally {
+    await db.$client.end();
+  }
+}

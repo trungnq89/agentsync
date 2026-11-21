@@ -23,9 +23,31 @@
     "main": "Main navigation",
     "preferenceFailed": "Could not save your preference. Please try again."
   },
-  "auth": {},
-  "home": {},
-  "person": {},
+  "auth": {
+    "title": "Sign in",
+    "subtitle": "Sign in to continue to AgentSync.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "logo": "AgentSync logo"
+  },
+  "home": {
+    "attentionTitle": "Needs your attention",
+    "emptyTitle": "Nothing to show yet",
+    "emptyHint": "There are no tasks or people to display. Follow the agent setup guide (Settings, create a token, then install the skill for Claude Code or Codex) so your agent can start syncing work.",
+    "blockedBadge": "Blocked",
+    "reviewBadge": "Awaiting review",
+    "doneActive": "{done} done · {active} in progress",
+    "updated": "updated {when}"
+  },
+  "person": {
+    "back": "Home",
+    "timelineEmpty": "No tasks to show yet.",
+    "today": "Today",
+    "todayWithDate": "Today {date}",
+    "agreedDue": "Agreed due date {date}",
+    "done": "Done"
+  },
   "task": {},
   "settings": {},
   "admin": {},

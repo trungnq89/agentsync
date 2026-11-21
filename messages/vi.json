@@ -23,9 +23,31 @@
     "main": "Điều hướng chính",
     "preferenceFailed": "Không thể lưu tùy chọn. Vui lòng thử lại."
   },
-  "auth": {},
-  "home": {},
-  "person": {},
+  "auth": {
+    "title": "Đăng nhập",
+    "subtitle": "Đăng nhập để tiếp tục dùng AgentSync.",
+    "username": "Tên đăng nhập",
+    "password": "Mật khẩu",
+    "submit": "Đăng nhập",
+    "logo": "Logo AgentSync"
+  },
+  "home": {
+    "attentionTitle": "Cần anh chú ý",
+    "emptyTitle": "Chưa có gì để hiển thị",
+    "emptyHint": "Chưa có việc hay người nào để hiển thị. Hãy làm theo hướng dẫn cài đặt agent (Cài đặt, tạo token, rồi cài skill cho Claude Code hoặc Codex) để agent bắt đầu đồng bộ công việc.",
+    "blockedBadge": "Kẹt",
+    "reviewBadge": "Chờ review",
+    "doneActive": "{done} việc xong · {active} việc đang làm",
+    "updated": "cập nhật {when}"
+  },
+  "person": {
+    "back": "Trang chủ",
+    "timelineEmpty": "Chưa có việc nào để hiển thị.",
+    "today": "Hôm nay",
+    "todayWithDate": "Hôm nay {date}",
+    "agreedDue": "Hạn thống nhất {date}",
+    "done": "Xong"
+  },
   "task": {},
   "settings": {},
   "admin": {},
