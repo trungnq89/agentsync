@@ -16,7 +16,6 @@ export async function createUserAction(_p: FormState, form: FormData): Promise<F
     const username = str(form, 'username');
     const password = String(form.get('password') ?? '');
     if (!username || !password) throw new DomainError('VALIDATION', 'Cần nhập tên đăng nhập và mật khẩu.');
-    if (password.length < 8) throw new DomainError('VALIDATION', 'Mật khẩu phải có ít nhất 8 ký tự.');
     await createUser(getDb(), actor, {
       username,
       displayName: str(form, 'displayName') || username,
@@ -49,7 +48,6 @@ export async function resetPasswordAction(_p: FormState, form: FormData): Promis
   const actor = await getActor();
   return run(async () => {
     const pw = String(form.get('password') ?? '');
-    if (pw.length < 8) throw new DomainError('VALIDATION', 'Mật khẩu phải có ít nhất 8 ký tự.');
     await setPassword(getDb(), actor, str(form, 'userId'), pw);
     return { ok: 'Đã đặt lại mật khẩu.' };
   });

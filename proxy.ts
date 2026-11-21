@@ -13,5 +13,5 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Skip: /login, /api/* (MCP uses Bearer tokens, not cookies), Next internals and static files.
-  matcher: ['/((?!login|api/|_next/|favicon.ico|.*\\.[a-zA-Z0-9]+$).*)'],
+  matcher: ['/((?!login(?:/|$)|api/|_next/|.*\\.(?:ico|png|jpe?g|gif|svg|webp|avif|css|js|map|txt|xml|woff2?|ttf|otf)$).*)'],
 };

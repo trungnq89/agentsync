@@ -23,8 +23,8 @@ export default async function AdminPage() {
   const managerSelect = (value: string | null, exclude?: string) => (
     <select name="managerId" defaultValue={value ?? ''} className={input} aria-label="Quản lý">
       <option value="">Không có</option>
-      {users.filter((u) => u.id !== exclude && !u.disabledAt).map((u) => (
-        <option key={u.id} value={u.id}>{u.displayName}</option>
+      {users.filter((u) => u.id !== exclude && (!u.disabledAt || u.id === value)).map((u) => (
+        <option key={u.id} value={u.id}>{u.displayName}{u.disabledAt ? ' (đã vô hiệu hóa)' : ''}</option>
       ))}
     </select>
   );

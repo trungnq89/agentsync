@@ -1,4 +1,13 @@
 import { hash, verify } from '@node-rs/argon2';
+import { DomainError } from '../errors';
+
+export const MIN_PASSWORD_LENGTH = 8;
+
+export function assertPasswordLength(pw: string): void {
+  if (pw.length < MIN_PASSWORD_LENGTH) {
+    throw new DomainError('VALIDATION', `Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`);
+  }
+}
 
 // The library default algorithm is argon2id (asserted in tests).
 export function hashPassword(pw: string): Promise<string> {

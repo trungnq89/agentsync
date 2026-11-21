@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { users } from '@/db/schema';
+import { sessions, users } from '@/db/schema';
+import { hashPassword } from '@/server/auth/password';
+import { login } from '@/server/auth/session';
 import { verifyPassword } from '@/server/auth/password';
 import { createUser, listDirectReports, setPassword, updateUser } from '@/server/org';
 import { testDb } from '../helpers/db';
@@ -32,9 +34,9 @@ describe('org', () => {
   it('setPassword changes hash', async () => {
     const admin = await makeUser({ isAdmin: true });
     const u = await makeUser();
-    await setPassword(testDb, admin, u.id, 'new-pw');
+    await setPassword(testDb, admin, u.id, 'new-password-1');
     const [row] = await testDb.select().from(users).where(eq(users.id, u.id));
-    expect(await verifyPassword(row.passwordHash, 'new-pw')).toBe(true);
+    expect(await verifyPassword(row.passwordHash, 'new-password-1')).toBe(true);
   });
 
   it('rejects manager cycle and self-manager', async () => {
@@ -84,7 +86,7 @@ describe('org', () => {
     const admin = await makeUser({ isAdmin: true });
     const m = await makeUser({ level: 'manager' });
     const u = await createUser(testDb, admin, {
-      username: 'nomgr', displayName: 'N', password: 'pw', level: 'member', managerId: '',
+      username: 'nomgr', displayName: 'N', password: 'password-1', level: 'member', managerId: '',
     });
     expect(u.managerId).toBeNull();
     const r = await makeUser({ managerId: m.id });
@@ -94,11 +96,43 @@ describe('org', () => {
 
   it('duplicate username is VALIDATION', async () => {
     const admin = await makeUser({ isAdmin: true });
-    const input = { username: 'dup', displayName: 'D', password: 'pw', level: 'member' as const };
+    const input = { username: 'dup', displayName: 'D', password: 'password-1', level: 'member' as const };
     await createUser(testDb, admin, input);
     await expect(createUser(testDb, admin, input)).rejects.toMatchObject({
       code: 'VALIDATION',
       message: 'Tên đăng nhập đã tồn tại.',
     });
+  });
+
+  it('validates password length, level and displayName', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    const base = { username: 'v1', displayName: 'V', password: 'long-enough-pw', level: 'member' as const };
+    await expect(createUser(testDb, admin, { ...base, password: 'short' })).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(createUser(testDb, admin, { ...base, level: 'boss' as never })).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(createUser(testDb, admin, { ...base, displayName: '   ' })).rejects.toMatchObject({ code: 'VALIDATION' });
+    const u = await createUser(testDb, admin, base);
+    await expect(updateUser(testDb, admin, u.id, { level: 'boss' as never })).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(updateUser(testDb, admin, u.id, { displayName: ' ' })).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(setPassword(testDb, admin, u.id, 'short')).rejects.toMatchObject({ code: 'VALIDATION' });
+  });
+
+  it('setPassword signs the user out everywhere', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    const u = await makeUser({ passwordHash: await hashPassword('old-password') });
+    await login(testDb, u.username, 'old-password');
+    await login(testDb, u.username, 'old-password');
+    await setPassword(testDb, admin, u.id, 'new-password-1');
+    expect(await testDb.select().from(sessions).where(eq(sessions.userId, u.id))).toHaveLength(0);
+  });
+
+  it('cannot demote or disable the last active admin', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    await expect(updateUser(testDb, admin, admin.id, { isAdmin: false })).rejects.toMatchObject({ code: 'VALIDATION' });
+    await expect(updateUser(testDb, admin, admin.id, { disabled: true })).rejects.toMatchObject({ code: 'VALIDATION' });
+    const other = await makeUser({ isAdmin: true });
+    await updateUser(testDb, admin, other.id, { isAdmin: false });
+    await expect(updateUser(testDb, admin, admin.id, { isAdmin: false })).rejects.toMatchObject({ code: 'VALIDATION' });
+    await updateUser(testDb, admin, other.id, { isAdmin: true });
+    await updateUser(testDb, admin, admin.id, { isAdmin: false });
   });
 });

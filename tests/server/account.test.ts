@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { appSettings, users } from '@/db/schema';
+import { appSettings, sessions, users } from '@/db/schema';
 import { changeMyPassword, listMyTokens, setMySendMode } from '@/server/account';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
+import { login } from '@/server/auth/session';
 import { createAgentToken } from '@/server/auth/tokens';
 import { listAllUsers } from '@/server/org';
 import { getStaleBusinessDays, setStaleBusinessDays } from '@/server/settings';
@@ -37,6 +38,17 @@ describe('account', () => {
     await changeMyPassword(testDb, a, 'old-password', 'new-password-1');
     const [row] = await testDb.select().from(users).where(eq(users.id, a.id));
     expect(await verifyPassword(row.passwordHash, 'new-password-1')).toBe(true);
+  });
+});
+
+describe('password change sessions', () => {
+  it('changeMyPassword signs out other sessions but keeps the current one', async () => {
+    const a = await makeUser({ passwordHash: await hashPassword('old-password') });
+    const s1 = await login(testDb, a.username, 'old-password');
+    await login(testDb, a.username, 'old-password');
+    await changeMyPassword(testDb, a, 'old-password', 'new-password-1', s1.sessionId);
+    const left = await testDb.select().from(sessions).where(eq(sessions.userId, a.id));
+    expect(left.map((r) => r.id)).toEqual([s1.sessionId]);
   });
 });
 

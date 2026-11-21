@@ -43,7 +43,8 @@ test('admin creates users, leader logs in and creates a token shown once', async
   await page.getByRole('link', { name: 'Quản trị' }).click();
   await createUser(page, { username: 'manager1', name: 'Manager Một', level: 'Manager' });
   await createUser(page, { username: 'leader1', name: 'Leader Một', level: 'Leader', manager: 'Manager Một' });
-  await expect(page.getByTestId('user-leader1').getByLabel('Quản lý')).toContainText('Manager Một');
+  const mgrId = await page.getByTestId('user-manager1').locator('input[name=userId]').first().inputValue();
+  await expect(page.getByTestId('user-leader1').getByLabel('Quản lý')).toHaveValue(mgrId);
 
   await page.getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -95,4 +96,27 @@ test('no horizontal scroll at 375px', async ({ page }) => {
     await page.goto(path);
     expect(await overflow(), path).toBe(false);
   }
+});
+
+test('saving a report keeps a disabled manager selected', async ({ page }) => {
+  await login(page, ADMIN.username, ADMIN.password);
+  await page.getByRole('link', { name: 'Quản trị' }).click();
+  await createUser(page, { username: 'mgr', name: 'Sếp', level: 'Manager' });
+  await createUser(page, { username: 'rep', name: 'Nhân viên', level: 'Leader', manager: 'Sếp' });
+  const mgrId = await page.getByTestId('user-mgr').locator('input[name=userId]').first().inputValue();
+
+  const mgr = page.getByTestId('user-mgr');
+  await mgr.getByLabel('Vô hiệu hóa').check();
+  await mgr.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(mgr.getByRole('status')).toHaveText('Đã lưu.');
+
+  await page.reload();
+  const rep = page.getByTestId('user-rep');
+  await expect(rep.getByLabel('Quản lý')).toHaveValue(mgrId);
+  await rep.getByLabel('Tên', { exact: true }).fill('Nhân viên mới');
+  await rep.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(rep.getByRole('status')).toHaveText('Đã lưu.');
+  await page.reload();
+  await expect(page.getByTestId('user-rep').getByLabel('Quản lý')).toHaveValue(mgrId);
+  await expect(page.getByTestId('user-rep').getByLabel('Tên', { exact: true })).toHaveValue('Nhân viên mới');
 });

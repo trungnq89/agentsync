@@ -2,9 +2,10 @@ import 'dotenv/config';
 import { eq } from 'drizzle-orm';
 import { createDb, type Db } from '../src/db/client';
 import { users } from '../src/db/schema';
-import { hashPassword } from '../src/server/auth/password';
+import { assertPasswordLength, hashPassword } from '../src/server/auth/password';
 
 export async function seedAdmin(db: Db, username: string, password: string): Promise<void> {
+  assertPasswordLength(password);
   const [dup] = await db.select({ id: users.id }).from(users).where(eq(users.username, username));
   if (dup) throw new Error(`Tên đăng nhập "${username}" đã tồn tại.`);
   await db.insert(users).values({

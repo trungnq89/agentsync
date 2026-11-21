@@ -1,11 +1,9 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { agentTokens, users, type AgentToken } from '@/db/schema';
-import { hashPassword, verifyPassword } from './auth/password';
+import { agentTokens, sessions, users, type AgentToken } from '@/db/schema';
+import { assertPasswordLength, hashPassword, verifyPassword } from './auth/password';
 import type { Actor } from './authz';
 import { DomainError } from './errors';
-
-export const MIN_PASSWORD_LENGTH = 8;
 
 export type TokenInfo = Pick<AgentToken, 'id' | 'label' | 'prefix' | 'createdAt' | 'lastUsedAt' | 'revokedAt'>;
 
@@ -30,13 +28,21 @@ export async function setMySendMode(db: Db, actor: Actor, mode: 'auto' | 'review
   await db.update(users).set({ sendMode: mode }).where(eq(users.id, actor.id));
 }
 
-export async function changeMyPassword(db: Db, actor: Actor, current: string, next: string): Promise<void> {
+/** Changes the actor's password; other sessions are signed out (the one in `keepSessionId` stays). */
+export async function changeMyPassword(
+  db: Db,
+  actor: Actor,
+  current: string,
+  next: string,
+  keepSessionId?: string,
+): Promise<void> {
   const [row] = await db.select({ hash: users.passwordHash }).from(users).where(eq(users.id, actor.id));
   if (!row || !(await verifyPassword(row.hash, current))) {
     throw new DomainError('VALIDATION', 'Mật khẩu hiện tại không đúng.');
   }
-  if (next.length < MIN_PASSWORD_LENGTH) {
-    throw new DomainError('VALIDATION', `Mật khẩu mới phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`);
-  }
+  assertPasswordLength(next);
   await db.update(users).set({ passwordHash: await hashPassword(next) }).where(eq(users.id, actor.id));
+  await db
+    .delete(sessions)
+    .where(keepSessionId ? and(eq(sessions.userId, actor.id), ne(sessions.id, keepSessionId)) : eq(sessions.userId, actor.id));
 }

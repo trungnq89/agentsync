@@ -15,7 +15,7 @@ const fmt = (d: Date | null) =>
 export default async function SettingsPage() {
   const actor = await getActor();
   const tokens = await listMyTokens(getDb(), actor);
-  const mcpUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/api/mcp`;
+  const mcpUrl = `${(process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')}/api/mcp`;
   return (
     <main className="space-y-8">
       <h1 className="text-xl font-semibold">Cài đặt</h1>
