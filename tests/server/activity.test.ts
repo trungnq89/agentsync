@@ -5,7 +5,7 @@ import {
   answerQuestion, askQuestion, deleteUpdate, editUpdate, getPendingFeedback, postUpdate,
   reviewSolution, submitSolutionSummary,
 } from '@/server/tasks/activity';
-import { getCurrentPlan } from '@/server/tasks/service';
+import { getCurrentPlan, requestChanges, setTaskStatus } from '@/server/tasks/service';
 import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
 
@@ -95,10 +95,11 @@ describe('activity', () => {
 
   it('reviewSolution changes_needed → in_progress and shows in reviewResults', async () => {
     const { manager, member } = await pair();
-    const t = await makeTask(member.id, { status: 'awaiting_review', mode: 'project' });
+    const t = await makeTask(member.id, { status: 'awaiting_review', mode: 'project', completedAt: T0 });
     await expect(reviewSolution(testDb, member, t.id, 'approved', undefined, T0)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     const r = await reviewSolution(testDb, manager, t.id, 'changes_needed', 'Thiếu test', T0);
     expect(r.status).toBe('in_progress');
+    expect(r.completedAt).toBeNull();
     const fb = await getPendingFeedback(testDb, member);
     expect(fb.reviewResults).toEqual([{ taskId: t.id, title: t.title, verdict: 'changes_needed', note: 'Thiếu test' }]);
   });
@@ -111,5 +112,24 @@ describe('activity', () => {
     await submitSolutionSummary(testDb, member, p.id, summary, T0);
     const s = await submitSolutionSummary(testDb, member, p.id, { ...summary, solution: 'mới' }, T0);
     expect(s.solution).toBe('mới');
+  });
+
+  it('changesRequested lists only tasks currently in changes_requested', async () => {
+    const { manager, member } = await pair();
+    const t = await makeTask(member.id, { status: 'pending_confirmation' });
+    await requestChanges(testDb, manager, t.id, 'Làm lại', T0);
+    expect((await getPendingFeedback(testDb, member)).changesRequested).toEqual([{ taskId: t.id, title: t.title, note: 'Làm lại' }]);
+    await setTaskStatus(testDb, member, t.id, 'cancel', 'bỏ', T0);
+    expect((await getPendingFeedback(testDb, member)).changesRequested).toEqual([]);
+  });
+
+  it('postUpdate with unknown stepsCompleted → VALIDATION, no writes', async () => {
+    const { member } = await pair();
+    const t = await makeTask(member.id, { status: 'in_progress', steps: ['A'] });
+    await expect(postUpdate(testDb, member, t.id, { ...upd, stepsCompleted: ['A', 'X', 'Y'] }, T0)).rejects.toMatchObject({
+      code: 'VALIDATION', message: expect.stringContaining('X, Y'),
+    });
+    expect(await testDb.select().from(updates)).toHaveLength(0);
+    expect((await getCurrentPlan(testDb, t.id)).steps[0].status).toBe('todo');
   });
 });

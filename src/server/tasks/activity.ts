@@ -9,7 +9,7 @@ import { isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
 import { isUuid } from '@/server/ids';
 import { nextStatus, TERMINAL_STATUSES } from './lifecycle';
-import { asDb, currentPlan, lifecycleCtx, requireOwner } from './service';
+import { asDb, currentPlan, lifecycleCtx, requireOwner, type Tx } from './internal';
 
 export type Update = typeof updates.$inferSelect;
 export type Question = typeof questions.$inferSelect;
@@ -53,6 +53,10 @@ export async function postUpdate(
     const done = input.stepsCompleted ?? [];
     if (done.length > 0) {
       const plan = await currentPlan(tx, taskId);
+      const unknown = done.filter((t) => !plan.steps.some((s) => s.title === t));
+      if (unknown.length > 0) {
+        throw new DomainError('VALIDATION', `Không tìm thấy bước: ${unknown.join(', ')}. Kiểm tra lại tên bước trong plan.`);
+      }
       const steps = plan.steps.map((s) => (done.includes(s.title) ? { ...s, status: 'done' as const } : s));
       await tx.update(planVersions).set({ steps }).where(eq(planVersions.id, plan.id));
     }
@@ -78,32 +82,37 @@ export async function postUpdate(
 
 const notFound = (what: string) => new DomainError('NOT_FOUND', `Không tìm thấy ${what}.`);
 
-async function editBody<T extends 'updates' | 'questions'>(
-  db: Db, actor: Actor, id: string, body: string, now: Date, kind: T,
-): Promise<T extends 'updates' ? Update : Question> {
-  const table = kind === 'updates' ? updates : questions;
-  const label = kind === 'updates' ? 'cập nhật' : 'câu hỏi';
-  if (!isUuid(id)) throw notFound(label);
+function assertEditable(row: { authorId: string; createdAt: Date }, actor: Actor, now: Date) {
+  if (row.authorId !== actor.id) throw new DomainError('FORBIDDEN', 'Chỉ tác giả mới được sửa.');
+  if (!isWithinHours(row.createdAt, now, 24)) {
+    throw new DomainError('EDIT_WINDOW_CLOSED', 'Đã quá 24 giờ, không thể sửa.');
+  }
+}
+
+export async function editUpdate(db: Db, actor: Actor, updateId: string, body: string, now: Date = new Date()): Promise<Update> {
+  if (!isUuid(updateId)) throw notFound('cập nhật');
   if (!body.trim()) throw new DomainError('VALIDATION', 'Nội dung không được để trống.');
   return db.transaction(async (tx) => {
-    const [row] = await tx.select().from(table).where(eq(table.id, id));
-    if (!row) throw notFound(label);
+    const [row] = await tx.select().from(updates).where(eq(updates.id, updateId));
+    if (!row) throw notFound('cập nhật');
     await loadTaskForViewer(asDb(tx), actor, row.taskId, { forUpdate: true });
-    if (row.authorId !== actor.id) throw new DomainError('FORBIDDEN', 'Chỉ tác giả mới được sửa.');
-    if (!isWithinHours(row.createdAt, now, 24)) {
-      throw new DomainError('EDIT_WINDOW_CLOSED', 'Đã quá 24 giờ, không thể sửa.');
-    }
-    const [updated] = await tx.update(table).set({ body, editedAt: now }).where(eq(table.id, id)).returning();
-    return updated as never;
+    assertEditable(row, actor, now);
+    const [updated] = await tx.update(updates).set({ body, editedAt: now }).where(eq(updates.id, updateId)).returning();
+    return updated;
   });
 }
 
-export function editUpdate(db: Db, actor: Actor, updateId: string, body: string, now: Date = new Date()): Promise<Update> {
-  return editBody(db, actor, updateId, body, now, 'updates');
-}
-
-export function editQuestion(db: Db, actor: Actor, questionId: string, body: string, now: Date = new Date()): Promise<Question> {
-  return editBody(db, actor, questionId, body, now, 'questions');
+export async function editQuestion(db: Db, actor: Actor, questionId: string, body: string, now: Date = new Date()): Promise<Question> {
+  if (!isUuid(questionId)) throw notFound('câu hỏi');
+  if (!body.trim()) throw new DomainError('VALIDATION', 'Nội dung không được để trống.');
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(questions).where(eq(questions.id, questionId));
+    if (!row) throw notFound('câu hỏi');
+    await loadTaskForViewer(asDb(tx), actor, row.taskId, { forUpdate: true });
+    assertEditable(row, actor, now);
+    const [updated] = await tx.update(questions).set({ body, editedAt: now }).where(eq(questions.id, questionId)).returning();
+    return updated;
+  });
 }
 
 export async function deleteUpdate(db: Db, actor: Actor, updateId: string): Promise<void> {
@@ -142,7 +151,7 @@ export async function askQuestion(
   });
 }
 
-async function loadQuestion(tx: Parameters<Parameters<Db['transaction']>[0]>[0], actor: Actor, questionId: string) {
+async function loadQuestion(tx: Tx, actor: Actor, questionId: string) {
   if (!isUuid(questionId)) throw notFound('câu hỏi');
   const [q] = await tx.select().from(questions).where(eq(questions.id, questionId));
   if (!q) throw notFound('câu hỏi');
@@ -245,7 +254,7 @@ export async function reviewSolution(
     });
     const [updated] = await tx
       .update(tasks)
-      .set({ status: to, statusChangedAt: now })
+      .set({ status: to, statusChangedAt: now, ...(to === 'in_progress' ? { completedAt: null } : {}) })
       .where(eq(tasks.id, taskId))
       .returning();
     return updated;
@@ -264,7 +273,7 @@ export async function getPendingFeedback(db: Db, actor: Actor): Promise<PendingF
     .select({ taskId: tasks.id, title: tasks.title, note: managerFeedback.note })
     .from(managerFeedback)
     .innerJoin(tasks, eq(tasks.id, managerFeedback.taskId))
-    .where(and(eq(tasks.ownerId, actor.id), isNull(managerFeedback.consumedAt)))
+    .where(and(eq(tasks.ownerId, actor.id), eq(tasks.status, 'changes_requested'), isNull(managerFeedback.consumedAt)))
     .orderBy(managerFeedback.createdAt);
 
   const questionsForMe = await db

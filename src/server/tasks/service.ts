@@ -7,9 +7,10 @@ import {
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
 import { isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
+import { asDb, currentPlan, lifecycleCtx, requireOwner, type PlanVersion } from './internal';
 import { initialStatus, nextStatus, TERMINAL_STATUSES, type TaskAction, type TaskStatus } from './lifecycle';
 
-export type PlanVersion = typeof planVersions.$inferSelect;
+export type { PlanVersion };
 
 export interface CreateTaskInput {
   title: string;
@@ -21,25 +22,6 @@ export interface CreateTaskInput {
   isPrivate?: boolean;
   repoRef?: { repo?: string; branch?: string };
   cwdHint?: string;
-}
-
-export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
-// A transaction exposes the same query API; authz helpers only use that.
-export const asDb = (tx: Tx) => tx as unknown as Db;
-
-export function lifecycleCtx(task: Task, managerId: string | null) {
-  return { status: task.status, mode: task.mode, hasManager: managerId !== null, isPrivate: task.isPrivate };
-}
-
-export async function currentPlan(tx: Tx | Db, taskId: string): Promise<PlanVersion> {
-  const [v] = await tx
-    .select()
-    .from(planVersions)
-    .where(eq(planVersions.taskId, taskId))
-    .orderBy(desc(planVersions.version))
-    .limit(1);
-  if (!v) throw new DomainError('NOT_FOUND', 'Không tìm thấy plan của việc này.');
-  return v;
 }
 
 export function getCurrentPlan(db: Db, taskId: string): Promise<PlanVersion> {
@@ -134,10 +116,6 @@ export function requestChanges(
 ): Promise<Task> {
   if (!note.trim()) throw new DomainError('VALIDATION', 'Cần nhập ghi chú khi yêu cầu chỉnh sửa.');
   return managerAction(db, actor, taskId, 'request_changes', now, note);
-}
-
-export function requireOwner(actor: Actor, task: Task) {
-  if (actor.id !== task.ownerId) throw new DomainError('FORBIDDEN', 'Chỉ chủ việc mới được thực hiện thao tác này.');
 }
 
 export async function changePlan(
