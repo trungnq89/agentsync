@@ -82,6 +82,12 @@ describe('applyTurn', () => {
 });
 
 describe('decide', () => {
+  it('decide skips steps with non-string titles without throwing', () => {
+    const bad = plan([['A', 'pending']]);
+    (bad.steps as unknown[]).push({ title: 5, status: 'done' }, null);
+    const r = decide(base({ claimed: ['A'] }), bad as never, { stopHookActive: false });
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'] });
+  });
   const p = plan([['A', 'pending'], ['B', 'pending']]);
   it('decide: new checkpoint not done on server → remindSteps with that step; reminded updated; outstanding true', () => {
     const r = decide(base({ claimed: ['A'] }), p, { stopHookActive: false });

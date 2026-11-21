@@ -80,10 +80,35 @@ describe('hook runtime', () => {
     expect(requests[0].auth).toBe('Bearer secret-token');
   });
 
-  it('second run with stop_hook_active true → no stdout', async () => {
-    await run(msg(MARK));
-    const r = await run(msg('again', { stop_hook_active: true }));
+  it('new checkpoint with stop_hook_active true → silent; next normal run with no markers → block', async () => {
+    const r1 = await run(msg(MARK, { stop_hook_active: true }));
+    expect(r1.stdout).toBe('');
+    const r2 = await run(msg('no markers'));
+    expect(JSON.parse(r2.stdout).reason).toContain('Step A');
+  });
+
+  it('server failure keeps the reminder: slow run silent, next run (no markers) blocks', async () => {
+    respond = (res) => {
+      setTimeout(() => json(plan())(res), 5000).unref();
+    };
+    const r1 = await run(msg(MARK));
+    expect(r1.stdout).toBe('');
+    respond = json(plan());
+    const r2 = await run(msg('nothing new'));
+    expect(JSON.parse(r2.stdout).reason).toContain('Step A');
+  }, 15000);
+
+  it('all steps done but status awaiting_review → silent', async () => {
+    respond = json(plan({ status: 'awaiting_review' }, [['Step A', 'done']]));
+    const r = await run(msg(MARK));
     expect(r.stdout).toBe('');
+  });
+
+  it('rotates hook.log to hook.log.1 when over 1MB', async () => {
+    writeFileSync(join(dir, 'hook.log'), 'x'.repeat(1024 * 1024 + 10));
+    await run(msg(MARK), { env: { AGENTSYNC_TOKEN: undefined } }); // logs missing token
+    expect(existsSync(join(dir, 'hook.log.1'))).toBe(true);
+    expect(readFileSync(join(dir, 'hook.log'), 'utf8').length).toBeLessThan(1000);
   });
 
   it('after server shows all done (in_progress) → block reminding completion once; next run silent', async () => {

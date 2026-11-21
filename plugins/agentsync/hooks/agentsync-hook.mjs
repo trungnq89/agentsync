@@ -120,13 +120,14 @@ export function decide(session, plan, opts) {
 
   /** @type {Map<string, { original: string, done: boolean }>} */
   const byTitle = new Map();
-  for (const st of plan.steps) {
+  const steps = plan.steps.filter((st) => st && typeof st.title === 'string');
+  for (const st of steps) {
     const key = st.title.trim();
     const prev = byTitle.get(key);
     byTitle.set(key, { original: prev ? prev.original : st.title, done: (prev ? prev.done : true) && st.status === 'done' });
   }
   const pendingKeys = ts.claimed.filter((c) => byTitle.has(c) && !byTitle.get(c)?.done);
-  const allDone = plan.steps.length > 0 && plan.steps.every((st) => st.status === 'done');
+  const allDone = steps.length > 0 && steps.every((st) => st.status === 'done');
   const outstanding = pendingKeys.length > 0 || (allDone && !TERMINAL_STATUSES.includes(plan.status));
   const keptReminded = ts.reminded.filter((r) => pendingKeys.includes(r));
 
@@ -262,6 +263,7 @@ async function main() {
   const fs = await import('node:fs');
   const env = process.env;
   if (env.AGENTSYNC_HOOK === 'off') return;
+  setTimeout(() => process.exit(0), 4000).unref(); // watchdog: bound total runtime
 
   const stateDir = env.AGENTSYNC_STATE_DIR || join(homedir(), '.agentsync');
   const logFile = join(stateDir, 'hook.log');
@@ -324,7 +326,9 @@ async function main() {
     const token = env.AGENTSYNC_TOKEN;
     /** @type {Action} */
     let action = { type: 'none' };
-    if (session.currentTaskId && (applied.newCheckpoints.length > 0 || session.outstanding)) {
+    let decided = false;
+    const needServer = !!session.currentTaskId && (applied.newCheckpoints.length > 0 || session.outstanding);
+    if (needServer) {
       if (url && token) {
         /** @type {Plan | null} */
         let plan = null;
@@ -342,26 +346,44 @@ async function main() {
           const d = decide(session, plan, { stopHookActive: input.stop_hook_active === true });
           session = d.session;
           action = d.action;
+          decided = true;
         }
       } else {
         log('missing AGENTSYNC_URL or AGENTSYNC_TOKEN');
       }
     }
 
+    // Server needed but no decision (timeout/non-200/bad JSON/missing env): retry next turn.
+    if (needServer && !decided) session = { ...session, outstanding: true };
     session = { ...session, updatedAt: new Date(now).toISOString() };
-    state.sessions[sessionId] = session;
+    const tmp = `${statePath}.${process.pid}.tmp`;
     try {
       fs.mkdirSync(stateDir, { recursive: true });
-      const tmp = `${statePath}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(state));
+      // Re-read right before writing so concurrent sessions' entries are not clobbered.
+      let fresh = '';
+      try {
+        fresh = fs.readFileSync(statePath, 'utf8');
+      } catch {
+        /* none */
+      }
+      const merged = loadState(fresh, Date.now());
+      merged.sessions[sessionId] = session;
+      fs.writeFileSync(tmp, JSON.stringify(merged));
       fs.renameSync(tmp, statePath);
     } catch (e) {
-      log(`state write failed: ${e instanceof Error ? e.message : 'error'}`);
+      log(`state write failed: ${e instanceof Error ? e.name : 'error'}`);
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        /* ignore */
+      }
     }
 
-    if (action.type !== 'none') process.stdout.write(blockOutput(agent, reasonFor(action)) + '\n');
+    if (action.type !== 'none') {
+      await new Promise((r) => process.stdout.write(blockOutput(agent, reasonFor(action)) + '\n', () => r(undefined)));
+    }
   } catch (e) {
-    log(`hook error: ${e instanceof Error ? e.message : 'error'}`);
+    log(`hook error: ${e instanceof Error ? e.name : 'error'}`);
   }
 }
 
@@ -374,5 +396,7 @@ try {
   isMain = false;
 }
 if (isMain) {
-  main().finally(() => process.exit(0));
+  main().finally(() => {
+    process.exitCode = 0; // let stdout flush; the watchdog bounds runtime
+  });
 }
