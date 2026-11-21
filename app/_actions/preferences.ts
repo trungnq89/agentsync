@@ -7,18 +7,29 @@ import { isTheme } from '@/ui/theme';
 import { getOptionalActor } from '../_lib/actor';
 import { writeLocaleCookie, writeThemeCookie } from '../_lib/preference-cookies';
 
-export async function setLocaleAction(locale: string): Promise<void> {
-  if (!isLocale(locale)) return;
-  const user = await getOptionalActor();
-  if (user) await setMyLocale(getDb(), user, locale);
-  await writeLocaleCookie(locale);
-  revalidatePath('/', 'layout');
+/** Both actions resolve to true on success, false on any failure (the UI shows a translated toast). */
+export async function setLocaleAction(locale: string): Promise<boolean> {
+  try {
+    if (!isLocale(locale)) return false;
+    const user = await getOptionalActor();
+    if (user) await setMyLocale(getDb(), user, locale);
+    await writeLocaleCookie(locale);
+    revalidatePath('/', 'layout');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export async function setThemeAction(theme: string): Promise<void> {
-  if (!isTheme(theme)) return;
-  const user = await getOptionalActor();
-  if (user) await setMyTheme(getDb(), user, theme);
-  await writeThemeCookie(theme);
-  revalidatePath('/', 'layout');
+export async function setThemeAction(theme: string): Promise<boolean> {
+  try {
+    if (!isTheme(theme)) return false;
+    const user = await getOptionalActor();
+    if (user) await setMyTheme(getDb(), user, theme);
+    await writeThemeCookie(theme);
+    revalidatePath('/', 'layout');
+    return true;
+  } catch {
+    return false;
+  }
 }

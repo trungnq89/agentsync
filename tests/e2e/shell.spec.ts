@@ -13,7 +13,7 @@ async function login(page: Page) {
 
 async function pick(page: Page, switchId: 'lang-switch' | 'theme-switch', option: string) {
   await page.getByTestId(switchId).click();
-  await page.getByRole('menuitem', { name: option, exact: true }).click();
+  await page.getByRole('menuitemradio', { name: option, exact: true }).click();
 }
 
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
@@ -66,12 +66,35 @@ test('dark theme sets html.dark and persists', async ({ page }) => {
 
 test.describe('system theme on a dark machine', () => {
   test.use({ colorScheme: 'dark' });
-  test('init script ships in HTML and dark class is set at domcontentloaded', async ({ page }) => {
+  test('init script ships in HTML and sets html.dark with all app JS blocked', async ({ page, context, baseURL }) => {
     const html = await (await page.request.get('/login')).text();
     expect(html).toContain('prefers-color-scheme');
+    await context.addCookies([{ name: 'theme', value: 'system', url: baseURL! }]);
+    await page.route('**/_next/static/**', (route) => route.abort());
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('html.dark')).toHaveCount(1);
+    // Single synchronous read: no retries, so only the inline script can have set it.
+    expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(true);
   });
+});
+
+test('no React script-tag warning after a revalidating preference change', async ({ page }) => {
+  const logs: string[] = [];
+  page.on('console', (m) => logs.push(m.text()));
+  await login(page);
+  await pick(page, 'theme-switch', 'Tối');
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+  await pick(page, 'lang-switch', 'Tiếng Anh');
+  await expect(page.getByTestId('nav-home')).toHaveText('Home');
+  expect(logs.filter((l) => l.includes('Encountered a script tag'))).toEqual([]);
+});
+
+test('switchers expose the current option as a checked radio', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByTestId('lang-switch').click();
+  await expect(page.getByRole('menuitemradio', { name: 'Tiếng Việt' })).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('theme-switch').click();
+  await expect(page.getByRole('menuitemradio', { name: 'Theo hệ thống' })).toHaveAttribute('aria-checked', 'true');
 });
 
 for (const locale of ['vi', 'en'] as const) {

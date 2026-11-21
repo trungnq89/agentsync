@@ -1,11 +1,18 @@
 'use client';
-import { useEffect, useTransition } from 'react';
-import { Check, Monitor, Moon, Sun } from 'lucide-react';
+import { useLayoutEffect, useTransition } from 'react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { setThemeAction } from '../../app/_actions/preferences';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { THEMES, type Theme } from '@/ui/theme';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { isTheme, THEMES, type Theme } from '@/ui/theme';
 
 const ICONS = { system: Monitor, light: Sun, dark: Moon } as const;
 
@@ -17,9 +24,21 @@ function applyTheme(theme: Theme) {
 
 export function ThemeSwitcher({ theme }: { theme: Theme }) {
   const t = useTranslations('theme');
+  const tn = useTranslations('nav');
   const [pending, startTransition] = useTransition();
-  useEffect(() => applyTheme(theme), [theme]);
+  // Layout effect: runs before paint, so re-renders never expose a stale class.
+  useLayoutEffect(() => applyTheme(theme), [theme]);
   const Icon = ICONS[theme];
+  const change = (value: string) => {
+    if (!isTheme(value)) return;
+    applyTheme(value);
+    startTransition(async () => {
+      if (!(await setThemeAction(value))) {
+        applyTheme(theme);
+        toast.error(tn('preferenceFailed'));
+      }
+    });
+  };
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -28,22 +47,17 @@ export function ThemeSwitcher({ theme }: { theme: Theme }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {THEMES.map((value) => {
-          const ItemIcon = ICONS[value];
-          return (
-            <DropdownMenuItem
-              key={value}
-              onSelect={() => {
-                applyTheme(value);
-                startTransition(() => setThemeAction(value));
-              }}
-            >
-              <ItemIcon className="h-4 w-4" aria-hidden />
-              {t(value)}
-              <Check className={value === theme ? 'ml-auto h-4 w-4' : 'ml-auto h-4 w-4 opacity-0'} aria-hidden />
-            </DropdownMenuItem>
-          );
-        })}
+        <DropdownMenuRadioGroup value={theme} onValueChange={change}>
+          {THEMES.map((value) => {
+            const ItemIcon = ICONS[value];
+            return (
+              <DropdownMenuRadioItem key={value} value={value}>
+                <ItemIcon className="h-4 w-4" aria-hidden />
+                {t(value)}
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -20,7 +20,8 @@
     "logout": "Log out",
     "menu": "Menu",
     "account": "Account",
-    "main": "Main navigation"
+    "main": "Main navigation",
+    "preferenceFailed": "Could not save your preference. Please try again."
   },
   "auth": {},
   "home": {},

@@ -20,7 +20,8 @@
     "logout": "Đăng xuất",
     "menu": "Menu",
     "account": "Tài khoản",
-    "main": "Điều hướng chính"
+    "main": "Điều hướng chính",
+    "preferenceFailed": "Không thể lưu tùy chọn. Vui lòng thử lại."
   },
   "auth": {},
   "home": {},

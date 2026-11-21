@@ -1,19 +1,31 @@
 'use client';
 import { useTransition } from 'react';
-import { Check, Languages } from 'lucide-react';
+import { Languages } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { setLocaleAction } from '../../app/_actions/preferences';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export function LanguageSwitcher() {
   const t = useTranslations('common');
+  const tn = useTranslations('nav');
   const current = useLocale();
   const [pending, startTransition] = useTransition();
   const options = [
     { value: 'en', label: t('english') },
     { value: 'vi', label: t('vietnamese') },
   ];
+  const change = (value: string) =>
+    startTransition(async () => {
+      if (!(await setLocaleAction(value))) toast.error(tn('preferenceFailed'));
+    });
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -22,12 +34,13 @@ export function LanguageSwitcher() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {options.map((o) => (
-          <DropdownMenuItem key={o.value} onSelect={() => startTransition(() => setLocaleAction(o.value))}>
-            <Check className={o.value === current ? 'h-4 w-4' : 'h-4 w-4 opacity-0'} aria-hidden />
-            {o.label}
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuRadioGroup value={current} onValueChange={change}>
+          {options.map((o) => (
+            <DropdownMenuRadioItem key={o.value} value={o.value}>
+              {o.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
