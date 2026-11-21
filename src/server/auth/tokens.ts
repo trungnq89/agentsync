@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { agentTokens, users, type AgentToken, type User } from '@/db/schema';
 import { DomainError } from '../errors';
+import { isUuid } from '../ids';
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 const BAD_TOKEN = 'Token không hợp lệ hoặc đã bị thu hồi.';
@@ -40,6 +41,7 @@ export async function authenticateAgentToken(db: Db, bearer: string, now: Date =
 }
 
 export async function revokeAgentToken(db: Db, actorId: string, tokenId: string): Promise<void> {
+  if (!isUuid(tokenId)) throw new DomainError('NOT_FOUND', 'Không tìm thấy token.');
   const [row] = await db.select().from(agentTokens).where(eq(agentTokens.id, tokenId));
   if (!row) throw new DomainError('NOT_FOUND', 'Không tìm thấy token.');
   if (row.userId !== actorId) throw new DomainError('FORBIDDEN', 'Bạn không có quyền thu hồi token này.');

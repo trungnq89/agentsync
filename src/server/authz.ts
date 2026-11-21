@@ -1,0 +1,42 @@
+import { eq } from 'drizzle-orm';
+import type { Db } from '@/db/client';
+import { tasks, users, type Task, type User } from '@/db/schema';
+import { DomainError } from './errors';
+import { isUuid } from './ids';
+
+/** Admin flag only grants user management, never visibility of others' tasks. */
+export type Actor = Pick<User, 'id' | 'isAdmin'>;
+
+/** Direct manager only: no inheritance up the chain. */
+export function isCurrentManagerOf(actor: Actor, owner: Pick<User, 'managerId'>): boolean {
+  return owner.managerId !== null && owner.managerId === actor.id;
+}
+
+export function canViewUser(actor: Actor, target: Pick<User, 'id' | 'managerId'>): boolean {
+  return target.id === actor.id || isCurrentManagerOf(actor, target);
+}
+
+export function canViewTask(
+  actor: Actor,
+  task: Pick<Task, 'ownerId' | 'isPrivate'>,
+  owner: Pick<User, 'id' | 'managerId'>,
+): boolean {
+  if (task.ownerId === actor.id) return true;
+  return !task.isPrivate && isCurrentManagerOf(actor, owner);
+}
+
+export async function loadTaskForViewer(
+  db: Db,
+  actor: Actor,
+  taskId: string,
+): Promise<{ task: Task; owner: User }> {
+  const notFound = () => new DomainError('NOT_FOUND', 'Không tìm thấy việc này.');
+  if (!isUuid(taskId)) throw notFound();
+  const [row] = await db
+    .select({ task: tasks, owner: users })
+    .from(tasks)
+    .innerJoin(users, eq(users.id, tasks.ownerId))
+    .where(eq(tasks.id, taskId));
+  if (!row || !canViewTask(actor, row.task, row.owner)) throw notFound();
+  return row;
+}
