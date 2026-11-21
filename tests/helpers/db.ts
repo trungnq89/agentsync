@@ -16,4 +16,5 @@ const tableNames = (Object.values(schema) as unknown[])
 
 export async function resetDb(): Promise<void> {
   await testDb.execute(sql.raw(`TRUNCATE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`));
+  await testDb.insert(schema.appSettings).values({ id: 1, staleBusinessDays: 3 });
 }

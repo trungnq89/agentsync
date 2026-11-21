@@ -1,5 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
-  pgTable, pgEnum, uuid, text, boolean, integer, date, jsonb, timestamp, unique, type AnyPgColumn,
+  pgTable, pgEnum, uuid, text, boolean, integer, date, jsonb, timestamp, unique, check, type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 export const userLevel = pgEnum('user_level', ['director', 'manager', 'leader', 'member']);
@@ -145,7 +146,7 @@ export const managerFeedback = pgTable('manager_feedback', {
 export const appSettings = pgTable('app_settings', {
   id: integer('id').primaryKey().default(1),
   staleBusinessDays: integer('stale_business_days').notNull().default(3),
-});
+}, (t) => [check('app_settings_singleton', sql`${t.id} = 1`)]);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
