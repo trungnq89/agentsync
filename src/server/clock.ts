@@ -22,3 +22,8 @@ export function businessDaysBetween(from: Date, to: Date): number {
 export function isWithinHours(start: Date, now: Date, hours: number): boolean {
   return now.getTime() - start.getTime() <= hours * 60 * 60 * 1000;
 }
+
+/** Calendar date ('YYYY-MM-DD') in Asia/Ho_Chi_Minh for the given instant. */
+export function vnDateString(now: Date): string {
+  return new Date(now.getTime() + VN_OFFSET_MS).toISOString().slice(0, 10);
+}

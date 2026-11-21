@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { businessDaysBetween, isWithinHours } from '@/server/clock';
+import { businessDaysBetween, isWithinHours, vnDateString } from '@/server/clock';
 
 describe('clock', () => {
   it('Fri 17:00 VN to Mon 09:00 VN is 0 business days', () => {
@@ -12,5 +12,9 @@ describe('clock', () => {
     const s = new Date('2026-11-21T00:00:00Z');
     expect(isWithinHours(s, new Date('2026-11-21T23:59:59Z'), 24)).toBe(true);
     expect(isWithinHours(s, new Date('2026-11-22T00:00:01Z'), 24)).toBe(false);
+  });
+  it('vnDateString gives the Asia/Ho_Chi_Minh calendar date', () => {
+    expect(vnDateString(new Date('2026-11-20T16:59:59Z'))).toBe('2026-11-20');
+    expect(vnDateString(new Date('2026-11-20T17:00:00Z'))).toBe('2026-11-21');
   });
 });
