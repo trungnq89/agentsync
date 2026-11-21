@@ -100,7 +100,7 @@ async function managerAction(
   note?: string,
 ): Promise<Task> {
   return db.transaction(async (tx) => {
-    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId);
+    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     const role = isCurrentManagerOf(actor, owner) && actor.id !== task.ownerId ? 'manager' : 'owner';
     const to = nextStatus(lifecycleCtx(task, owner.managerId), action, role);
     if (action === 'request_changes') {
@@ -149,7 +149,7 @@ export async function changePlan(
 ): Promise<Task> {
   if (input.steps.length === 0) throw new DomainError('VALIDATION', 'Plan cần ít nhất một bước.');
   return db.transaction(async (tx) => {
-    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId);
+    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);
     if (TERMINAL_STATUSES.includes(task.status)) {
       throw new DomainError('INVALID_TRANSITION', `Không thể sửa plan khi việc đang ở trạng thái "${task.status}".`);
@@ -171,9 +171,17 @@ export async function changePlan(
       kind = 'revision';
     }
 
-    await tx.insert(planVersions).values({
-      taskId, version: current.version + 1, kind, reason, steps: input.steps, createdAt: now,
-    });
+    try {
+      await tx.insert(planVersions).values({
+        taskId, version: current.version + 1, kind, reason, steps: input.steps, createdAt: now,
+      });
+    } catch (e) {
+      const code = (e as { code?: string; cause?: { code?: string } });
+      if (code.code === '23505' || code.cause?.code === '23505') {
+        throw new DomainError('INVALID_TRANSITION', 'Việc vừa được người khác cập nhật, hãy thử lại.');
+      }
+      throw e;
+    }
     if (nextState) {
       await tx
         .update(managerFeedback)
@@ -206,11 +214,11 @@ export async function setTaskStatus(
     throw new DomainError('VALIDATION', 'Cần nhập lý do.');
   }
   return db.transaction(async (tx) => {
-    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId);
+    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);
     const taskAction: TaskAction = action;
     const to = nextStatus(lifecycleCtx(task, owner.managerId), taskAction, 'owner');
-    if (action === 'complete' && task.mode === 'project' && owner.managerId !== null) {
+    if (action === 'complete' && task.mode === 'project' && owner.managerId !== null && !task.isPrivate) {
       const [summary] = await tx
         .select({ id: solutionSummaries.id })
         .from(solutionSummaries)
@@ -240,9 +248,12 @@ export async function makePublic(
   now: Date = new Date(),
 ): Promise<Task> {
   return db.transaction(async (tx) => {
-    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId);
+    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
     requireOwner(actor, task);
     if (!task.isPrivate) throw new DomainError('VALIDATION', 'Việc này đã công khai.');
+    if (TERMINAL_STATUSES.includes(task.status)) {
+      throw new DomainError('INVALID_TRANSITION', `Không thể công khai việc đang ở trạng thái "${task.status}".`);
+    }
     const hasManager = owner.managerId !== null;
     const [updated] = await tx
       .update(tasks)

@@ -133,7 +133,7 @@ describe('task service', () => {
   });
 
   it('complete project task without solution → VALIDATION', async () => {
-    const { manager, member } = await pair();
+    const { member } = await pair();
     const t = await makeTask(member.id, { mode: 'project', status: 'in_progress' });
     await expect(setTaskStatus(testDb, member, t.id, 'complete')).rejects.toMatchObject({
       code: 'VALIDATION',
@@ -145,7 +145,6 @@ describe('task service', () => {
     const done = await setTaskStatus(testDb, member, t.id, 'complete');
     expect(done.status).toBe('awaiting_review');
     expect(done.completedAt).not.toBeNull();
-    expect(manager.id).toBeTruthy();
   });
 
   it('makePublic on private task of member with manager → pending_confirmation', async () => {
@@ -157,5 +156,55 @@ describe('task service', () => {
     expect(pub.status).toBe('pending_confirmation');
     expect(pub.confirmerIdAtCreation).toBe(manager.id);
     await expect(makePublic(testDb, member, t.id)).rejects.toMatchObject({ code: 'VALIDATION' });
+  });
+
+  it('private project task completes to done without a summary', async () => {
+    const { member } = await pair();
+    const t = await makeTask(member.id, { mode: 'project', status: 'in_progress', isPrivate: true });
+    const done = await setTaskStatus(testDb, member, t.id, 'complete');
+    expect(done.status).toBe('done');
+  });
+
+  it('makePublic rejects terminal statuses; no manager keeps status', async () => {
+    const { member } = await pair();
+    const t = await makeTask(member.id, { status: 'cancelled', isPrivate: true });
+    await expect(makePublic(testDb, member, t.id)).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
+    const solo = await makeUser();
+    const t2 = await makeTask(solo.id, { status: 'paused', isPrivate: true });
+    const pub = await makePublic(testDb, solo, t2.id);
+    expect(pub.isPrivate).toBe(false);
+    expect(pub.status).toBe('paused');
+  });
+
+  it('project plan 24h boundary: exactly 24h → edit; 24h + 1s without reason → EDIT_WINDOW_CLOSED', async () => {
+    const { member } = await pair();
+    const t = await makeTask(member.id, { mode: 'project', status: 'in_progress' });
+    const [v] = await testDb.select().from(planVersions).where(eq(planVersions.taskId, t.id));
+    const steps = [{ title: 'N', status: 'todo' as const }];
+    await expect(changePlan(testDb, member, t.id, { steps }, new Date(v.createdAt.getTime() + 24 * 3600_000 + 1000)))
+      .rejects.toMatchObject({ code: 'EDIT_WINDOW_CLOSED' });
+    await changePlan(testDb, member, t.id, { steps }, new Date(v.createdAt.getTime() + 24 * 3600_000));
+    expect((await getCurrentPlan(testDb, t.id)).kind).toBe('edit');
+  });
+
+  it('concurrent confirm and cancel end in a serially valid state', async () => {
+    for (let i = 0; i < 5; i++) {
+      const { manager, member } = await pair();
+      const t = await createTask(testDb, member, base);
+      const [a, b] = await Promise.allSettled([
+        confirmTask(testDb, manager, t.id),
+        setTaskStatus(testDb, member, t.id, 'cancel', 'Hủy'),
+      ]);
+      const [row] = await testDb.select().from(tasks).where(eq(tasks.id, t.id));
+      if (a.status === 'fulfilled' && b.status === 'fulfilled') {
+        expect(row.status).toBe('cancelled'); // confirm then cancel
+      } else {
+        // cancel first: confirm must have been rejected, never in_progress after cancelled
+        expect(b.status).toBe('fulfilled');
+        expect(a.status).toBe('rejected');
+        expect((a as PromiseRejectedResult).reason).toMatchObject({ code: 'INVALID_TRANSITION' });
+        expect(row.status).toBe('cancelled');
+      }
+    }
   });
 });
