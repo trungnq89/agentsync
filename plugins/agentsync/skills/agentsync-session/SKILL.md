@@ -15,7 +15,7 @@ Call `get_my_settings` to read `sendMode`. If `sendMode` is `review`, EVERY memb
 
 1. Call `get_pending_feedback` and remind the member of pending items (plan change requests, questions, answers, review results). If there is a question for the member, ask them and reply with `answer_question`. After you have passed the manager's answer on to the member, call `resolve_question` (with `questionId`) so the question no longer shows up in `get_pending_feedback`.
 2. Identify the current task: call `list_my_tasks` first. Match the current branch (`git branch --show-current`) against `repoRef.branch`; if that does not match, match the current directory against `cwdHint`. If there is not exactly one matching task (none or several), ask the member to choose. Never guess from task titles.
-   Once you know which task this session is about, print this marker on its own line: `AGENTSYNC-TASK: <taskId>` (keep the English text exactly, whatever language you reply in).
+   Once you know which task this session is about, print the task marker (see "Marker format" below).
 3. If the manager asked for plan changes, draft a new plan and call `revise_plan` (following the `sendMode` rule).
 4. If the review verdict is `changes_needed`: make the changes from the note, then run `submit_solution_summary` again (resubmitting overwrites the old one) and `set_task_status` with `action` set to `complete`.
 
@@ -23,17 +23,26 @@ Call `get_my_settings` to read `sendMode`. If `sendMode` is `review`, EVERY memb
 
 When you finish a step of the task's plan, do both of these right away:
 
-1. Print this marker on its own line: `AGENTSYNC-CHECKPOINT: <exact step title>`. Use the step title exactly as written in the plan (see `task_detail` if needed) and keep the English text `AGENTSYNC-CHECKPOINT:` as is. Print one marker per finished step.
+1. Print the checkpoint marker (see "Marker format" below) with the step title exactly as written in the plan (see `task_detail` if needed). Print one marker per finished step.
 2. Call `update_progress` for that step now, with `stepsCompleted` set to that exact title (following the `sendMode` rule: with `review`, show the draft and wait for the member to agree first).
 
 A stop hook reads these markers and reminds you if the step is still not reported on the server. It is only a safety net: do not wait for the reminder. If a reminder arrives, follow it, still respecting `sendMode`.
 
 Never print a marker as an example or quote; print it only when it is true.
 
+## Marker format
+
+Print each marker as plain text on its own line: no backticks, bullets, bold or quotes around it. Keep the English label exactly, whatever language you reply in. The fence below only illustrates the instruction; do not print the fence:
+
+```
+AGENTSYNC-TASK: <taskId>
+AGENTSYNC-CHECKPOINT: <exact step title>
+```
+
 ## When the member says they are done or ends the session
 
 1. Summarize in 2-4 sentences: what was done, which steps finished, what was newly discovered, any blockers. Put the summary in `body`.
-2. Steps just finished: fill `stepsCompleted`, using the exact step names from the task's plan (see `task_detail` if needed; do not invent other names).
+2. Steps finished but not yet reported: fill `stepsCompleted` with only those, using the exact step names from the task's plan (see `task_detail` if needed; do not invent other names). Do not re-send steps you already reported right after their checkpoint.
 3. Evidence (`evidence`): `branch` from `git branch --show-current`; `commits` is the result of `git rev-list --count <base>..HEAD`, where `<base>` is the result of `git merge-base HEAD origin/main` (try `origin/master` if missing). If you cannot determine the base, omit `commits`. Add `prUrl` if there is a PR.
 4. Call `update_progress`: `source` is `reviewed` if the member approved the draft, `auto` if `sendMode` is `auto`.
 5. If there is a blocker the manager must decide, call `report_blocker`. For an ordinary question, call `ask_manager`.

@@ -208,4 +208,13 @@ describe('hook runtime', () => {
     expect(typeof out.reason).toBe('string');
     expect(r.code).toBe(0);
   });
+
+  it('--agent antigravity prints {} on no-op and error paths; claude prints nothing', async () => {
+    const noop = await run(msg('hello'), { agent: 'antigravity' });
+    expect(JSON.parse(noop.stdout)).toEqual({});
+    expect(noop.code).toBe(0);
+    const missing = await run(msg(MARK), { agent: 'antigravity', env: { AGENTSYNC_TOKEN: undefined } });
+    expect(JSON.parse(missing.stdout)).toEqual({});
+    expect((await run(msg('hello', { session_id: 'other' }), { agent: 'codex' })).stdout).toBe('');
+  });
 });

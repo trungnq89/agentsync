@@ -21,15 +21,20 @@ export function parseMarkers(text) {
   const checkpoints = [];
   /** @type {Markers['events']} */
   const events = [];
-  const re = /^[ \t]*AGENTSYNC-(TASK|CHECKPOINT):[ \t]*(.+?)[ \t]*\r?$/gm;
+  // Tolerated wrappers: leading "- ", "* ", "> " (repeatable), then optional ** or `; the same
+  // wrapper may close the line. The captured title excludes all wrappers.
+  const re = /^[ \t]*(?:[>*-][ \t]+)*(\*\*|`)?AGENTSYNC-(TASK|CHECKPOINT):(?:\*\*)?[ \t]*(.+?)[ \t]*\r?$/gm;
   for (const m of String(text ?? '').matchAll(re)) {
-    if (m[1] === 'TASK') {
-      if (/\s/.test(m[2])) continue;
-      taskIds.push(m[2]);
-      events.push({ kind: 'task', value: m[2] });
+    let value = m[3];
+    if (m[1] && value.endsWith(m[1])) value = value.slice(0, -m[1].length).trimEnd();
+    if (!value) continue;
+    if (m[2] === 'TASK') {
+      if (/\s/.test(value)) continue;
+      taskIds.push(value);
+      events.push({ kind: 'task', value });
     } else {
-      checkpoints.push(m[2]);
-      events.push({ kind: 'checkpoint', value: m[2] });
+      checkpoints.push(value);
+      events.push({ kind: 'checkpoint', value });
     }
   }
   return { taskIds, checkpoints, events };
@@ -264,7 +269,10 @@ async function main() {
   const fs = await import('node:fs');
   const env = process.env;
   if (env.AGENTSYNC_HOOK === 'off') return;
-  setTimeout(() => process.exit(0), 4000).unref(); // watchdog: bound total runtime
+  setTimeout(() => {
+    emptyForAntigravity();
+    process.exit(0);
+  }, 4000).unref(); // watchdog: bound total runtime
 
   const stateDir = env.AGENTSYNC_STATE_DIR || join(homedir(), '.agentsync');
   const logFile = join(stateDir, 'hook.log');
@@ -381,10 +389,27 @@ async function main() {
     }
 
     if (action.type !== 'none') {
+      printed = true;
       await new Promise((r) => process.stdout.write(blockOutput(agent, reasonFor(action)) + '\n', () => r(undefined)));
     }
   } catch (e) {
     log(`hook error: ${e instanceof Error ? e.name : 'error'}`);
+  }
+}
+
+// Exception to "silent on no-op/error": Antigravity requires a JSON object on stdout with exit 0
+// (https://antigravity.google/docs/build-plugins/), so for --agent antigravity only we print `{}`
+// (allow the stop) whenever nothing else was printed. claude/codex print nothing.
+let printed = false;
+function emptyForAntigravity() {
+  const i = process.argv.indexOf('--agent');
+  if (!printed && i > -1 && process.argv[i + 1] === 'antigravity') {
+    printed = true;
+    try {
+      process.stdout.write('{}\n');
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -398,6 +423,7 @@ try {
 }
 if (isMain) {
   main().finally(() => {
+    emptyForAntigravity();
     process.exitCode = 0; // let stdout flush; the watchdog bounds runtime
   });
 }

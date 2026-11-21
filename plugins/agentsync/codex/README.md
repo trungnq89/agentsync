@@ -74,7 +74,7 @@ Add this to `~/.codex/hooks.json` (or `$CODEX_HOME/hooks.json`), using the absol
 }
 ```
 
-Then run `/hooks` in Codex, review the hook and trust it. Codex skips new or changed hooks until you do. Set `AGENTSYNC_HOOK=off` to disable the hook. State and logs live in `~/.agentsync`. The `Stop` format comes from learn.chatgpt.com/docs/hooks.md; not tried with a real Codex.
+Then run `/hooks` in Codex, review the hook and trust it. Codex skips new or changed hooks until you do. Set `AGENTSYNC_HOOK=off` to disable the hook. State and logs live in `~/.agentsync`. The `Stop` format comes from learn.chatgpt.com/docs/hooks.md; not tried with a real Codex. Not verified: that `AGENTSYNC_URL` / `AGENTSYNC_TOKEN` are inherited by the hook process.
 
 ## Not verified
 

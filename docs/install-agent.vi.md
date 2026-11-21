@@ -46,6 +46,8 @@ cp -R /Users/ten-ban/agentsync/plugins/agentsync/skills/* ~/.claude/skills/
 claude mcp add --transport http agentsync https://agentsync.example.com/api/mcp --header "Authorization: Bearer $AGENTSYNC_TOKEN"
 ```
 
+Cách thay thế này không kèm checkpoint hook (mục 5). Dùng `--plugin-dir` để có hook.
+
 ## 3. Codex
 
 Xem `plugins/agentsync/codex/README.md`. Tóm tắt: copy `/Users/ten-ban/agentsync/plugins/agentsync/skills/*` vào `~/.agents/skills/`, thêm vào `~/.codex/config.toml`:
@@ -75,14 +77,17 @@ Hook `Stop` tùy chọn chạy sau mỗi lượt của agent. Nếu agent đã i
 - Trạng thái và log nằm trong `~/.agentsync` (`state.json`, `hook.log`). Không lưu token hay code. Hook chờ server tối đa 3 giây và không bao giờ làm hỏng lượt chạy.
 - **Claude Code:** đã nằm trong plugin (`hooks/hooks.json`); `--plugin-dir` sẽ nạp nó. Chưa kiểm tra thủ công: lúc viết không có `claude`.
 - **Codex:** thêm hook `Stop` vào `~/.codex/hooks.json` và duyệt trong `/hooks`. Xem `plugins/agentsync/codex/README.md`. Chưa chạy thử với Codex thật.
-- **Antigravity:** có mẫu trong `plugins/agentsync/antigravity/`, **chưa kiểm tra thực tế** (chưa thử trên Antigravity thật). Script in đúng đầu ra `continue` mà tài liệu Antigravity mô tả, nhưng chưa thử trên bản cài thật; hiện Antigravity dựa vào skill.
+- **Antigravity:** có mẫu trong `plugins/agentsync/antigravity/` (xem README trong đó). **Chưa kiểm tra thực tế** trên bản cài thật, nên hiện Antigravity dựa vào skill.
 
 ## Đã kiểm tra
 
 Đã làm:
 - Test tự động (`tests/server/plugin-files.test.ts`): frontmatter của skill; mọi tên tool và tên trường nhắc trong skill đều khớp với `registerTools`; `.mcp.json` là JSON hợp lệ.
+- Test hook (`tests/hooks/`): phân tích dấu (gồm cả dấu bọc bằng backtick, gạch đầu dòng, trích dẫn, in đậm), logic quyết định, và chạy script thật với server giả (im lặng khi lỗi, giới hạn 3 giây, đầu ra của Codex và Antigravity).
+- Đọc tài liệu hook của Claude Code (code.claude.com/docs/en/hooks), Codex (learn.chatgpt.com/docs/hooks.md) và Antigravity (antigravity.google/docs/build-plugins).
 - Đọc tài liệu Claude Code (bố cục plugin, `.mcp.json`, `--plugin-dir`) và tài liệu Codex (khóa `url`, `bearer_token_env_var`, cờ `--url`, thư mục skill) khi viết.
 
 Chưa làm (chờ người dùng thực hiện):
 - Cài thật và chạy từ đầu đến cuối trong Claude Code và Codex (cài plugin, nói "lập plan cho việc thêm API X, hạn thứ 6", thấy việc "Chờ xác nhận" trên web quản lý).
+- Chạy hook thật trên từng agent (Claude Code, Codex, Antigravity): thấy lời nhắc xuất hiện sau dấu checkpoint.
 - Chưa chạy thử với Codex. Chưa chạy `claude plugin validate`. Chưa kiểm tra việc mở rộng `${VAR}` trong header của `.mcp.json` trên máy thật.

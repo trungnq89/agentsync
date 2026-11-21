@@ -27,6 +27,21 @@ describe('parseMarkers', () => {
     expect(r.taskIds).toEqual(['abc-1']);
     expect(r.checkpoints).toEqual(['Step A', 'Step B']);
   });
+  it.each([
+    ['backticks', '`AGENTSYNC-CHECKPOINT: Step A`'],
+    ['dash bullet', '- AGENTSYNC-CHECKPOINT: Step A'],
+    ['star bullet', '* AGENTSYNC-CHECKPOINT: Step A'],
+    ['quote', '> AGENTSYNC-CHECKPOINT: Step A'],
+    ['bold', '**AGENTSYNC-CHECKPOINT: Step A**'],
+    ['bold label', '**AGENTSYNC-CHECKPOINT:** Step A'],
+    ['bullet + backticks', '- `AGENTSYNC-CHECKPOINT: Step A`'],
+  ])('parseMarkers tolerates %s', (_n, line) => {
+    expect(parseMarkers(line).checkpoints).toEqual(['Step A']);
+  });
+  it('parseMarkers tolerates wrappers on the task marker', () => {
+    expect(parseMarkers('- **AGENTSYNC-TASK: abc-1**').taskIds).toEqual(['abc-1']);
+    expect(parseMarkers('`AGENTSYNC-TASK: abc-1`').taskIds).toEqual(['abc-1']);
+  });
   it('parseMarkers ignores markers not at line start', () => {
     const r = parseMarkers('see AGENTSYNC-CHECKPOINT: x\nuse AGENTSYNC-TASK: y');
     expect(r).toEqual({ taskIds: [], checkpoints: [], events: [] });

@@ -4,7 +4,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "node /ABSOLUTE/PATH/TO/agentsync/plugins/agentsync/hooks/agentsync-hook.mjs --agent antigravity",
+        "command": "node ./hooks/agentsync-hook.mjs --agent antigravity",
         "timeout": 10
       }
     ]

@@ -46,6 +46,8 @@ cp -R /Users/your-name/agentsync/plugins/agentsync/skills/* ~/.claude/skills/
 claude mcp add --transport http agentsync https://agentsync.example.com/api/mcp --header "Authorization: Bearer $AGENTSYNC_TOKEN"
 ```
 
+This alternative does not include the checkpoint hook (section 5). Use `--plugin-dir` to get it.
+
 ## 3. Codex
 
 See `plugins/agentsync/codex/README.md`. In short: copy `/Users/your-name/agentsync/plugins/agentsync/skills/*` into `~/.agents/skills/` and add this to `~/.codex/config.toml`:
@@ -75,14 +77,17 @@ An optional `Stop` hook runs after every agent turn. If the agent printed `AGENT
 - State and logs live in `~/.agentsync` (`state.json`, `hook.log`). No token or code is stored. The hook waits at most 3 seconds for the server and never fails a turn.
 - **Claude Code:** included in the plugin (`hooks/hooks.json`); `--plugin-dir` loads it. Not manually tested: `claude` was not available when this was written.
 - **Codex:** add a `Stop` hook to `~/.codex/hooks.json` and trust it in `/hooks`. See `plugins/agentsync/codex/README.md`. Not tried with a real Codex.
-- **Antigravity:** a template is in `plugins/agentsync/antigravity/` and is **not tested** (never tried on a real Antigravity). The script prints the `continue` output the Antigravity docs describe, but it has not been tried on a real install; Antigravity relies on the skills for now.
+- **Antigravity:** a template is in `plugins/agentsync/antigravity/` (see its README). It is **not tested** on a real install, so Antigravity relies on the skills for now.
 
 ## Verified
 
 Done:
 - Automated test (`tests/server/plugin-files.test.ts`): skill frontmatter; every tool and field name mentioned in the skills matches `registerTools`; `.mcp.json` is valid JSON.
+- Hook tests (`tests/hooks/`): marker parsing (including backtick, bullet, quote and bold wrappers), decision logic, and the real script run against a fake server (silent on errors, 3-second bound, Codex and Antigravity output shapes).
+- Read the hook docs for Claude Code (code.claude.com/docs/en/hooks), Codex (learn.chatgpt.com/docs/hooks.md) and Antigravity (antigravity.google/docs/build-plugins).
 - Read the Claude Code docs (plugin layout, `.mcp.json`, `--plugin-dir`) and the Codex docs (the `url` and `bearer_token_env_var` keys, the `--url` flag, the skills folder) while writing.
 
 Not done (waiting on a person):
 - A real end-to-end install and run in Claude Code and Codex (install the plugin, say "make a plan for adding API X, due Friday", see the "Pending confirmation" task on the manager's web page).
+- A real hook run on each agent (Claude Code, Codex, Antigravity): see the reminder appear after a checkpoint marker.
 - Not tried with Codex. `claude plugin validate` not run. `${VAR}` expansion in `.mcp.json` headers not checked on a real machine.
