@@ -26,7 +26,7 @@ Kiểm tra: `pnpm vitest run`, `pnpm playwright test`, `pnpm typecheck`, `pnpm l
 ## Triển khai (Docker Compose)
 
 ```bash
-export POSTGRES_PASSWORD='doi-mat-khau-nay'
+export POSTGRES_PASSWORD='doi-mat-khau-nay'        # chỉ dùng chữ, số, - và _ (được ghép vào DATABASE_URL)
 export APP_URL='https://agentsync.example.com'   # địa chỉ công khai, hiện trong hướng dẫn cấu hình MCP
 docker compose -f docker-compose.prod.yml up -d --build
 ```
@@ -34,7 +34,8 @@ docker compose -f docker-compose.prod.yml up -d --build
 - Container `app` tự chạy migration khi khởi động rồi mới start server. Cổng db không mở ra ngoài; dữ liệu nằm trong volume `pgdata`.
 - Bắt buộc: `POSTGRES_PASSWORD`. Tùy chọn: `APP_URL`, `APP_PORT` (mặc định 3000), `ALLOWED_ORIGINS`. Không cần `SESSION_SECRET` (phiên đăng nhập là id ngẫu nhiên lưu trong DB).
 - Không có dịch vụ ngoài lúc chạy: không CDN, không analytics, dùng font hệ thống.
-- Đặt sau reverse proxy (nginx, Caddy, ...): cấp HTTPS ở proxy và chuyển tiếp tới cổng app. Nếu proxy đổi header `Host` so với `Origin` của trình duyệt, server actions sẽ bị từ chối; khi đó đặt `ALLOWED_ORIGINS` (các host cách nhau bằng dấu phẩy, ví dụ `agentsync.example.com`).
+- Đặt sau reverse proxy (nginx, Caddy, ...): cấp HTTPS ở proxy và chuyển tiếp tới cổng app. Nếu proxy đổi header `Host` so với `Origin` của trình duyệt, server actions sẽ bị từ chối; khi đó đặt `ALLOWED_ORIGINS` (các host cách nhau bằng dấu phẩy, ví dụ `agentsync.example.com`). Biến này được nhúng lúc build: đổi giá trị thì phải chạy lại `docker compose -f docker-compose.prod.yml up -d --build`.
+- Container chạy bằng user `node` (không phải root) và có healthcheck. Nếu `app` cứ khởi động lại liên tục, xem log: `docker compose -f docker-compose.prod.yml logs app`.
 
 ## Tạo admin đầu tiên
 
@@ -46,6 +47,8 @@ docker compose -f docker-compose.prod.yml exec app \
 Đăng nhập web bằng tài khoản này, vào **Quản trị** để tạo người dùng và gán quản lý, mỗi người vào **Cài đặt** để tạo token agent.
 
 ## Kiểm tra khói MCP
+
+Chạy từ bản checkout trên máy host sau `pnpm install`. Script tạo một việc thật, nên dùng tài khoản member tạm (throwaway), không dùng tài khoản thật.
 
 ```bash
 AGENTSYNC_URL=http://localhost:3000 AGENTSYNC_TOKEN=ags_... pnpm smoke:mcp

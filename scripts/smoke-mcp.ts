@@ -40,7 +40,13 @@ async function main() {
     agreedDueDate: day(7),
     steps: ['Bước 1', 'Bước 2'],
   });
-  const taskId = (JSON.parse(created[1]?.text ?? '{}') as { id?: string }).id;
+  let taskId: string | undefined;
+  for (const c of created) {
+    try {
+      const parsed = JSON.parse(c.text ?? '') as { id?: string };
+      if (parsed && typeof parsed === 'object' && parsed.id) { taskId = parsed.id; break; }
+    } catch { /* not JSON: skip */ }
+  }
   if (!taskId) throw new Error('create_task did not return a task id');
 
   await call('update_progress', { taskId, body: 'Smoke: đã xong bước 1', stepsCompleted: ['Bước 1'], progressPct: 50, source: 'auto' });
