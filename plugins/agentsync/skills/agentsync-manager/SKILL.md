@@ -7,7 +7,7 @@ description: Use when a manager asks about team status, which tasks need attenti
 
 Use the manager-side tools. Keep answers short and high-level; go into detail only when the manager asks.
 
-Always reply to the member in the language they use.
+Always reply to the manager in the language they use.
 
 ## Pick the tool by question
 

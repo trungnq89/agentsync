@@ -23,27 +23,43 @@ const JSX_TEXT_ALLOWLIST: Record<string, string> = {
   AgentSync: 'product brand name, identical in every language',
 };
 
+/** Returns user-visible literal strings found in TSX source (JSX text nodes and a few attributes). */
+export function scanJsx(src: string): string[] {
+  const out: string[] = [];
+  // Drop comments and quoted strings so `>` inside them (and TS generics/comparisons) is not read as a tag end.
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+    .replace(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, "''");
+  for (const m of code.matchAll(/>\s*([A-Za-zÀ-ỹ][^<{>]*)(?=[<{])/g)) {
+    const before = code[(m.index ?? 0) - 1];
+    if (before === '=' || before === '-') continue; // arrow function `=>`, `->`
+    const text = m[1].trim();
+    if (/[;=?]/.test(text)) continue; // code (comparison / ternary / statement), not prose
+    if (JSX_TEXT_ALLOWLIST[text]) continue;
+    out.push(`text "${text}"`);
+  }
+  for (const m of src.matchAll(/\b(placeholder|aria-label|title|alt)="([A-Za-z][^"]*)"/g)) out.push(`attr ${m[1]}="${m[2]}"`);
+  return out;
+}
+
 describe('hardcoded strings guard', () => {
   it('no Vietnamese diacritics in app/, components/, src/server, src/mcp', () => {
     const bad = files.filter((f) => /[À-ỹ]/.test(readFileSync(f, 'utf8'))).map(rel);
     expect(bad).toEqual([]);
   });
 
-  it('no literal JSX text nodes outside the allowlist', () => {
+  it('no literal JSX text or attribute strings outside the allowlist', () => {
     const bad: string[] = [];
     for (const f of files.filter((x) => x.endsWith('.tsx'))) {
-      const src = readFileSync(f, 'utf8');
-      for (const m of src.matchAll(/>\s*([A-Za-zÀ-ỹ][^<{>]*)</g)) {
-        const text = m[1].trim();
-        const before = src[(m.index ?? 0) - 1];
-        if (before === '=' || before === '-') continue; // arrow function `=>`, `->`
-        if (JSX_TEXT_ALLOWLIST[text]) continue;
-        // Skip generics/comparisons in plain TS: require a closing-tag-like context on the same text.
-        if (/[;(){}=]/.test(text)) continue;
-        bad.push(`${rel(f)}: "${text}"`);
-      }
+      for (const v of scanJsx(readFileSync(f, 'utf8'))) bad.push(`${rel(f)}: ${v}`);
     }
     expect(bad).toEqual([]);
+  });
+
+  it('scanner self-test reports text, text before {expr}, and attribute strings', () => {
+    const fixture = '<p>Total: {n}</p>\n<button>Save (draft)</button>\n<input placeholder="Search" />';
+    expect(scanJsx(fixture)).toEqual(['text "Total:"', 'text "Save (draft)"', 'attr placeholder="Search"']);
   });
 
   it('SKILL.md bodies are English', () => {

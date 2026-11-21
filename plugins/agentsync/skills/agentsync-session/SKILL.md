@@ -14,7 +14,7 @@ Call `get_my_settings` to read `sendMode`. If `sendMode` is `review`, EVERY memb
 ## When starting or resuming a task
 
 1. Call `get_pending_feedback` and remind the member of pending items (plan change requests, questions, answers, review results). If there is a question for the member, ask them and reply with `answer_question`. After you have passed the manager's answer on to the member, call `resolve_question` (with `questionId`) so the question no longer shows up in `get_pending_feedback`.
-2. Identify the current task: call `list_my_tasks` first. Match the current branch (`git branch --show-current`) against `repoRef.branch`; if that does not match, match the current directory against `cwdHint`. If exactly one task does not match, ask the member to choose. Never guess from task titles.
+2. Identify the current task: call `list_my_tasks` first. Match the current branch (`git branch --show-current`) against `repoRef.branch`; if that does not match, match the current directory against `cwdHint`. If there is not exactly one matching task (none or several), ask the member to choose. Never guess from task titles.
 3. If the manager asked for plan changes, draft a new plan and call `revise_plan` (following the `sendMode` rule).
 4. If the review verdict is `changes_needed`: make the changes from the note, then run `submit_solution_summary` again (resubmitting overwrites the old one) and `set_task_status` with `action` set to `complete`.
 

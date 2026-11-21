@@ -26,7 +26,7 @@ Call `get_my_settings` to read `sendMode`. If `sendMode` is `review`, EVERY memb
    - `review`: show the draft (title, mode, outcome, dates, steps) and WAIT for the member to agree. Do not call `create_task` until they do.
    - `auto`: go straight to step 5.
 5. Call `create_task` with `cwdHint` set to the absolute path of the current directory and `repoRef.branch` set to the current branch (`git branch --show-current`, if in a git repo).
-6. Tell the member the task was created and is now "Awaiting confirmation" for the manager to confirm.
+6. Tell the member the task was created and is now "Pending confirmation" for the manager to confirm.
 
 ## Rules
 
