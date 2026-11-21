@@ -16,7 +16,8 @@
     "backHome": "Về trang chủ",
     "errorTitle": "Đã xảy ra lỗi",
     "errorDesc": "Có lỗi không mong muốn. Vui lòng thử lại.",
-    "retry": "Thử lại"
+    "retry": "Thử lại",
+    "appDescription": "Giữ đội ngũ và các AI agent đồng bộ về công việc và tiến độ."
   },
   "nav": {
     "home": "Trang chủ",
@@ -41,7 +42,8 @@
     "emptyTitle": "Chưa có gì để hiển thị",
     "emptyHint": "Chưa có việc hay người nào để hiển thị. Hãy làm theo hướng dẫn cài đặt agent (Cài đặt, tạo token, rồi cài skill cho Claude Code hoặc Codex) để agent bắt đầu đồng bộ công việc.",
     "doneActive": "{done} việc xong · {active} việc đang làm",
-    "updated": "cập nhật {when}"
+    "updated": "cập nhật {when}",
+    "pageTitle": "Tổng quan đội ngũ"
   },
   "person": {
     "back": "Trang chủ",
@@ -398,5 +400,10 @@
     "toast": "Thông báo",
     "avatarName": "Ada Lovelace",
     "progress": "Tiến độ"
+  },
+  "cli": {
+    "usage": "Cách dùng: SEED_ADMIN_PASSWORD=<mật khẩu> pnpm seed:admin --username <tên đăng nhập>   (hoặc nhập mật khẩu khi được hỏi)",
+    "passwordPrompt": "Mật khẩu admin: ",
+    "adminCreated": "Đã tạo admin \"{username}\"."
   }
 }

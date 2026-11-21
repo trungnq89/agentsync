@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
-import { getLocale } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { InlineScript } from '@/components/inline-script';
 import { Header } from '@/components/shell/header';
 import { Toaster } from '@/components/ui/toaster';
@@ -11,10 +11,10 @@ import { getOptionalActor } from './_lib/actor';
 import '@fontsource-variable/inter';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: 'AgentSync',
-  description: 'AgentSync',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('common');
+  return { title: 'AgentSync', description: t('appDescription') };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [user, locale, jar] = await Promise.all([getOptionalActor().catch(() => null), getLocale(), cookies()]);

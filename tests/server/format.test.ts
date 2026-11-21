@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDate, formatRelative } from '../../app/_lib/format';
+import { formatDate, formatRelative, localizeAttention } from '../../app/_lib/format';
 
 const now = new Date('2026-11-21T05:00:00Z'); // 12:00 in Asia/Ho_Chi_Minh
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -38,5 +38,16 @@ describe('formatDate', () => {
   it('short date per locale', () => {
     expect(formatDate('2026-11-21', 'en')).toBe('Nov 21, 2026');
     expect(formatDate('2026-11-21', 'vi')).toBe('21 thg 11, 2026');
+  });
+});
+
+describe('localizeAttention', () => {
+  it('formats due/expected for the locale and leaves other params alone', () => {
+    const item = { detailParams: { due: '2026-11-20', expected: '2026-11-25', days: '3' } };
+    const out = localizeAttention(item, 'en');
+    expect(out.detailParams).toEqual({ due: formatDate('2026-11-20', 'en'), expected: formatDate('2026-11-25', 'en'), days: '3' });
+    expect(out.detailParams.due).not.toBe('2026-11-20');
+    expect(item.detailParams.due).toBe('2026-11-20');
+    expect(localizeAttention({}, 'vi')).toEqual({});
   });
 });

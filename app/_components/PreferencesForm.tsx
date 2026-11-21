@@ -17,7 +17,7 @@ export function PreferencesForm({ theme }: { theme: Theme }) {
   const [pending, startTransition] = useTransition();
   const run = (fn: () => Promise<boolean>) =>
     startTransition(async () => {
-      if (!(await fn())) toast.error(tn('preferenceFailed'));
+      if (!(await fn().catch(() => false))) toast.error(tn('preferenceFailed'));
     });
   return (
     <div className="grid gap-4 sm:grid-cols-2">

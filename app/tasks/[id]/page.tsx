@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
@@ -14,6 +15,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getActor } from '../../_lib/actor';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const [user, { id }] = await Promise.all([getActor(), params]);
+  try {
+    const { task } = await taskDetail(getDb(), user, id, new Date());
+    return { title: `${task.title} · AgentSync` };
+  } catch {
+    return {};
+  }
+}
 
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getActor();

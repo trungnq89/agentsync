@@ -3,12 +3,15 @@ import { createInterface } from 'node:readline/promises';
 import { eq } from 'drizzle-orm';
 import { createDb, type Db } from '../src/db/client';
 import { users } from '../src/db/schema';
+import { defaultLocale, type Locale } from '../src/i18n/config';
+import { serverTranslator } from '../src/i18n/translator';
+import { DomainError, translateError } from '../src/server/errors';
 import { assertPasswordLength, hashPassword } from '../src/server/auth/password';
 
 export async function seedAdmin(db: Db, username: string, password: string): Promise<void> {
   assertPasswordLength(password);
   const [dup] = await db.select({ id: users.id }).from(users).where(eq(users.username, username));
-  if (dup) throw new Error(`Tên đăng nhập "${username}" đã tồn tại.`);
+  if (dup) throw new DomainError('VALIDATION', 'usernameTaken', { field: 'username' });
   await db.insert(users).values({
     username,
     displayName: username,
@@ -16,6 +19,12 @@ export async function seedAdmin(db: Db, username: string, password: string): Pro
     level: 'director',
     isAdmin: true,
   });
+}
+
+/** Message shown for a failed seed; domain errors are translated, never printed as raw keys. */
+export function seedErrorMessage(e: unknown, locale: Locale): string {
+  if (e instanceof DomainError) return translateError(e, locale);
+  return e instanceof Error ? e.message : String(e);
 }
 
 function arg(name: string): string | undefined {
@@ -31,27 +40,29 @@ async function resolvePassword(): Promise<string | undefined> {
   if (fromArg) return fromArg;
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   try {
-    return (await rl.question('Mật khẩu admin: ')).trim() || undefined;
+    return (await rl.question(serverTranslator(defaultLocale(), 'cli')('passwordPrompt'))).trim() || undefined;
   } finally {
     rl.close();
   }
 }
 
 async function main() {
+  const locale = defaultLocale();
+  const t = serverTranslator(locale, 'cli');
   const username = arg('username');
   const password = username ? await resolvePassword() : undefined;
   if (!username || !password) {
-    console.error('Usage: SEED_ADMIN_PASSWORD=<p> pnpm seed:admin --username <u>   (or enter the password when prompted)');
+    console.error(t('usage'));
     process.exit(1);
   }
   const db = createDb(process.env.DATABASE_URL!);
   seedAdmin(db, username, password).then(
     async () => {
-      console.log(`Đã tạo admin "${username}".`);
+      console.log(t('adminCreated', { username }));
       await db.$client.end();
     },
     async (e) => {
-      console.error(e instanceof Error ? e.message : e);
+      console.error(seedErrorMessage(e, locale));
       await db.$client.end();
       process.exit(1);
     },

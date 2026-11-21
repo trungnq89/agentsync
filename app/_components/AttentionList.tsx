@@ -2,12 +2,14 @@ import Link from 'next/link';
 import {
   Ban, Clock, Eye, FilePenLine, Hourglass, MessageCircleQuestion, PauseCircle, UserCheck, type LucideIcon,
 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { attentionDetail } from '@/i18n/attention';
 import type { AttentionItem, AttentionKind } from '@/server/tasks/queries';
 import { toneForAttention, type Tone } from '@/ui/tone';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import type { Locale } from '@/i18n/config';
+import { localizeAttention } from '../_lib/format';
 
 const ICONS: Record<AttentionKind, LucideIcon> = {
   blocked: Ban,
@@ -32,6 +34,7 @@ const ICON_TONE: Record<Tone, string> = {
 
 export function AttentionList({ items }: { items: AttentionItem[] }) {
   const t = useTranslations('attention');
+  const locale = useLocale() as Locale;
   const tHome = useTranslations('home');
   if (items.length === 0) return null;
   return (
@@ -58,7 +61,7 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
                     <span className="min-w-0 break-words">{it.taskTitle}</span>
                   </span>
                   <span className="mt-0.5 block break-words text-xs text-muted-foreground">
-                    {attentionDetail(t, it)}
+                    {attentionDetail(t, localizeAttention(it, locale))}
                   </span>
                 </span>
               </Link>

@@ -3,6 +3,9 @@ export const dayMs = (d: string) => Date.parse(`${d}T00:00:00Z`);
 
 export interface Axis { min: number; max: number; span: number }
 
+/** Last day the axis covers, inclusive (`max` is the exclusive end boundary). */
+export const lastDayMs = (axis: Axis) => axis.max - DAY_MS;
+
 /** Axis from min(startDate)-3d to max(expectedEndDate)+7d (end inclusive), always containing today. */
 export function computeAxis(
   tasks: { startDate: string; expectedEndDate: string }[],

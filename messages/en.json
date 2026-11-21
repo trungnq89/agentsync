@@ -16,7 +16,8 @@
     "backHome": "Back to home",
     "errorTitle": "Something went wrong",
     "errorDesc": "An unexpected error occurred. Please try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "appDescription": "Keep your team and AI agents in sync on tasks and progress."
   },
   "nav": {
     "home": "Home",
@@ -41,7 +42,8 @@
     "emptyTitle": "Nothing to show yet",
     "emptyHint": "There are no tasks or people to display. Follow the agent setup guide (Settings, create a token, then install the skill for Claude Code or Codex) so your agent can start syncing work.",
     "doneActive": "{done} done · {active} in progress",
-    "updated": "updated {when}"
+    "updated": "updated {when}",
+    "pageTitle": "Team overview"
   },
   "person": {
     "back": "Home",
@@ -398,5 +400,10 @@
     "toast": "Toast",
     "avatarName": "Ada Lovelace",
     "progress": "Progress"
+  },
+  "cli": {
+    "usage": "Usage: SEED_ADMIN_PASSWORD=<p> pnpm seed:admin --username <u>   (or enter the password when prompted)",
+    "passwordPrompt": "Admin password: ",
+    "adminCreated": "Admin \"{username}\" created."
   }
 }

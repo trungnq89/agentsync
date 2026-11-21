@@ -33,7 +33,7 @@ export function ThemeSwitcher({ theme }: { theme: Theme }) {
     if (!isTheme(value)) return;
     applyTheme(value);
     startTransition(async () => {
-      if (!(await setThemeAction(value))) {
+      if (!(await setThemeAction(value).catch(() => false))) {
         applyTheme(theme);
         toast.error(tn('preferenceFailed'));
       }

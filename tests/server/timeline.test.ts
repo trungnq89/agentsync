@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { barSpan, computeAxis, position } from '../../app/_lib/timeline';
+import { barSpan, computeAxis, lastDayMs, position } from '../../app/_lib/timeline';
 
 const D = 86_400_000;
 const t = (startDate: string, expectedEndDate: string) => ({ startDate, expectedEndDate });
@@ -35,5 +35,12 @@ describe('timeline axis', () => {
     const b = barSpan('2026-06-20', '2026-07-10', a);
     expect(b.left).toBeGreaterThanOrEqual(0);
     expect(b.left + b.width).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('timeline last covered day', () => {
+  it('lastDayMs is the inclusive last day (one day before the exclusive max)', () => {
+    const a = computeAxis([t('2026-11-10', '2026-11-20')], '2026-11-15');
+    expect(lastDayMs(a)).toBe(Date.parse('2026-11-27T00:00:00Z'));
   });
 });

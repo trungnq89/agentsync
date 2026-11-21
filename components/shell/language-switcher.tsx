@@ -24,7 +24,7 @@ export function LanguageSwitcher() {
   ];
   const change = (value: string) =>
     startTransition(async () => {
-      if (!(await setLocaleAction(value))) toast.error(tn('preferenceFailed'));
+      if (!(await setLocaleAction(value).catch(() => false))) toast.error(tn('preferenceFailed'));
     });
   return (
     <DropdownMenu>

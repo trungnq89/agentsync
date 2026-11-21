@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import type { TaskStatus } from '@/server/tasks/lifecycle';
 import type { Health } from '@/server/tasks/health';
 import { formatDate } from '../_lib/format';
-import { barSpan, computeAxis, position } from '../_lib/timeline';
+import { barSpan, computeAxis, lastDayMs, position } from '../_lib/timeline';
 
 const isoOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
@@ -64,7 +64,7 @@ export function Timeline({ tasks, now = new Date() }: { tasks: TimelineTask[]; n
       <div className="relative mb-2 h-4 overflow-hidden text-[10px] text-muted-foreground md:ml-44">
         {!nearLeft && <span className="absolute left-0 hidden sm:inline">{formatDate(isoOf(axis.min), locale)}</span>}
         <span className="absolute whitespace-nowrap" style={todayStyle}>{todayLabel}</span>
-        {!nearRight && <span className="absolute right-0 hidden sm:inline">{formatDate(isoOf(axis.max), locale)}</span>}
+        {!nearRight && <span className="absolute right-0 hidden sm:inline">{formatDate(isoOf(lastDayMs(axis)), locale)}</span>}
       </div>
       <div className="relative">
         {tasks.map((task) => {

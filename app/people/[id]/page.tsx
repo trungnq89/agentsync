@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -11,6 +12,16 @@ import { Timeline } from '../../_components/Timeline';
 import { getActor } from '../../_lib/actor';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const [user, { id }] = await Promise.all([getActor(), params]);
+  try {
+    const { person } = await personTimeline(getDb(), user, id, new Date());
+    return { title: `${person.displayName} · AgentSync` };
+  } catch {
+    return {};
+  }
+}
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getActor();

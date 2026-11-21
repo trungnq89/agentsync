@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Inbox } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { getDb } from '@/db';
@@ -8,6 +9,11 @@ import { TierSection } from './_components/TierSection';
 import { getActor } from './_lib/actor';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('home');
+  return { title: `${t('pageTitle')} · AgentSync` };
+}
 
 export default async function Home() {
   const user = await getActor();

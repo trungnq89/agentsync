@@ -26,6 +26,17 @@ export function formatRelative(date: Date, now: Date, locale: Locale): string {
   return out.toLocaleLowerCase(locale);
 }
 
+/** Attention item with its date params formatted for the viewer's locale (MCP keeps ISO dates). */
+export function localizeAttention<T extends { detailParams?: Record<string, string | number> }>(item: T, locale: Locale): T {
+  if (!item.detailParams) return item;
+  const params = { ...item.detailParams };
+  for (const k of ['due', 'expected']) {
+    const v = params[k];
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) params[k] = formatDate(v, locale);
+  }
+  return { ...item, detailParams: params };
+}
+
 /** Short date for a `YYYY-MM-DD` string (calendar date, no timezone shift). */
 export function formatDate(iso: string, locale: Locale): string {
   return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
