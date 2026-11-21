@@ -127,6 +127,32 @@ describe('hook runtime', () => {
     expect(r.code).toBe(0);
   });
 
+  it('new session with task marker only: server all done + in_progress -> completion reminder once', async () => {
+    respond = json(plan({}, [['Step A', 'done']]));
+    const r1 = await run(msg('AGENTSYNC-TASK: t1'));
+    expect(JSON.parse(r1.stdout).reason).toContain('set_task_status');
+    const r2 = await run(msg('next'));
+    expect(r2.stdout).toBe('');
+  });
+
+  it('last_assistant_message is scanned even when the transcript lacks the final message', async () => {
+    const tp = join(dir, 'tr2.jsonl');
+    writeFileSync(tp, [
+      JSON.stringify({ type: 'user', message: { role: 'user', content: 'go' } }),
+      JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'AGENTSYNC-TASK: t1' }] } }),
+    ].join('\n'));
+    const r = await run({ session_id: 's1', transcript_path: tp, last_assistant_message: 'AGENTSYNC-CHECKPOINT: Step A' });
+    expect(JSON.parse(r.stdout).reason).toContain('Step A');
+  });
+
+  it('404 is decided: no retry on the next turn', async () => {
+    respond = json({ error: 'nf' }, 404);
+    await run(msg(MARK));
+    expect(requests).toHaveLength(1);
+    await run(msg('again'));
+    expect(requests).toHaveLength(1);
+  });
+
   it('server delays 5s → exits silently within 4.5s', async () => {
     respond = (res) => {
       setTimeout(() => json(plan())(res), 5000).unref();

@@ -69,7 +69,7 @@ describe('applyTurn', () => {
     let s = base({ claimed: ['A'], reminded: ['A'] }, true);
     s = applyTurn(s, parseMarkers('AGENTSYNC-TASK: t2\nAGENTSYNC-CHECKPOINT: B')).session;
     expect(s.currentTaskId).toBe('t2');
-    expect(s.outstanding).toBe(false);
+    expect(s.outstanding).toBe(true); // newly linked task is checked once
     expect(s.tasks.t2.claimed).toEqual(['B']);
     s = applyTurn(s, parseMarkers('AGENTSYNC-TASK: t1')).session;
     expect(s.currentTaskId).toBe('t1');
@@ -251,6 +251,9 @@ describe('reasonFor', () => {
     const e = reasonFor({ type: 'remindComplete', mode: 'executive' });
     expect(e).not.toContain('submit_solution_summary');
     expect(e).toContain('set_task_status');
-    expect(e).toContain('complete');
+    expect(e).toContain('action "complete"');
+    expect(e).not.toContain('status complete');
+    expect(p).toContain('action "complete"');
+    for (const t of [p, e]) expect(t).toContain('If your send mode is review, show the member the draft and wait for approval first.');
   });
 });

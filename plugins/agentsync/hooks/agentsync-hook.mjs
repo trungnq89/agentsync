@@ -93,7 +93,7 @@ export function applyTurn(session, markers) {
   const added = {};
   for (const ev of markers.events) {
     if (ev.kind === 'task') {
-      if (ev.value !== current) outstanding = false;
+      if (ev.value !== current) outstanding = true; // check the server once for a newly linked task
       current = ev.value;
       if (!tasks[current]) tasks[current] = { claimed: [], reminded: [] };
     } else if (current) {
@@ -174,10 +174,11 @@ export function reasonFor(action) {
     ].join('\n');
   }
   if (action.type === 'remindComplete') {
+    const review = 'If your send mode is review, show the member the draft and wait for approval first.';
     if (action.mode === 'executive') {
-      return 'AgentSync: every plan step is done. Finish the task now: call set_task_status with status complete.';
+      return `AgentSync: every plan step is done. Finish the task now: call set_task_status with action "complete".\n${review}`;
     }
-    return 'AgentSync: every plan step is done. Finish the task now: call submit_solution_summary with a summary of the solution, then call set_task_status with status complete.';
+    return `AgentSync: every plan step is done. Finish the task now: call submit_solution_summary with a summary of the solution, then call set_task_status with action "complete".\n${review}`;
   }
   return '';
 }
@@ -314,7 +315,7 @@ async function main() {
         texts = [];
       }
     }
-    if (texts.length === 0 && typeof input.last_assistant_message === 'string') texts = [input.last_assistant_message];
+    if (typeof input.last_assistant_message === 'string') texts = [...texts, input.last_assistant_message];
     const markers = parseMarkers(texts.join('\n'));
 
     const now = Date.now();
@@ -336,6 +337,7 @@ async function main() {
     /** @type {Action} */
     let action = { type: 'none' };
     let decided = false;
+    let gone = false;
     const needServer = !!session.currentTaskId && (applied.newCheckpoints.length > 0 || session.outstanding);
     if (needServer) {
       if (url && token) {
@@ -347,7 +349,10 @@ async function main() {
             signal: AbortSignal.timeout(3000),
           });
           if (res.status === 200) plan = await res.json();
-          else log(`plan fetch status ${res.status}`);
+          else {
+            if (res.status === 404) gone = true; // decided: task unknown/not ours, do not retry every turn
+            log(`plan fetch status ${res.status}`);
+          }
         } catch (e) {
           log(`plan fetch failed: ${e instanceof Error ? e.name : 'error'}`);
         }
@@ -363,7 +368,7 @@ async function main() {
     }
 
     // Server needed but no decision (timeout/non-200/bad JSON/missing env): retry next turn.
-    if (needServer && !decided) session = { ...session, outstanding: true };
+    if (needServer && !decided) session = { ...session, outstanding: !gone };
     session = { ...session, updatedAt: new Date(now).toISOString() };
     const tmp = `${statePath}.${process.pid}.tmp`;
     try {

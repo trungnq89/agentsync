@@ -76,7 +76,7 @@ Hook `Stop` tùy chọn chạy sau mỗi lượt của agent. Nếu agent đã i
 - Tắt hook bằng `AGENTSYNC_HOOK=off` trong môi trường.
 - Trạng thái và log nằm trong `~/.agentsync` (`state.json`, `hook.log`). Không lưu token hay code. Hook chờ server tối đa 3 giây và không bao giờ làm hỏng lượt chạy.
 - **Claude Code:** đã nằm trong plugin (`hooks/hooks.json`); `--plugin-dir` sẽ nạp nó. Chưa kiểm tra thủ công: lúc viết không có `claude`.
-- **Codex:** thêm hook `Stop` vào `~/.codex/hooks.json` và duyệt trong `/hooks`. Xem `plugins/agentsync/codex/README.md`. Chưa chạy thử với Codex thật.
+- **Codex:** thêm hook `Stop` vào `~/.codex/hooks.json` và duyệt trong `/hooks`. Xem `plugins/agentsync/codex/README.md`. Codex chỉ thấy dấu nằm trong tin nhắn cuối của lượt (hãy in dấu ở đó). Chưa chạy thử với Codex thật.
 - **Antigravity:** có mẫu trong `plugins/agentsync/antigravity/` (xem README trong đó). **Chưa kiểm tra thực tế** trên bản cài thật, nên hiện Antigravity dựa vào skill.
 
 ## Đã kiểm tra

@@ -76,7 +76,7 @@ An optional `Stop` hook runs after every agent turn. If the agent printed `AGENT
 - Turn it off with `AGENTSYNC_HOOK=off` in the environment.
 - State and logs live in `~/.agentsync` (`state.json`, `hook.log`). No token or code is stored. The hook waits at most 3 seconds for the server and never fails a turn.
 - **Claude Code:** included in the plugin (`hooks/hooks.json`); `--plugin-dir` loads it. Not manually tested: `claude` was not available when this was written.
-- **Codex:** add a `Stop` hook to `~/.codex/hooks.json` and trust it in `/hooks`. See `plugins/agentsync/codex/README.md`. Not tried with a real Codex.
+- **Codex:** add a `Stop` hook to `~/.codex/hooks.json` and trust it in `/hooks`. See `plugins/agentsync/codex/README.md`. Codex only sees markers in the final message of a turn (print them there). Not tried with a real Codex.
 - **Antigravity:** a template is in `plugins/agentsync/antigravity/` (see its README). It is **not tested** on a real install, so Antigravity relies on the skills for now.
 
 ## Verified
