@@ -1,0 +1,58 @@
+import type { Question } from '@/server/tasks/activity';
+import { answerAction, askAction } from '../_actions/task';
+import { relativeTime } from '../_lib/relative-time';
+import { ActionForm, button, input } from './ui';
+
+export function QuestionBox({
+  taskId, ownerId, ownerName, viewerId, isCurrentManager, questions, now,
+}: {
+  taskId: string;
+  ownerId: string;
+  ownerName: string;
+  viewerId: string;
+  isCurrentManager: boolean;
+  questions: Question[];
+  now: Date;
+}) {
+  const open = questions.filter((q) => q.status === 'open');
+  const canAnswer = (q: Question) =>
+    q.direction === 'manager_to_member' ? viewerId === ownerId : isCurrentManager;
+  return (
+    <section data-testid="question-box" className="space-y-3">
+      <h2 className="text-sm font-medium">Vướng mắc / câu hỏi</h2>
+      {open.length === 0 && <p className="text-sm opacity-60">Không có câu hỏi đang mở.</p>}
+      {open.map((q) => (
+        <div key={q.id} data-testid="question" className="rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+          <div className="break-words whitespace-pre-wrap">
+            {q.isBlocker && <span className="mr-1 text-red-600 dark:text-red-400">[Kẹt]</span>}
+            {q.body}
+          </div>
+          <div className="mt-1 text-xs opacity-60">
+            {q.direction === 'manager_to_member' ? 'Quản lý hỏi' : `${ownerName} hỏi`} · {relativeTime(q.createdAt, now)}
+          </div>
+          {canAnswer(q) && (
+            <ActionForm action={answerAction} className="mt-2 space-y-2">
+              <input type="hidden" name="taskId" value={taskId} />
+              <input type="hidden" name="questionId" value={q.id} />
+              <label className="block text-xs">
+                Trả lời
+                <textarea name="answer" required rows={2} className={`${input} mt-1`} />
+              </label>
+              <button className={button}>Gửi trả lời</button>
+            </ActionForm>
+          )}
+        </div>
+      ))}
+      {isCurrentManager && (
+        <ActionForm action={askAction} className="space-y-2">
+          <input type="hidden" name="taskId" value={taskId} />
+          <label className="block text-sm">
+            Đặt câu hỏi cho {ownerName}
+            <textarea name="body" required rows={2} className={`${input} mt-1`} />
+          </label>
+          <button className={button}>Gửi câu hỏi</button>
+        </ActionForm>
+      )}
+    </section>
+  );
+}
