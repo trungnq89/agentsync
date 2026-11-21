@@ -44,3 +44,16 @@ export const VERDICT_LABEL: Record<string, string> = {
 
 export const sendModeLabel = (s: string) => SEND_MODE_LABEL[s] ?? s;
 export const verdictLabel = (s: string) => VERDICT_LABEL[s] ?? s;
+
+export const ATTENTION_KIND_LABEL: Record<string, string> = {
+  pending_confirmation: 'Chờ xác nhận',
+  awaiting_review: 'Chờ review',
+  blocked: 'Đang kẹt',
+  overdue: 'Trễ hạn',
+  stale: 'Lâu không cập nhật',
+  paused_or_cancelled: 'Tạm dừng/Hủy',
+  changes_requested: 'Cần sửa plan',
+  question_for_me: 'Câu hỏi cho bạn',
+};
+
+export const attentionKindLabel = (s: string) => ATTENTION_KIND_LABEL[s] ?? s;
