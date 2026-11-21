@@ -175,3 +175,204 @@ export function reasonFor(action) {
   }
   return '';
 }
+
+// ---------------------------------------------------------------------------
+// Runtime (IO, network, per-agent output). Everything below fails silently.
+// ---------------------------------------------------------------------------
+
+const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
+const LOG_MAX_BYTES = 1024 * 1024;
+
+/**
+ * Block output format per agent.
+ * - claude: https://code.claude.com/docs/en/hooks (Stop: {"decision":"block","reason":...}).
+ * - codex: https://learn.chatgpt.com/docs/hooks.md (verified): Stop reads JSON on stdin with
+ *   session_id, transcript_path (format "not a stable interface"), stop_hook_active,
+ *   last_assistant_message (string|null). Block = exit 0 + stdout {"decision":"block","reason":...};
+ *   reason becomes the continuation prompt. Plain text on stdout is invalid.
+ * - antigravity: UNVERIFIED. Docs not consulted; Claude-compatible shape implemented.
+ * @param {string} agent
+ * @param {string} reason
+ * @returns {string}
+ */
+export function blockOutput(agent, reason) {
+  void agent; // all three currently share the shape; kept as a seam for per-agent divergence
+  return JSON.stringify({ decision: 'block', reason });
+}
+
+/**
+ * Normalize a possibly old/malformed state session; never throws.
+ * @param {any} s
+ * @returns {Session | null} null => treat as fresh
+ */
+export function normalizeSession(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) return null;
+  if (s.tasks !== undefined && (typeof s.tasks !== 'object' || s.tasks === null || Array.isArray(s.tasks))) return null;
+  if (s.tasks === undefined && ('claimed' in s || 'reminded' in s)) return null; // pre-C3 shape
+  /** @type {Record<string, TaskState>} */
+  const tasks = {};
+  for (const [id, t] of Object.entries(s.tasks ?? {})) {
+    if (!t || typeof t !== 'object') continue;
+    const o = /** @type {any} */ (t);
+    if (!Array.isArray(o.claimed) || !Array.isArray(o.reminded)) continue;
+    tasks[id] = {
+      claimed: o.claimed.filter((x) => typeof x === 'string'),
+      reminded: o.reminded.filter((x) => typeof x === 'string'),
+      ...(typeof o.completionRemindedAt === 'string' ? { completionRemindedAt: o.completionRemindedAt } : {}),
+    };
+  }
+  const updatedAt = typeof s.updatedAt === 'string' ? s.updatedAt : new Date(0).toISOString();
+  return {
+    currentTaskId: typeof s.currentTaskId === 'string' ? s.currentTaskId : undefined,
+    tasks,
+    outstanding: s.outstanding === true,
+    updatedAt,
+  };
+}
+
+/**
+ * @param {string} raw
+ * @param {number} now
+ * @returns {{ sessions: Record<string, Session> }}
+ */
+export function loadState(raw, now) {
+  /** @type {Record<string, Session>} */
+  const sessions = {};
+  try {
+    const parsed = JSON.parse(raw);
+    const src = parsed && typeof parsed === 'object' ? parsed.sessions : null;
+    if (src && typeof src === 'object' && !Array.isArray(src)) {
+      for (const [id, s] of Object.entries(src)) {
+        const n = normalizeSession(s);
+        if (!n) continue;
+        const t = Date.parse(n.updatedAt);
+        if (Number.isFinite(t) && now - t > SESSION_TTL_MS) continue;
+        sessions[id] = n;
+      }
+    }
+  } catch {
+    /* corrupted: start fresh */
+  }
+  return { sessions };
+}
+
+async function main() {
+  const { homedir } = await import('node:os');
+  const { join } = await import('node:path');
+  const fs = await import('node:fs');
+  const env = process.env;
+  if (env.AGENTSYNC_HOOK === 'off') return;
+
+  const stateDir = env.AGENTSYNC_STATE_DIR || join(homedir(), '.agentsync');
+  const logFile = join(stateDir, 'hook.log');
+  /** @param {string} msg */
+  const log = (msg) => {
+    try {
+      fs.mkdirSync(stateDir, { recursive: true });
+      try {
+        if (fs.statSync(logFile).size > LOG_MAX_BYTES) fs.renameSync(logFile, logFile + '.1');
+      } catch {
+        /* no log yet */
+      }
+      const safe = env.AGENTSYNC_TOKEN ? String(msg).split(env.AGENTSYNC_TOKEN).join('[redacted]') : String(msg);
+      fs.appendFileSync(logFile, `${new Date().toISOString()} ${safe}\n`);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  try {
+    const agentIdx = process.argv.indexOf('--agent');
+    const agent = agentIdx > -1 ? process.argv[agentIdx + 1] : 'claude';
+
+    const chunks = [];
+    for await (const c of process.stdin) chunks.push(c);
+    /** @type {any} */
+    const input = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+    const sessionId = typeof input.session_id === 'string' ? input.session_id : '';
+    if (!sessionId) return;
+
+    // Turn text: transcript first (Claude JSONL); fall back to last_assistant_message
+    // (Codex transcript format is documented as unstable).
+    /** @type {string[]} */
+    let texts = [];
+    if (typeof input.transcript_path === 'string') {
+      try {
+        texts = turnAssistantTexts(fs.readFileSync(input.transcript_path, 'utf8'));
+      } catch {
+        texts = [];
+      }
+    }
+    if (texts.length === 0 && typeof input.last_assistant_message === 'string') texts = [input.last_assistant_message];
+    const markers = parseMarkers(texts.join('\n'));
+
+    const now = Date.now();
+    const statePath = join(stateDir, 'state.json');
+    let raw = '';
+    try {
+      raw = fs.readFileSync(statePath, 'utf8');
+    } catch {
+      /* none yet */
+    }
+    const state = loadState(raw, now);
+    const prev = state.sessions[sessionId] ?? { tasks: {}, outstanding: false, updatedAt: new Date(now).toISOString() };
+
+    const applied = applyTurn(prev, markers);
+    let session = applied.session;
+
+    const url = env.AGENTSYNC_URL;
+    const token = env.AGENTSYNC_TOKEN;
+    /** @type {Action} */
+    let action = { type: 'none' };
+    if (session.currentTaskId && (applied.newCheckpoints.length > 0 || session.outstanding)) {
+      if (url && token) {
+        /** @type {Plan | null} */
+        let plan = null;
+        try {
+          const res = await fetch(`${url.replace(/\/+$/, '')}/api/agent/tasks/${encodeURIComponent(session.currentTaskId)}/plan`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(3000),
+          });
+          if (res.status === 200) plan = await res.json();
+          else log(`plan fetch status ${res.status}`);
+        } catch (e) {
+          log(`plan fetch failed: ${e instanceof Error ? e.name : 'error'}`);
+        }
+        if (plan && Array.isArray(plan.steps)) {
+          const d = decide(session, plan, { stopHookActive: input.stop_hook_active === true });
+          session = d.session;
+          action = d.action;
+        }
+      } else {
+        log('missing AGENTSYNC_URL or AGENTSYNC_TOKEN');
+      }
+    }
+
+    session = { ...session, updatedAt: new Date(now).toISOString() };
+    state.sessions[sessionId] = session;
+    try {
+      fs.mkdirSync(stateDir, { recursive: true });
+      const tmp = `${statePath}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(state));
+      fs.renameSync(tmp, statePath);
+    } catch (e) {
+      log(`state write failed: ${e instanceof Error ? e.message : 'error'}`);
+    }
+
+    if (action.type !== 'none') process.stdout.write(blockOutput(agent, reasonFor(action)) + '\n');
+  } catch (e) {
+    log(`hook error: ${e instanceof Error ? e.message : 'error'}`);
+  }
+}
+
+import { fileURLToPath } from 'node:url';
+import { realpathSync } from 'node:fs';
+let isMain = false;
+try {
+  isMain = !!process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+} catch {
+  isMain = false;
+}
+if (isMain) {
+  main().finally(() => process.exit(0));
+}
