@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: agentsync
       POSTGRES_DB: agentsync
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"   # dev DB: reachable from this machine only
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
