@@ -2,7 +2,7 @@ import { and, asc, eq, isNull, ne } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { sessions, users, type User } from '@/db/schema';
 import { assertPasswordLength, hashPassword } from './auth/password';
-import type { Actor } from './authz';
+import { requireAdmin, type Actor } from './authz';
 import { DomainError } from './errors';
 import { isUuid } from './ids';
 
@@ -14,10 +14,6 @@ function assertLevel(level: string) {
 }
 function assertDisplayName(name: string) {
   if (!name.trim()) throw new DomainError('VALIDATION', 'displayNameRequired', { field: 'displayName' });
-}
-
-function requireAdmin(actor: Actor) {
-  if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'adminOnly');
 }
 
 const userNotFound = () => new DomainError('NOT_FOUND', 'notFoundUser');

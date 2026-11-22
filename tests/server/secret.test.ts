@@ -32,6 +32,22 @@ describe('secret', () => {
     expectKeyMissing(() => decryptSecret(parts.join(':')));
   });
 
+  it('truncated or tampered tag, and wrong key, are rejected', () => {
+    const parts = encryptSecret('x').split(':');
+    const tag = Buffer.from(parts[2], 'base64');
+    expectKeyMissing(() => decryptSecret([parts[0], parts[1], tag.subarray(0, 4).toString('base64'), parts[3]].join(':')));
+    const bad = Buffer.from(tag); bad[0] ^= 0xff;
+    expectKeyMissing(() => decryptSecret([parts[0], parts[1], bad.toString('base64'), parts[3]].join(':')));
+    const enc = encryptSecret('x');
+    process.env.SETTINGS_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+    expectKeyMissing(() => decryptSecret(enc));
+  });
+
+  it('non-canonical key is not ready', () => {
+    process.env.SETTINGS_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64').replace(/=+$/, '');
+    expectKeyMissing(() => encryptSecret('x'));
+  });
+
   it('missing env → odooKeyMissing', () => {
     delete process.env.SETTINGS_ENCRYPTION_KEY;
     expectKeyMissing(() => encryptSecret('x'));

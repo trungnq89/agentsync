@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { odooSettings, userLevel, type TitleMapping } from '@/db/schema';
-import type { Actor } from '../authz';
+import { requireAdmin, type Actor } from '../authz';
 import { DomainError } from '../errors';
 import { decryptSecret, encryptSecret, isEncryptionReady } from '../secret';
 
@@ -32,10 +32,6 @@ export type OdooSettingsInput = {
   titleMappingEnabled?: boolean;
   titleMappings?: TitleMapping[];
 };
-
-function requireAdmin(actor: Actor) {
-  if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'adminOnly');
-}
 
 async function readRow(db: Db) {
   const [row] = await db.select().from(odooSettings).where(eq(odooSettings.id, 1));

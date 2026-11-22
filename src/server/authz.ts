@@ -7,6 +7,10 @@ import { isUuid } from './ids';
 /** Admin flag only grants user management, never visibility of others' tasks. */
 export type Actor = Pick<User, 'id' | 'isAdmin'>;
 
+export function requireAdmin(actor: Actor): void {
+  if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'adminOnly');
+}
+
 /** Direct manager only: no inheritance up the chain. */
 export function isCurrentManagerOf(actor: Actor, owner: Pick<User, 'managerId'>): boolean {
   return owner.managerId !== null && owner.managerId === actor.id;

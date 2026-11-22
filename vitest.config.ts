@@ -11,6 +11,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Fixed test-only key (32 bytes, base64); set before any module (incl. dotenv) loads.
+    env: { SETTINGS_ENCRYPTION_KEY: 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktMTIzNDU=' },
     include: ['tests/**/*.test.ts'],
     globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup.ts'],

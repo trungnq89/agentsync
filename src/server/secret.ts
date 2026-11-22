@@ -7,8 +7,10 @@ const keyMissing = () => new DomainError('VALIDATION', 'odooKeyMissing');
 function readKey(): Buffer | null {
   const raw = process.env.SETTINGS_ENCRYPTION_KEY;
   if (!raw) return null;
-  const key = Buffer.from(raw, 'base64');
-  return key.length === 32 ? key : null;
+  const trimmed = raw.trim();
+  const key = Buffer.from(trimmed, 'base64');
+  // Canonical base64 only: re-encoding must reproduce the input exactly.
+  return key.length === 32 && key.toString('base64') === trimmed ? key : null;
 }
 
 export function isEncryptionReady(): boolean {
@@ -30,9 +32,12 @@ export function decryptSecret(enc: string): string {
   if (!key) throw keyMissing();
   const parts = enc.split(':');
   if (parts.length !== 4 || parts[0] !== 'v1') throw keyMissing();
+  const iv = Buffer.from(parts[1], 'base64');
+  const tag = Buffer.from(parts[2], 'base64');
+  if (iv.length !== 12 || tag.length !== 16) throw keyMissing();
   try {
-    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(parts[1], 'base64'));
-    decipher.setAuthTag(Buffer.from(parts[2], 'base64'));
+    const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
+    decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(Buffer.from(parts[3], 'base64')), decipher.final()]).toString('utf8');
   } catch {
     throw keyMissing();

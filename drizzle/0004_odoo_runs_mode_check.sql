@@ -1,0 +1,1 @@
+ALTER TABLE "odoo_sync_runs" ADD CONSTRAINT "odoo_sync_runs_mode_check" CHECK ("odoo_sync_runs"."mode" in ('full','incremental','review'));

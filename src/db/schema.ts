@@ -191,6 +191,7 @@ export const odooSyncRuns = pgTable('odoo_sync_runs', {
   preview: jsonb('preview').$type<unknown>(),
   errorKey: text('error_key'),
 }, (t) => [
+  check('odoo_sync_runs_mode_check', sql`${t.mode} in ('full','incremental','review')`),
   check('odoo_sync_runs_trigger_check', sql`${t.trigger} in ('manual','schedule')`),
   check('odoo_sync_runs_status_check', sql`${t.status} in ('previewed','applied','failed')`),
 ]);

@@ -64,10 +64,12 @@ describe('odoo settings', () => {
   });
 
   it('users.email unique case-insensitive', async () => {
-    await makeUser({ email: 'A@Example.com' } as never);
-    await expect(makeUser({ email: 'a@example.COM' } as never)).rejects.toThrow();
-    await makeUser({ email: null } as never);
-    await makeUser({ email: null } as never);
+    await makeUser({ email: 'A@Example.com' });
+    const err = await makeUser({ email: 'a@example.COM' }).catch((e) => e);
+    const code = (err as { code?: string; cause?: { code?: string } }).code ?? (err as { cause?: { code?: string } }).cause?.code;
+    expect(code).toBe('23505');
+    await makeUser({ email: null });
+    await makeUser({ email: null });
   });
 
   it('seeds the odoo_settings singleton', async () => {
