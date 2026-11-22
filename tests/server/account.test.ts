@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { appSettings, sessions, users } from '@/db/schema';
+import { appSettings, odooSyncRuns, pendingCredentials, sessions, users } from '@/db/schema';
 import { changeMyPassword, listMyTokens, setMySendMode } from '@/server/account';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
 import { login } from '@/server/auth/session';
@@ -92,5 +92,29 @@ describe('mustChangePassword flag', () => {
     await setPassword(testDb, admin, a.id, 'temp-password-9');
     const [row2] = await testDb.select().from(users).where(eq(users.id, a.id));
     expect(row2.mustChangePassword).toBe(true);
+  });
+});
+
+describe('pending credentials on password change', () => {
+  const seed = async (userId: string) => {
+    const [run] = await testDb.insert(odooSyncRuns).values({ mode: 'incremental', trigger: 'schedule', status: 'applied' }).returning();
+    await testDb.insert(pendingCredentials).values({ userId, runId: run.id, secretEnc: 'v1:x' });
+  };
+  it('changeMyPassword deletes the user pending credential', async () => {
+    const a = await makeUser({ passwordHash: await hashPassword('old-password'), mustChangePassword: true });
+    const b = await makeUser();
+    await seed(a.id);
+    await seed(b.id);
+    await changeMyPassword(testDb, a, 'old-password', 'new-password-1');
+    const rows = await testDb.select().from(pendingCredentials);
+    expect(rows.map((r) => r.userId)).toEqual([b.id]);
+  });
+  it('admin setPassword deletes the user pending credential', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    const a = await makeUser();
+    await seed(a.id);
+    const { setPassword } = await import('@/server/org');
+    await setPassword(testDb, admin, a.id, 'temp-password-9');
+    expect(await testDb.select().from(pendingCredentials)).toEqual([]);
   });
 });

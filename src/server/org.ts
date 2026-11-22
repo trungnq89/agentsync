@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { sessions, users, type User } from '@/db/schema';
+import { pendingCredentials, sessions, users, type User } from '@/db/schema';
 import { assertPasswordLength, hashPassword } from './auth/password';
 import { requireAdmin, type Actor } from './authz';
 import { DomainError } from './errors';
@@ -25,8 +25,23 @@ function normalizeEmail(raw: string | null | undefined): string | null {
   return e;
 }
 async function assertEmailFree(db: Db, email: string, exceptId?: string) {
-  const rows = await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = ${email}`);
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${email} or lower(${users.username}) = ${email}`);
   if (rows.some((r) => r.id !== exceptId)) throw new DomainError('VALIDATION', 'emailTaken', { field: 'email' });
+}
+
+/** Maps a unique-constraint race on users to the same errors the pre-checks give. */
+function mapUniqueViolation(e: unknown): never {
+  const err = e as { code?: string; constraint_name?: string; constraint?: string; cause?: { code?: string; constraint_name?: string; constraint?: string } };
+  const code = err.code ?? err.cause?.code;
+  const constraint = err.constraint_name ?? err.constraint ?? err.cause?.constraint_name ?? err.cause?.constraint ?? '';
+  if (code === '23505') {
+    if (constraint.includes('email')) throw new DomainError('VALIDATION', 'emailTaken', { field: 'email' });
+    if (constraint.includes('username')) throw new DomainError('VALIDATION', 'usernameTaken', { field: 'username' });
+  }
+  throw e;
 }
 
 const userNotFound = () => new DomainError('NOT_FOUND', 'notFoundUser');
@@ -93,19 +108,24 @@ export async function createUser(
   if (managerId) await assertValidManager(db, null, managerId);
   const [dup] = await db.select({ id: users.id }).from(users).where(eq(users.username, input.username));
   if (dup) throw new DomainError('VALIDATION', 'usernameTaken', { field: 'username' });
-  const [u] = await db
-    .insert(users)
-    .values({
-      username: input.username,
-      displayName: input.displayName.trim(),
-      passwordHash: await hashPassword(input.password),
-      level: input.level,
-      managerId,
-      isAdmin: input.isAdmin ?? false,
-      email,
-    })
-    .returning();
-  return u;
+  const passwordHash = await hashPassword(input.password);
+  try {
+    const [u] = await db
+      .insert(users)
+      .values({
+        username: input.username,
+        displayName: input.displayName.trim(),
+        passwordHash,
+        level: input.level,
+        managerId,
+        isAdmin: input.isAdmin ?? false,
+        email,
+      })
+      .returning();
+    return u;
+  } catch (e) {
+    return mapUniqueViolation(e);
+  }
 }
 
 export async function updateUser(
@@ -155,8 +175,12 @@ export async function updateUser(
   if (patch.isAdmin !== undefined) set.isAdmin = patch.isAdmin;
   if (patch.disabled !== undefined) set.disabledAt = patch.disabled ? now : null;
   if (Object.keys(set).length === 0) return existing;
-  const [u] = await db.update(users).set(set).where(eq(users.id, id)).returning();
-  return u;
+  try {
+    const [u] = await db.update(users).set(set).where(eq(users.id, id)).returning();
+    return u;
+  } catch (e) {
+    return mapUniqueViolation(e);
+  }
 }
 
 export async function setPassword(db: Db, actor: Actor, id: string, pw: string): Promise<void> {
@@ -170,4 +194,5 @@ export async function setPassword(db: Db, actor: Actor, id: string, pw: string):
     .returning({ id: users.id });
   if (rows.length === 0) throw userNotFound();
   await db.delete(sessions).where(eq(sessions.userId, id));
+  await db.delete(pendingCredentials).where(eq(pendingCredentials.userId, id));
 }

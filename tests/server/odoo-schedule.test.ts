@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sql } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { testDb } from '../helpers/db';
 import { makeUser } from '../helpers/factories';
@@ -21,6 +22,7 @@ const runs = () => testDb.select().from(odooSyncRuns);
 beforeEach(async () => {
   fake = await startFakeOdoo({ db: 'db', login: 'me', apiKey: KEY, employees: [emp(1, 'a@x.com')] });
   admin = await makeUser({ isAdmin: true });
+  await makeUser({ source: 'odoo', odooEmployeeId: 99 });
   await saveOdooSettings(testDb, admin, { url: fake.url, database: 'db', login: 'me', apiKey: KEY, mode: 'incremental', scheduleHours: 6 });
 });
 afterEach(async () => { await fake.close(); });
@@ -81,5 +83,34 @@ describe('runScheduledSyncIfDue', () => {
     await runScheduledSyncIfDue(testDb, new Date());
     const [row] = await testDb.select().from(odooSyncRuns).where(eq(odooSyncRuns.id, stale.id));
     expect(row).toMatchObject({ status: 'failed', errorKey: 'odooUnreachable' });
+  });
+
+  it('logs only the error key and records a failed run when Odoo is down', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await fake.close();
+    await runScheduledSyncIfDue(testDb, NOW);
+    expect(spy).toHaveBeenCalledWith('[odoo-sync]', 'odooUnreachable');
+    expect(spy.mock.calls.every((c) => c.length === 2 && typeof c[1] === 'string')).toBe(true);
+    spy.mockRestore();
+  });
+
+  it('odooSyncBusy is a skip: no failed run is recorded', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await testDb.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('agentsync_odoo_sync'))`);
+      await runScheduledSyncIfDue(testDb, NOW);
+    });
+    expect(await runs()).toHaveLength(0);
+    expect(spy).toHaveBeenCalledWith('[odoo-sync]', 'odooSyncBusy');
+    spy.mockRestore();
+  });
+
+  it('no linked users → logs odooNeedsInitialReview once, no run', async () => {
+    await testDb.update(users).set({ odooEmployeeId: null });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await runScheduledSyncIfDue(testDb, NOW);
+    expect(await runs()).toHaveLength(0);
+    expect(spy.mock.calls).toEqual([['[odoo-sync]', 'odooNeedsInitialReview']]);
+    spy.mockRestore();
   });
 });

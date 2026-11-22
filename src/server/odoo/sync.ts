@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { odooSettings, odooSyncRuns, pendingCredentials, sessions, users, type OdooRunCounts } from '@/db/schema';
 import { hashPassword } from '../auth/password';
@@ -64,7 +64,7 @@ async function recordFailure(db: Db, runId: string, e: unknown) {
   await db
     .update(odooSyncRuns)
     .set({ status: 'failed', errorKey: errorKeyOf(e), finishedAt: new Date() })
-    .where(eq(odooSyncRuns.id, runId));
+    .where(and(eq(odooSyncRuns.id, runId), inArray(odooSyncRuns.status, ['running', 'previewed'])));
 }
 
 async function currentMode(db: Db): Promise<Mode> {
@@ -328,6 +328,9 @@ export async function applySync(db: Db, actor: Actor, runId: string, selectedKey
 
 export async function runIncrementalSync(db: Db, trigger: 'manual' | 'schedule', actor?: Actor, deps: SyncDeps = {}) {
   if (actor) requireAdmin(actor);
+  // Unattended runs only create accounts; until accounts are linked, matches would turn into duplicates.
+  const [linked] = await db.select({ n: sql<number>`count(*)::int` }).from(users).where(isNotNull(users.odooEmployeeId));
+  if (!linked || linked.n === 0) throw new DomainError('VALIDATION', 'odooNeedsInitialReview');
   const [run] = await db
     .insert(odooSyncRuns)
     .values({ mode: 'incremental', trigger, actorId: actor?.id ?? null, status: 'running' })
@@ -338,7 +341,12 @@ export async function runIncrementalSync(db: Db, trigger: 'manual' | 'schedule',
     const r = await applyRun(db, run.id, undefined, new Date(), true);
     return { runId: run.id, created: r.created, linked: r.linked, updated: r.updated, disabled: r.disabled, skipped: r.skipped };
   } catch (e) {
-    await recordFailure(db, run.id, e);
+    if (trigger === 'schedule' && e instanceof DomainError && e.key === 'odooSyncBusy') {
+      // Another sync holds the lock: the tick is skipped, not a failure.
+      await db.delete(odooSyncRuns).where(eq(odooSyncRuns.id, run.id));
+    } else {
+      await recordFailure(db, run.id, e);
+    }
     throw e;
   }
 }
@@ -392,8 +400,10 @@ export async function runScheduledSyncIfDue(db: Db, now: Date, deps: SyncDeps = 
       .limit(1);
     if (last && now.getTime() - last.startedAt.getTime() < cfg.scheduleHours * 3_600_000) return;
     await runIncrementalSync(db, 'schedule', undefined, deps);
-  } catch {
+  } catch (e) {
     // runIncrementalSync already recorded a failed run; the scheduler must never throw.
+    // Log the key only: never the message, stack or anything secret.
+    console.error('[odoo-sync]', errorKeyOf(e));
   }
 }
 

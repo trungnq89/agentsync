@@ -173,3 +173,26 @@ describe('user email', () => {
     expect((await updateUser(testDb, admin, v.id, { email: '' })).email).toBeNull();
   });
 });
+
+describe('email vs username uniqueness', () => {
+  it('rejects an email equal to another user username (create and update)', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    await makeUser({ username: 'Taken@X.com' });
+    await expect(createUser(testDb, admin, { username: 'n1', displayName: 'N', password: 'password-1', level: 'member', email: 'taken@x.com' }))
+      .rejects.toMatchObject({ key: 'emailTaken', params: { field: 'email' } });
+    const v = await makeUser();
+    await expect(updateUser(testDb, admin, v.id, { email: 'taken@x.com' })).rejects.toMatchObject({ key: 'emailTaken' });
+  });
+  it('a concurrent duplicate insert maps 23505 to emailTaken / usernameTaken', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    const mk = (username: string, email: string) => createUser(testDb, admin, { username, displayName: 'N', password: 'password-1', level: 'member', email });
+    const r1 = await Promise.allSettled([mk('c1', 'race@x.com'), mk('c2', 'race@x.com')]);
+    const bad1 = r1.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    expect(bad1).toHaveLength(1);
+    expect(bad1[0].reason).toMatchObject({ code: 'VALIDATION', key: 'emailTaken', params: { field: 'email' } });
+    const r2 = await Promise.allSettled([mk('same', 'r3@x.com'), mk('same', 'r4@x.com')]);
+    const bad2 = r2.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    expect(bad2).toHaveLength(1);
+    expect(bad2[0].reason).toMatchObject({ code: 'VALIDATION', key: 'usernameTaken', params: { field: 'username' } });
+  });
+});

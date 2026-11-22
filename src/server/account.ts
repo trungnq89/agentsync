@@ -1,6 +1,6 @@
 import { and, desc, eq, ne } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { agentTokens, sessions, users, type AgentToken } from '@/db/schema';
+import { agentTokens, pendingCredentials, sessions, users, type AgentToken } from '@/db/schema';
 import { assertPasswordLength, hashPassword, verifyPassword } from './auth/password';
 import type { Actor } from './authz';
 import { DomainError } from './errors';
@@ -42,6 +42,7 @@ export async function changeMyPassword(
   }
   assertPasswordLength(next, 'next');
   await db.update(users).set({ passwordHash: await hashPassword(next), mustChangePassword: false }).where(eq(users.id, actor.id));
+  await db.delete(pendingCredentials).where(eq(pendingCredentials.userId, actor.id));
   await db
     .delete(sessions)
     .where(keepSessionId ? and(eq(sessions.userId, actor.id), ne(sessions.id, keepSessionId)) : eq(sessions.userId, actor.id));

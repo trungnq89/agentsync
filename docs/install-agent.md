@@ -26,6 +26,8 @@ export AGENTSYNC_TOKEN="ags_..."
 
 Never paste the token into a chat or commit it to a repo.
 
+If your account was given a temporary password, the server rejects agent tokens (HTTP 401, error `passwordChangeRequired`) until you sign in to AgentSync and change the password in Settings.
+
 Note: variables in `~/.zshrc` only apply to programs started from a terminal. Desktop apps opened by clicking their icon (Claude Desktop, the Codex app) will NOT see them. Workarounds: open the app from a terminal (for example `open -a "Claude"` after the `export`), or use the CLI (`claude`, `codex`) in a terminal. Setting the variables permanently for desktop apps has not been verified; ask your admin if you need it.
 
 ## 2. Claude Code

@@ -31,11 +31,11 @@ export async function authenticateAgentToken(db: Db, bearer: string, now: Date =
     !row ||
     !timingSafeEqual(Buffer.from(row.token.tokenHash), Buffer.from(hash)) ||
     row.token.revokedAt ||
-    row.user.disabledAt ||
-    row.user.mustChangePassword
+    row.user.disabledAt
   ) {
     throw new DomainError('UNAUTHORIZED', 'badToken');
   }
+  if (row.user.mustChangePassword) throw new DomainError('UNAUTHORIZED', 'passwordChangeRequired');
   await db.update(agentTokens).set({ lastUsedAt: now }).where(eq(agentTokens.id, row.token.id));
   return row.user;
 }

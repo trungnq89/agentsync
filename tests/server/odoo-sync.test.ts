@@ -225,6 +225,7 @@ describe('odoo sync', () => {
   });
 
   it('incremental creates only new users and stores pending credentials; listPendingCredentials returns then deletes', async () => {
+    await makeUser({ source: 'odoo', odooEmployeeId: 99 });
     const existing = await makeUser({ email: 'ann@x.com', displayName: 'Old Ann' });
     const r = await runIncrementalSync(testDb, 'schedule', undefined, undefined);
     expect(r).toMatchObject({ created: 2, linked: 1, skipped: 0 }); // link of existing ann, no rename
@@ -246,6 +247,7 @@ describe('odoo sync', () => {
   });
 
   it('incremental under odooSyncBusy → run failed with odooSyncBusy', async () => {
+    await makeUser({ source: 'odoo', odooEmployeeId: 99 });
     await testDb.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext('agentsync_odoo_sync'))`);
       expect((await rejects(runIncrementalSync(testDb, 'manual', admin))).key).toBe('odooSyncBusy');
@@ -267,6 +269,7 @@ describe('odoo sync', () => {
   });
 
   it('listPendingCredentials skips and deletes undecryptable rows', async () => {
+    await makeUser({ source: 'odoo', odooEmployeeId: 99 });
     await runIncrementalSync(testDb, 'schedule');
     const [run] = await listSyncRuns(testDb, admin);
     await testDb.insert(pendingCredentials).values({ userId: admin.id, runId: run.id, secretEnc: 'v1:garbage' });
@@ -274,6 +277,23 @@ describe('odoo sync', () => {
     const list = await listPendingCredentials(testDb, admin);
     expect(list).toHaveLength(3);
     expect(await countPendingCredentials(testDb, admin)).toBe(0);
+  });
+
+  it('incremental refuses while no user is linked to Odoo, without recording a run', async () => {
+    const err = await rejects(runIncrementalSync(testDb, 'manual', admin));
+    expect(err).toMatchObject({ code: 'VALIDATION', key: 'odooNeedsInitialReview' });
+    expect(await testDb.select().from(odooSyncRuns)).toHaveLength(0);
+    expect(await testDb.select().from(users)).toHaveLength(1);
+    await makeUser({ source: 'odoo', odooEmployeeId: 99 });
+    await expect(runIncrementalSync(testDb, 'manual', admin)).resolves.toMatchObject({ created: 3 });
+  });
+
+  it('recordFailure never overwrites an applied run', async () => {
+    const p = await previewSync(testDb, admin);
+    await applySync(testDb, admin, p.runId);
+    await expect(applySync(testDb, admin, p.runId)).rejects.toMatchObject({ key: 'odooPreviewExpired' });
+    const [run] = await testDb.select().from(odooSyncRuns).where(eq(odooSyncRuns.id, p.runId));
+    expect(run.status).toBe('applied');
   });
 
   it('non-admin FORBIDDEN on all', async () => {

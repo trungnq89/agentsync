@@ -66,12 +66,13 @@ Admin > **Odoo** keeps AgentSync accounts and the org chart in step with the emp
 1. Generate an encryption key for the stored API key and pass it to the app as an environment variable: `openssl rand -base64 32` (put it in `.env` as `SETTINGS_ENCRYPTION_KEY`, or export it before `docker compose -f docker-compose.prod.yml up -d`). Without it the Odoo page is locked. Keep it safe: if it is lost or changed, re-enter the API key.
 2. In Odoo, create a dedicated user with read-only access to Employees, then create an API key for it (Preferences > Account Security > New API Key). **This user must have access to all companies** that should sync: Odoo only returns employees of the user's current company, so with a single company selected the other companies' employees are not synced.
 3. In Admin > Odoo enter the Odoo address, database, login and API key, save, and press **Test connection** (it shows the number of employees found).
+4. Existing accounts are matched to Odoo employees by work email: in Admin, fill in the email of every existing account first (an account with no email whose username is the work email is also matched). Then run a **Review** preview and apply what you accept. Only after that switch to Incremental or Full; Incremental refuses to run until at least one account is linked to Odoo, so it cannot create duplicates of existing people.
 
 **Modes** (set under "Mode and schedule")
 
 - **Review** (default): Preview, tick the changes you want, then Apply.
 - **Full**: Preview, then Apply every change. This overwrites names, managers and levels of linked accounts with the Odoo values and disables accounts that are no longer active in Odoo. Admin accounts are never disabled and keep their admin role; local accounts that do not match anyone in Odoo are left alone.
-- **Incremental**: only creates accounts for new employees, on a schedule of 1, 6 or 24 hours (or off), plus a **Run now** button. The scheduler runs inside the app server process (no cron job needed); it only runs while the app is up.
+- **Incremental**: only creates accounts for new employees, on a schedule of 1, 6 or 24 hours (or off), plus a **Run now** button. The scheduler runs inside the app server process (no cron job needed); it only runs while the app is up. It also links existing accounts to employees by email. A user who was disabled and is hired again in Odoo stays disabled: re-enable them manually.
 
 **Accounts and passwords.** New accounts use the work email as username and get a 16-character temporary password. Passwords are shown once after you apply (copy or download as CSV); for scheduled runs they are kept encrypted under "Pending passwords" until you view them, then deleted. A user with a temporary password can sign in with their email, but is sent to Settings and must change the password before using anything else.
 

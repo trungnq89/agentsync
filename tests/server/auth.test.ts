@@ -136,3 +136,20 @@ describe('email login and forced change', () => {
     expect((await authenticateAgentToken(testDb, token)).id).toBe(u.id);
   });
 });
+
+describe('passwordChangeRequired', () => {
+  it('agent token of a user who must change password gets a distinct key', async () => {
+    const u = await userWithPw('pw-12345', { mustChangePassword: true });
+    const { token } = await createAgentToken(testDb, u.id, 'l');
+    await expect(authenticateAgentToken(testDb, token)).rejects.toMatchObject({ code: 'UNAUTHORIZED', key: 'passwordChangeRequired' });
+  });
+  it('disabled user logging in by email is rejected with the generic error', async () => {
+    await userWithPw('pw-12345', { username: 'dis', email: 'dis@x.com', disabledAt: new Date() });
+    await expect(login(testDb, 'DIS@x.com', 'pw-12345')).rejects.toMatchObject({ code: 'UNAUTHORIZED', key: 'badLogin' });
+  });
+  it('username equal to another user email wins at login', async () => {
+    const a = await userWithPw('pw-aaaaaa', { username: 'x@y.com' });
+    await userWithPw('pw-bbbbbb', { username: 'other', email: 'x@y.com' });
+    expect((await login(testDb, 'x@y.com', 'pw-aaaaaa')).user.id).toBe(a.id);
+  });
+});

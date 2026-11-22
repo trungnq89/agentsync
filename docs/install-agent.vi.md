@@ -26,6 +26,8 @@ export AGENTSYNC_TOKEN="ags_..."
 
 Không dán token vào chat hay commit vào repo.
 
+Nếu tài khoản của bạn đang dùng mật khẩu tạm, máy chủ từ chối token agent (HTTP 401, lỗi `passwordChangeRequired`) cho tới khi bạn đăng nhập AgentSync và đổi mật khẩu trong Cài đặt.
+
 Lưu ý: biến trong `~/.zshrc` chỉ có hiệu lực với chương trình khởi động từ terminal. Ứng dụng desktop mở bằng cách bấm icon (Claude Desktop, Codex app) sẽ KHÔNG thấy chúng. Cách xử lý: mở ứng dụng từ terminal (ví dụ `open -a "Claude"` sau khi đã `export`), hoặc dùng bản CLI (`claude`, `codex`) trong terminal. Chưa kiểm tra cách đặt biến cố định cho ứng dụng desktop; nếu cần, hỏi admin.
 
 ## 2. Claude Code

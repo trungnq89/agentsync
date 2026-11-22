@@ -193,4 +193,19 @@ describe('odoo diff', () => {
     expect(r.changes.map((c) => c.key)).toEqual(['link:a', 'manager:a']);
     expect(r.changes[1]).toMatchObject({ from: 'b', to: null });
   });
+
+  it('links an unlinked user with null email whose username is the employee email', () => {
+    const e = [emp(1, { email: ' Ann@X.com ' })];
+    const u = [usr('u1', { username: 'ann@x.com', email: null })];
+    const r = computeOdooDiff(e, u, opts('incremental'));
+    expect(r.changes).toEqual([{ key: 'link:u1', type: 'link', userId: 'u1', employeeId: 1 }]);
+    expect(types(computeOdooDiff(e, u, opts('full')))).toContain('link');
+    expect(types(computeOdooDiff(e, u, opts('full')))).not.toContain('create');
+  });
+
+  it('a plain username (no @) or a user that has an email is not matched by username', () => {
+    const e = [emp(1, { email: 'ann@x.com' })];
+    expect(types(computeOdooDiff(e, [usr('u1', { username: 'ann' })], opts()))).toEqual(['create']);
+    expect(types(computeOdooDiff(e, [usr('u1', { username: 'ann@x.com', email: 'other@x.com' })], opts()))).toEqual(['create']);
+  });
 });

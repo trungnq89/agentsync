@@ -75,6 +75,12 @@ export function computeOdooDiff(employeesIn: OdooEmployee[], usersIn: ExistingUs
     const m = normEmail(u.email);
     if (m && !userByEmail.has(m)) userByEmail.set(m, u);
   }
+  // Older accounts have no email: their username is often the work email, so match on that too.
+  for (const u of users) {
+    if (normEmail(u.email)) continue;
+    const m = normEmail(u.username);
+    if (m && m.includes('@') && !userByEmail.has(m)) userByEmail.set(m, u);
+  }
 
   // Match employees to users (id first, then email for unlinked, active, non-duplicate employees).
   const matched = new Map<number, ExistingUser>(); // employeeId -> user
