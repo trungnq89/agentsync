@@ -4,3 +4,5 @@ allowBuilds:
   esbuild: false
   '@swc/core': false
   '@parcel/watcher': false
+overrides:
+  '@esbuild-kit/core-utils>esbuild': ^0.25.0
