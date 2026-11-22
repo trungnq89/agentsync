@@ -247,6 +247,9 @@
     "cancel": "Hủy việc"
   },
   "errors": {
+    "odooAuthFailed": "Odoo từ chối thông tin đăng nhập, cơ sở dữ liệu hoặc khóa API.",
+    "odooUnreachable": "Không thể kết nối tới máy chủ Odoo.",
+    "odooBadResponse": "Odoo trả về phản hồi không hợp lệ.",
     "odooKeyMissing": "Khóa mã hóa Odoo (SETTINGS_ENCRYPTION_KEY) bị thiếu hoặc không hợp lệ.",
     "odooUrlInvalid": "Hãy nhập URL http(s) hợp lệ.",
     "odooModeInvalid": "Chế độ đồng bộ không hợp lệ.",

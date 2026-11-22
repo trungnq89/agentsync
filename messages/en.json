@@ -247,6 +247,9 @@
     "cancel": "Cancel task"
   },
   "errors": {
+    "odooAuthFailed": "Odoo rejected the login, database or API key.",
+    "odooUnreachable": "Could not reach the Odoo server.",
+    "odooBadResponse": "Odoo returned an unexpected response.",
     "odooKeyMissing": "The Odoo encryption key (SETTINGS_ENCRYPTION_KEY) is missing or invalid.",
     "odooUrlInvalid": "Enter a valid http(s) URL.",
     "odooModeInvalid": "Invalid sync mode.",
