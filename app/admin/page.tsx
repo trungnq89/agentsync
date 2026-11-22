@@ -11,6 +11,7 @@ import { listAllUsers } from '@/server/org';
 import { getStaleBusinessDays } from '@/server/settings';
 import { getAdminActor } from '../_lib/actor';
 import { createUserAction, staleDaysAction } from '../_actions/admin';
+import { AdminTabs } from './_components/admin-tabs';
 import { CheckField, LevelField, ManagerField, type Person } from './_components/fields';
 import { UserActions, type AdminUser } from './_components/user-actions';
 
@@ -49,6 +50,7 @@ export default async function AdminPage() {
   return (
     <main className="space-y-6">
       <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
+      <AdminTabs active="users" />
 
       <Card>
         <CardHeader>

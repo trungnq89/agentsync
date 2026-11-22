@@ -2,7 +2,7 @@ export const LOCALES = ['en', 'vi'] as const;
 export type Locale = (typeof LOCALES)[number];
 
 export const NAMESPACES = [
-  'common', 'nav', 'auth', 'home', 'person', 'task', 'settings', 'admin', 'status', 'health',
+  'common', 'nav', 'auth', 'home', 'person', 'task', 'settings', 'admin', 'odoo', 'status', 'health',
   'level', 'mode', 'attention', 'verdict', 'sendMode', 'action', 'errors', 'mcp', 'theme', 'dev', 'cli',
 ] as const;
 

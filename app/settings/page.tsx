@@ -44,6 +44,8 @@ export default async function SettingsPage() {
         </div>
       )}
 
+      {!actor.mustChangePassword && (
+        <>
       <Card>
         <CardHeader>
           <CardTitle>{t('preferences')}</CardTitle>
@@ -82,6 +84,9 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
+        </>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>{t('passwordTitle')}</CardTitle>
@@ -102,6 +107,9 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
+
+      {!actor.mustChangePassword && (
+        <>
       <Card>
         <CardHeader>
           <CardTitle>{t('tokensTitle')}</CardTitle>
@@ -141,6 +149,8 @@ export default async function SettingsPage() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </main>
   );
 }
