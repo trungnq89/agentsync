@@ -193,7 +193,7 @@ export const odooSyncRuns = pgTable('odoo_sync_runs', {
 }, (t) => [
   check('odoo_sync_runs_mode_check', sql`${t.mode} in ('full','incremental','review')`),
   check('odoo_sync_runs_trigger_check', sql`${t.trigger} in ('manual','schedule')`),
-  check('odoo_sync_runs_status_check', sql`${t.status} in ('previewed','applied','failed')`),
+  check('odoo_sync_runs_status_check', sql`${t.status} in ('running','previewed','applied','failed')`),
 ]);
 
 export const pendingCredentials = pgTable('pending_credentials', {

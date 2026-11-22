@@ -1,0 +1,2 @@
+ALTER TABLE "odoo_sync_runs" DROP CONSTRAINT "odoo_sync_runs_status_check";--> statement-breakpoint
+ALTER TABLE "odoo_sync_runs" ADD CONSTRAINT "odoo_sync_runs_status_check" CHECK ("odoo_sync_runs"."status" in ('running','previewed','applied','failed'));

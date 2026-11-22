@@ -254,6 +254,7 @@
     "odooSyncBusy": "Đang có một lần đồng bộ Odoo khác chạy. Hãy thử lại sau giây lát.",
     "odooPreviewExpired": "Bản xem trước đã hết hạn hoặc đã được áp dụng. Hãy xem trước lại.",
     "odooRunNotFound": "Không tìm thấy lần đồng bộ.",
+    "odooApplyFailed": "Không thể áp dụng đồng bộ. Chưa có thay đổi nào được ghi. Hãy thử lại.",
     "odooKeyMissing": "Khóa mã hóa Odoo (SETTINGS_ENCRYPTION_KEY) bị thiếu hoặc không hợp lệ.",
     "odooUrlInvalid": "Hãy nhập URL http(s) hợp lệ.",
     "odooModeInvalid": "Chế độ đồng bộ không hợp lệ.",

@@ -36,6 +36,13 @@
       "when": 1795335324332,
       "tag": "0004_odoo_runs_mode_check",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795336515824,
+      "tag": "0005_odoo_runs_running",
+      "breakpoints": true
     }
   ]
 }

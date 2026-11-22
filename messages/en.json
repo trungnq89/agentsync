@@ -254,6 +254,7 @@
     "odooSyncBusy": "Another Odoo sync is running. Try again in a moment.",
     "odooPreviewExpired": "This preview has expired or was already applied. Run a new preview.",
     "odooRunNotFound": "Sync run not found.",
+    "odooApplyFailed": "The sync could not be applied. No changes were made. Try again.",
     "odooKeyMissing": "The Odoo encryption key (SETTINGS_ENCRYPTION_KEY) is missing or invalid.",
     "odooUrlInvalid": "Enter a valid http(s) URL.",
     "odooModeInvalid": "Invalid sync mode.",
