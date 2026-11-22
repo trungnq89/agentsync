@@ -125,4 +125,65 @@ describe('odoo diff', () => {
       'create:e5', 'link:a', 'link:b', 'name:a', 'name:b', 'level:a', 'disable:z',
     ]);
   });
+
+  it('rehire: user linked to archived employee, active employee with same email → relink, no disable', () => {
+    const users = [usr('u1', { email: 'new@x.com', source: 'odoo', odooEmployeeId: 1, displayName: 'E2' })];
+    const r = computeOdooDiff([emp(1, { active: false, email: 'new@x.com' }), emp(2, { email: 'new@x.com' })], users, opts());
+    expect(r.changes).toEqual([{ key: 'link:u1', type: 'link', userId: 'u1', employeeId: 2 }]);
+    expect(r.skipped).toEqual([]);
+    const gone = computeOdooDiff([emp(2, { email: 'new@x.com' })], users, opts());
+    expect(gone.changes.map((c) => c.key)).toEqual(['link:u1']);
+  });
+
+  it('active employee email owned by user linked to a different active employee → skip duplicateEmail, no create', () => {
+    const users = [usr('u1', { email: 'a@x.com', source: 'odoo', odooEmployeeId: 1, displayName: 'E1' })];
+    const r = computeOdooDiff([emp(1, { email: 'other@x.com' }), emp(2, { email: 'a@x.com' })], users, opts());
+    expect(r.changes).toEqual([]);
+    expect(r.skipped).toEqual([{ employeeId: 2, userId: 'u1', reason: 'duplicateEmail' }]);
+  });
+
+  it('inactive manager whose user gets disabled → updateManager null + managerNoAccount', () => {
+    const users = [
+      usr('m', { source: 'odoo', odooEmployeeId: 1, displayName: 'E1' }),
+      usr('w', { source: 'odoo', odooEmployeeId: 2, displayName: 'E2', managerId: 'm' }),
+    ];
+    const r = computeOdooDiff([emp(1, { active: false }), emp(2, { managerId: 1 }), emp(3, { managerId: 1 })], users, opts());
+    expect(r.changes.map((c) => c.key)).toEqual(['create:e3', 'manager:w', 'disable:m']);
+    expect(r.changes[0]).toMatchObject({ managerRef: null });
+    expect(r.changes[1]).toMatchObject({ from: 'm', to: null });
+    expect(r.skipped.map((s) => [s.employeeId, s.reason])).toEqual([[2, 'managerNoAccount'], [3, 'managerNoAccount']]);
+  });
+
+  it('parent_id to non-existent employee → managerNoAccount; create gets null', () => {
+    const r = computeOdooDiff([emp(1, { managerId: 77 })], [], opts());
+    expect(r.changes[0]).toMatchObject({ managerRef: null });
+    expect(r.skipped).toEqual([{ employeeId: 1, reason: 'managerNoAccount' }]);
+  });
+
+  it('self-manager → skip managerCycle, no manager change', () => {
+    const r = computeOdooDiff([emp(1, { managerId: 1 })], [], opts());
+    expect(r.changes[0]).toMatchObject({ type: 'create', managerRef: null });
+    expect(r.skipped).toEqual([{ employeeId: 1, reason: 'managerCycle' }]);
+  });
+
+  it('admin who is also an employee gets updates but never disable', () => {
+    const ad = usr('ad', { isAdmin: true, email: 'e1@x.com', managerId: null });
+    const r = computeOdooDiff([emp(1, { jobTitle: 'Director' }), emp(2)], [ad, usr('b', { email: 'e2@x.com', displayName: 'E2' })].map((u) => u), opts('full', true));
+    expect(r.changes.map((c) => c.key)).toEqual(['link:ad', 'link:b', 'name:ad', 'level:ad']);
+    const gone = computeOdooDiff([emp(1, { active: false })], [{ ...ad, odooEmployeeId: 1 }], opts());
+    expect(gone.changes).toEqual([]);
+  });
+
+  it('review mode yields same changes as full', () => {
+    const users = [usr('u1', { email: 'e1@x.com' }), usr('z', { source: 'odoo', odooEmployeeId: 9 })];
+    const e = [emp(1, { jobTitle: 'lead' }), emp(2, { managerId: 1 })];
+    expect(computeOdooDiff(e, users, opts('review', true))).toEqual(computeOdooDiff(e, users, opts('full', true)));
+  });
+
+  it('existing user whose parent_id is empty → updateManager to null', () => {
+    const users = [usr('a', { email: 'e1@x.com', displayName: 'E1', managerId: 'b' }), usr('b')];
+    const r = computeOdooDiff([emp(1)], users, opts());
+    expect(r.changes.map((c) => c.key)).toEqual(['link:a', 'manager:a']);
+    expect(r.changes[1]).toMatchObject({ from: 'b', to: null });
+  });
 });

@@ -53,7 +53,9 @@ const normEmail = (e: string | null | undefined): string | null => {
 
 const TYPE_ORDER: Change['type'][] = ['create', 'link', 'updateManager', 'updateName', 'updateLevel', 'disable'];
 
-export function computeOdooDiff(employees: OdooEmployee[], users: ExistingUser[], opts: DiffOptions): DiffResult {
+export function computeOdooDiff(employeesIn: OdooEmployee[], usersIn: ExistingUser[], opts: DiffOptions): DiffResult {
+  const employees = [...employeesIn].sort((a, b) => a.id - b.id);
+  const users = [...usersIn].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const full = opts.mode !== 'incremental';
   const changes: Change[] = [];
   const skipped: Skip[] = [];
@@ -61,7 +63,7 @@ export function computeOdooDiff(employees: OdooEmployee[], users: ExistingUser[]
   const empById = new Map(employees.map((e) => [e.id, e]));
   const emailCount = new Map<string, number>();
   for (const e of employees) {
-    const m = normEmail(e.email);
+    const m = e.active ? normEmail(e.email) : null;
     if (m) emailCount.set(m, (emailCount.get(m) ?? 0) + 1);
   }
   const userByEmpId = new Map<number, ExistingUser>();
@@ -77,6 +79,7 @@ export function computeOdooDiff(employees: OdooEmployee[], users: ExistingUser[]
   const claimed = new Set<string>(); // user ids
   for (const [eid, u] of userByEmpId) if (empById.has(eid)) { matched.set(eid, u); claimed.add(u.id); }
   const toCreate: OdooEmployee[] = [];
+  const relinked = new Set<string>();
   const sorted = [...employees].sort((a, b) => a.id - b.id);
   for (const e of sorted) {
     if (matched.has(e.id)) continue;
@@ -85,23 +88,36 @@ export function computeOdooDiff(employees: OdooEmployee[], users: ExistingUser[]
     if (!em) { skipped.push({ employeeId: e.id, reason: 'noEmail' }); continue; }
     if ((emailCount.get(em) ?? 0) > 1) { skipped.push({ employeeId: e.id, reason: 'duplicateEmail' }); continue; }
     const u = userByEmail.get(em);
-    if (u && !claimed.has(u.id) && u.odooEmployeeId === null) {
+    if (!u) {
+      toCreate.push(e);
+    } else if (u.odooEmployeeId === null) {
+      if (claimed.has(u.id)) continue;
       matched.set(e.id, u);
       claimed.add(u.id);
       changes.push({ key: `link:${u.id}`, type: 'link', userId: u.id, employeeId: e.id });
-    } else if (!u) {
-      toCreate.push(e);
+    } else {
+      const x = empById.get(u.odooEmployeeId);
+      if (!x || !x.active) {
+        // rehire / new Odoo record: re-link the user to the active employee
+        if (x && matched.get(x.id) === u) matched.delete(x.id);
+        matched.set(e.id, u);
+        relinked.add(u.id);
+        changes.push({ key: `link:${u.id}`, type: 'link', userId: u.id, employeeId: e.id });
+      } else {
+        skipped.push({ employeeId: e.id, userId: u.id, reason: 'duplicateEmail' });
+      }
     }
-    // email owned by a user already linked to another employee: nothing safe to do
   }
   const creating = new Set(toCreate.map((e) => e.id));
 
+  const disabling = new Set<string>();
   // Disable + untouchedLocal
   const untouchedLocal: string[] = [];
   for (const u of users) {
     const eid = u.odooEmployeeId;
     const emp = eid !== null ? empById.get(eid) : undefined;
-    if (eid !== null && (!emp || !emp.active)) {
+    if (eid !== null && (!emp || !emp.active) && !relinked.has(u.id)) {
+      if (full && !u.isAdmin && !u.disabled) disabling.add(u.id);
       if (full && !u.isAdmin && !u.disabled) changes.push({ key: `disable:${u.id}`, type: 'disable', userId: u.id });
     } else if (!claimed.has(u.id) && u.source === 'local') {
       untouchedLocal.push(u.id);
@@ -112,7 +128,11 @@ export function computeOdooDiff(employees: OdooEmployee[], users: ExistingUser[]
   type Node = { id: string; employeeId: number; user?: ExistingUser; proposed: boolean; desired: ManagerRef | null; current: string | null };
   const nodes = new Map<string, Node>();
   const nodeOfEmployee = (id: number): string | null =>
-    creating.has(id) ? `e:${id}` : matched.has(id) ? `u:${matched.get(id)!.id}` : null;
+    creating.has(id)
+      ? `e:${id}`
+      : matched.has(id) && !matched.get(id)!.disabled && !disabling.has(matched.get(id)!.id)
+        ? `u:${matched.get(id)!.id}`
+        : null;
   const refOf = (nid: string): ManagerRef => (nid.startsWith('u:') ? { userId: nid.slice(2) } : { employeeId: Number(nid.slice(2)) });
 
   for (const u of users) {
@@ -133,10 +153,9 @@ export function computeOdooDiff(employees: OdooEmployee[], users: ExistingUser[]
       const node = nodes.get(`u:${u.id}`)!;
       node.employeeId = e.id;
       if (!r.ok) skipped.push({ employeeId: e.id, userId: u.id, reason: 'managerNoAccount' });
-      else {
-        const cur = u.managerId ? `u:${u.managerId}` : null;
-        if (r.node !== cur) { node.proposed = true; node.desired = r.node ? refOf(r.node) : null; }
-      }
+      const target = r.ok ? r.node : null;
+      const cur = u.managerId ? `u:${u.managerId}` : null;
+      if (target !== cur) { node.proposed = true; node.desired = target ? refOf(target) : null; }
     } else if (u) {
       nodes.get(`u:${u.id}`)!.employeeId = e.id;
     } else if (creating.has(e.id)) {
