@@ -2,18 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { count, eq } from 'drizzle-orm';
 import { tasks, users } from '@/db/schema';
 import { testDb } from '../helpers/db';
-import { assertDemoDatabase, DEMO_PASSWORD, seedDemo } from '../../scripts/seed-demo';
+import { assertDemoDatabase, DEMO_PASSWORD, runSeedDemo, seedDemo } from '../../scripts/seed-demo';
 import { verifyPassword } from '@/server/auth/password';
 import { needsAttention, teamOverview } from '@/server/tasks/queries';
 
 describe('assertDemoDatabase', () => {
-  it('refuses database names without "demo"', () => {
-    expect(() => assertDemoDatabase('postgres://u:p@localhost:5432/agentsync_test')).toThrow(/demo/);
-    expect(() => assertDemoDatabase('postgres://u:p@localhost:5432/agentsync')).toThrow(/demo/);
+  it.each(['agentsync_test', 'agentsync', 'demo_prod', 'agentsync_nodemo'])('rejects %s', (name) => {
+    expect(() => assertDemoDatabase(`postgres://u:p@localhost:5432/${name}`)).toThrow(/not a demo database/);
+  });
+  it('rejects an invalid url', () => {
     expect(() => assertDemoDatabase('not a url')).toThrow();
   });
-  it('accepts a demo database name', () => {
-    expect(() => assertDemoDatabase('postgres://u:p@localhost:5432/agentsync_demo')).not.toThrow();
+  it.each(['agentsync_demo', 'x-demo', 'shop_demo'])('accepts %s', (name) => {
+    expect(() => assertDemoDatabase(`postgres://u:p@localhost:5432/${name}`)).not.toThrow();
+  });
+  it('runSeedDemo refuses a non-demo database even without --reset', async () => {
+    await expect(runSeedDemo('postgres://u:p@localhost:5432/agentsync', 'en', false)).rejects.toThrow(/not a demo database/);
+    await expect(runSeedDemo('postgres://u:p@localhost:5432/agentsync', 'en', true)).rejects.toThrow(/not a demo database/);
   });
 });
 

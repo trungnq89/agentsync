@@ -8,7 +8,7 @@ Mất khoảng 5 phút. Bạn cần: địa chỉ AgentSync của công ty (ví 
 
 Thư mục `plugins/agentsync` nằm trong mã nguồn AgentSync. Xin admin đường dẫn tải về: `<LINK_DO_ADMIN_CUNG_CAP>`. Hai cách:
 
-- Clone: `git clone <LINK_DO_ADMIN_CUNG_CAP> ~/agentsync`, thư mục plugin là `~/agentsync/plugins/agentsync`.
+- Clone: `git clone https://github.com/trungnq89/agentsync.git ~/agentsync` (hoặc `git clone <LINK_DO_ADMIN_CUNG_CAP> ~/agentsync` nếu dùng bản fork riêng), thư mục plugin là `~/agentsync/plugins/agentsync`.
 - Hoặc tải file zip từ link, giải nén vào `~/agentsync`.
 
 Các ví dụ dưới đây giả định plugin ở `/Users/ten-ban/agentsync/plugins/agentsync` (macOS). Thay `ten-ban` bằng tên tài khoản của bạn (chạy `echo $HOME` để xem), và dùng đường dẫn tuyệt đối đầy đủ.

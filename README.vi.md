@@ -20,13 +20,15 @@ English: [README.md](README.md)
   </tr>
 </table>
 
+> **Trạng thái:** bản phát hành sớm. Plugin agent và hook checkpoint đã có kiểm thử tự động nhưng chưa chạy thử trên bản cài thật của Claude Code, Codex hay Antigravity. Đồng bộ Odoo mới chỉ được kiểm thử với Odoo giả lập. Nếu gặp lỗi, hãy tạo issue.
+
 Ảnh chụp dùng dữ liệu demo được tạo sẵn (xem [Dùng thử với dữ liệu demo](#dùng-thử-với-dữ-liệu-demo)).
 
 ## Tính năng
 
 - **Bảng cho quản lý:** nhân sự chia theo cấp, danh sách "cần chú ý" (chờ xác nhận, chờ review, đang kẹt, trễ hạn, lâu không cập nhật) và timeline từng người.
 - **Plan do agent viết, quản lý xác nhận:** agent của thành viên soạn plan; quản lý trực tiếp xác nhận hoặc yêu cầu sửa. Các thay đổi plan sau đó được lưu thành các bản điều chỉnh.
-- **Hook Stop (checkpoint):** sau mỗi lượt của agent, hook nhắc agent báo cáo các bước đã xong. Dùng được với Claude Code, Codex và Antigravity.
+- **Hook Stop (checkpoint):** sau mỗi lượt của agent, hook nhắc agent báo cáo các bước đã xong. Hỗ trợ Claude Code, Codex và Antigravity (chưa thử trên bản cài thật).
 - **MCP cho thành viên và quản lý:** agent của thành viên đồng bộ plan, tiến độ và câu hỏi; agent của quản lý đọc được bảng và gửi phản hồi.
 - **Review giải pháp cho việc code:** hoàn thành việc dạng project sẽ gửi tóm tắt giải pháp (vấn đề, giải pháp, phương án đã loại, rủi ro, kiểm thử, link PR) cho quản lý review.
 - **Phân quyền theo quản lý trực tiếp và việc riêng tư:** chỉ quản lý trực tiếp mới thấy việc của một người; một việc có thể để riêng tư cho chủ sở hữu.
@@ -36,7 +38,7 @@ English: [README.md](README.md)
 
 ## Bắt đầu nhanh (Docker)
 
-1. Clone repository rồi vào thư mục.
+1. Clone repository rồi vào thư mục: `git clone https://github.com/trungnq89/agentsync.git && cd agentsync` (hoặc đường dẫn admin cấp cho bản fork riêng).
 2. Tạo file môi trường và điền giá trị:
 
    ```bash
@@ -62,13 +64,15 @@ English: [README.md](README.md)
 6. Mỗi người vào **Cài đặt** và tạo token agent.
 7. Cài plugin và kết nối agent: [docs/install-agent.vi.md](docs/install-agent.vi.md).
 
+Container `app` tự chạy migration mỗi lần khởi động; dữ liệu nằm trong volume `pgdata`. Nếu `app` cứ khởi động lại liên tục, xem log: `docker compose -f docker-compose.prod.yml logs app`. Không có dịch vụ ngoài lúc chạy: không CDN, không analytics, font Inter được đóng gói sẵn.
+
 ## Dùng thử với dữ liệu demo
 
-Bạn có thể xem một bảng đầy dữ liệu mà không đụng tới cơ sở dữ liệu thật. Script seed từ chối xóa bất kỳ cơ sở dữ liệu nào có tên không chứa `demo`.
+Bạn có thể xem một bảng đầy dữ liệu mà không đụng tới cơ sở dữ liệu thật. Script seed từ chối chạy trên mọi cơ sở dữ liệu có tên không phải `agentsync_demo` hoặc không kết thúc bằng `_demo` hay `-demo`.
 
 ```bash
 cp .env.example .env
-docker compose up -d db                                    # Postgres khi phát triển (cổng DB_PORT, mặc định 5432)
+docker compose up -d --wait db                              # Postgres khi phát triển (cổng DB_PORT, mặc định 5432)
 docker compose exec db createdb -U agentsync agentsync_demo
 pnpm install
 export DATABASE_URL=postgres://agentsync:agentsync@localhost:5432/agentsync_demo   # dùng đúng DB_PORT của bạn
@@ -149,7 +153,7 @@ SEED_ADMIN_PASSWORD='mat-khau-dai-hon-12-ky-tu' pnpm seed:admin --username admin
 pnpm dev                      # http://localhost:3000
 ```
 
-Kiểm tra: `pnpm test` (vitest), `pnpm e2e` (Playwright), `pnpm typecheck`, `pnpm lint`.
+Test dùng các cơ sở dữ liệu trong `DATABASE_URL_TEST` và `DATABASE_URL_E2E` của `.env` (được script khởi tạo của compose tạo sẵn). Kiểm tra: `pnpm test` (vitest), `pnpm e2e` (Playwright), `pnpm typecheck`, `pnpm lint`.
 
 Kiểm tra khói MCP (tạo một việc thật, nên dùng tài khoản member tạm):
 
@@ -165,7 +169,7 @@ In `SMOKE OK` nếu thành công, thoát mã khác 0 nếu có lỗi.
 - Toàn bộ nghiệp vụ là hàm thuần trong `src/server/` (nhận `db, actor, input`), mọi kiểm tra quyền đi qua `src/server/authz.ts`.
 - Web (RSC + server actions, tiếng Việt và tiếng Anh) và MCP (`POST /api/mcp`, Streamable HTTP, xác thực bằng token `ags_...`) chỉ là lớp mỏng gọi vào đó.
 - Schema và migration bằng Drizzle (`src/db/schema.ts`, thư mục `drizzle/`).
-- Gói skill cho agent nằm ở `plugins/agentsync` (Claude Code + Codex).
+- Gói skill cho agent nằm ở `plugins/agentsync` (Claude Code, Codex và một mẫu cho Antigravity).
 
 ## Lưu ý bảo mật
 
@@ -177,4 +181,4 @@ In `SMOKE OK` nếu thành công, thoát mã khác 0 nếu có lỗi.
 
 ## Giấy phép
 
-MIT — xem LICENSE.
+MIT — xem [LICENSE](LICENSE).

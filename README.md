@@ -20,13 +20,15 @@ Stop asking "how's it going?". AgentSync is a self-hosted app where managers fol
   </tr>
 </table>
 
+> **Status:** early release. The agent plugin and the checkpoint hook are covered by automated tests but have not yet been run on real Claude Code, Codex or Antigravity installs. Odoo sync is tested against a mocked Odoo only. Please report problems as issues.
+
 Screenshots show generated demo data (see [Try it with demo data](#try-it-with-demo-data)).
 
 ## Features
 
 - **Manager board:** people grouped by level, a "needs your attention" list (pending confirmation, awaiting review, blocked, overdue, not updated for a while) and a per-person timeline.
 - **Plans written by agents, confirmed by managers:** the member's agent drafts the plan; the direct manager confirms it or asks for changes. Later plan changes are kept as revisions.
-- **Checkpoint Stop hook:** after each agent turn, a hook nudges the agent to report finished steps. Works with Claude Code, Codex and Antigravity.
+- **Checkpoint Stop hook:** after each agent turn, a hook nudges the agent to report finished steps. Supports Claude Code, Codex and Antigravity (not yet tried on real installs).
 - **MCP for members and managers:** members' agents sync plans, progress and questions; managers' agents can read the board and give feedback.
 - **Solution review for code tasks:** finishing a project task sends a solution summary (problem, solution, alternatives, risks, testing, PR link) to the manager for review.
 - **Direct-manager permissions and private tasks:** only a person's direct manager sees their tasks; a task can be private to its owner.
@@ -36,7 +38,7 @@ Screenshots show generated demo data (see [Try it with demo data](#try-it-with-d
 
 ## Quick start (Docker)
 
-1. Clone the repository and enter it.
+1. Clone the repository and enter it: `git clone https://github.com/trungnq89/agentsync.git && cd agentsync` (or the link your admin gave you for a private fork).
 2. Create your environment file and fill it in:
 
    ```bash
@@ -62,13 +64,15 @@ Screenshots show generated demo data (see [Try it with demo data](#try-it-with-d
 6. Each person opens **Settings** and creates an agent token.
 7. Install the agent plugin and connect your agent: [docs/install-agent.md](docs/install-agent.md).
 
+The `app` container runs migrations on every start; data lives in the `pgdata` volume. If `app` keeps restarting, check `docker compose -f docker-compose.prod.yml logs app`. There are no external services at runtime: no CDN, no analytics, and the Inter font is bundled.
+
 ## Try it with demo data
 
-You can explore a populated board without touching a real database. The seed script refuses to wipe any database whose name does not contain `demo`.
+You can explore a populated board without touching a real database. The seed script refuses to run on any database whose name is not `agentsync_demo` or does not end with `_demo` or `-demo`.
 
 ```bash
 cp .env.example .env
-docker compose up -d db                                    # development Postgres (port DB_PORT, default 5432)
+docker compose up -d --wait db                              # development Postgres (port DB_PORT, default 5432)
 docker compose exec db createdb -U agentsync agentsync_demo
 pnpm install
 export DATABASE_URL=postgres://agentsync:agentsync@localhost:5432/agentsync_demo   # use your DB_PORT
@@ -149,7 +153,7 @@ SEED_ADMIN_PASSWORD='a-password-longer-than-12-chars' pnpm seed:admin --username
 pnpm dev                      # http://localhost:3000
 ```
 
-Checks: `pnpm test` (vitest), `pnpm e2e` (Playwright), `pnpm typecheck`, `pnpm lint`.
+Tests use the databases from `DATABASE_URL_TEST` and `DATABASE_URL_E2E` in `.env` (created by the compose init script). Checks: `pnpm test` (vitest), `pnpm e2e` (Playwright), `pnpm typecheck`, `pnpm lint`.
 
 MCP smoke test (creates a real task, so use a throwaway member account):
 
@@ -165,7 +169,7 @@ It prints `SMOKE OK` on success and exits non-zero on any error.
 - All business logic is plain functions in `src/server/` (taking `db, actor, input`); every permission check goes through `src/server/authz.ts`.
 - The web UI (RSC + server actions, English and Vietnamese) and MCP (`POST /api/mcp`, Streamable HTTP, authenticated with `ags_...` tokens) are thin layers over it.
 - Schema and migrations use Drizzle (`src/db/schema.ts`, `drizzle/`).
-- The agent skill bundle lives in `plugins/agentsync` (Claude Code + Codex).
+- The agent skill bundle lives in `plugins/agentsync` (Claude Code, Codex and an Antigravity template).
 
 ## Security notes
 

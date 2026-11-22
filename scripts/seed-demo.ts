@@ -22,7 +22,7 @@ export const DEMO_PASSWORD = 'demo-password-123';
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 
-/** The database name (last path segment of the URL) must contain "demo" before anything is wiped. */
+/** The database name (last path segment of the URL) must be agentsync_demo or end with _demo / -demo. Checked before any write. */
 export function assertDemoDatabase(databaseUrl: string): void {
   let name = '';
   try {
@@ -30,8 +30,8 @@ export function assertDemoDatabase(databaseUrl: string): void {
   } catch {
     throw new Error('seed:demo refused: DATABASE_URL is not a valid URL.');
   }
-  if (!name.toLowerCase().includes('demo')) {
-    throw new Error(`seed:demo --reset refused: database "${name}" does not contain "demo". Use a dedicated demo database (for example agentsync_demo).`);
+  if (!(name === 'agentsync_demo' || name.endsWith('_demo') || name.endsWith('-demo'))) {
+    throw new Error(`seed:demo refused: database "${name}" is not a demo database (its name must be agentsync_demo or end with _demo or -demo).`);
   }
 }
 
@@ -334,6 +334,18 @@ function arg(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
+/** Seeds the demo database named by `url`; the demo-name guard always runs first, with or without --reset. */
+export async function runSeedDemo(url: string, lang: DemoLang, reset: boolean): Promise<DemoSummary> {
+  assertDemoDatabase(url);
+  const db = createDb(url);
+  try {
+    if (reset) await wipeDatabase(db);
+    return await seedDemo(db, { lang });
+  } finally {
+    await db.$client.end();
+  }
+}
+
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -345,14 +357,8 @@ async function main() {
     console.error('--lang must be en or vi');
     process.exit(1);
   }
-  const reset = process.argv.includes('--reset');
-  const db = createDb(url);
   try {
-    if (reset) {
-      assertDemoDatabase(url);
-      await wipeDatabase(db);
-    }
-    const summary = await seedDemo(db, { lang });
+    const summary = await runSeedDemo(url, lang, process.argv.includes('--reset'));
     console.log(`Seeded ${summary.users} users and ${summary.tasks} tasks (${lang}).`);
     console.log('');
     console.log('DEMO ONLY - every demo account uses this shared password. Never use it on a real install.');
@@ -362,8 +368,6 @@ async function main() {
   } catch (e) {
     console.error(e instanceof Error ? e.message : String(e));
     process.exitCode = 1;
-  } finally {
-    await db.$client.end();
   }
 }
 

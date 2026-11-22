@@ -8,7 +8,7 @@ Takes about 5 minutes. You need: your company's AgentSync address (for example `
 
 The `plugins/agentsync` folder is part of the AgentSync source. Ask your admin for the download link: `<LINK_FROM_YOUR_ADMIN>`. Two ways:
 
-- Clone: `git clone <LINK_FROM_YOUR_ADMIN> ~/agentsync`; the plugin folder is `~/agentsync/plugins/agentsync`.
+- Clone: `git clone https://github.com/trungnq89/agentsync.git ~/agentsync` (or `git clone <LINK_FROM_YOUR_ADMIN> ~/agentsync` for a private fork); the plugin folder is `~/agentsync/plugins/agentsync`.
 - Or download the zip from the link and unpack it into `~/agentsync`.
 
 The examples below assume the plugin is at `/Users/your-name/agentsync/plugins/agentsync` (macOS). Replace `your-name` with your account name (run `echo $HOME` to see it) and use the full absolute path.
