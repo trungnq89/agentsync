@@ -9,6 +9,7 @@ import { isUuid } from '../ids';
 import { decryptSecret, encryptSecret } from '../secret';
 import { createOdooClient, type OdooConnection, type OdooEmployee } from './client';
 import { computeOdooDiff, type Change, type DiffResult, type ExistingUser, type Mode } from './diff';
+import { buildPreviewView, type PreviewView } from './preview-view';
 import { loadOdooConnection } from './settings';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -86,6 +87,14 @@ export async function previewSync(db: Db, actor: Actor, mode?: Mode, deps: SyncD
     await recordFailure(db, run.id, e);
     throw e;
   }
+}
+
+/** previewSync plus display names for the admin UI (admin only). */
+export async function previewSyncView(db: Db, actor: Actor, deps: SyncDeps = {}): Promise<PreviewView> {
+  requireAdmin(actor);
+  const mode = await currentMode(db);
+  const { runId, ...diff } = await previewSync(db, actor, mode, deps);
+  return buildPreviewView(db, runId, mode, diff);
 }
 
 type Cur = {
@@ -311,6 +320,9 @@ async function applyRun(
 export async function applySync(db: Db, actor: Actor, runId: string, selectedKeys?: string[], now: Date = new Date()) {
   requireAdmin(actor);
   if (!isUuid(runId)) throw new DomainError('NOT_FOUND', 'odooRunNotFound');
+  if (selectedKeys !== undefined && (!Array.isArray(selectedKeys) || selectedKeys.some((k) => typeof k !== 'string'))) {
+    throw new DomainError('VALIDATION', 'odooSelectionInvalid');
+  }
   return applyRun(db, runId, selectedKeys, now, false);
 }
 

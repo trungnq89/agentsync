@@ -38,7 +38,7 @@ describe('odoo diff', () => {
   it('employee without email → skip noEmail', () => {
     const r = computeOdooDiff([emp(1, { email: null })], [], opts());
     expect(r.changes).toEqual([]);
-    expect(r.skipped).toEqual([{ employeeId: 1, reason: 'noEmail' }]);
+    expect(r.skipped).toEqual([{ employeeId: 1, name: 'E1', reason: 'noEmail' }]);
   });
 
   it('two employees same email → both skip duplicateEmail', () => {
@@ -70,7 +70,7 @@ describe('odoo diff', () => {
   it('manager employee has no email → skip managerNoAccount, managerRef null', () => {
     const r = computeOdooDiff([emp(1, { email: null }), emp(2, { managerId: 1 })], [], opts());
     expect(r.changes.find((c) => c.key === 'create:e2')).toMatchObject({ managerRef: null });
-    expect(r.skipped).toContainEqual({ employeeId: 2, reason: 'managerNoAccount' });
+    expect(r.skipped).toContainEqual({ employeeId: 2, name: 'E2', reason: 'managerNoAccount' });
   });
 
   it('A→B→A cycle → skip managerCycle for both, no updateManager', () => {
@@ -146,7 +146,7 @@ describe('odoo diff', () => {
     const users = [usr('u1', { email: 'a@x.com', source: 'odoo', odooEmployeeId: 1, displayName: 'E1' })];
     const r = computeOdooDiff([emp(1, { email: 'other@x.com' }), emp(2, { email: 'a@x.com' })], users, opts());
     expect(r.changes).toEqual([]);
-    expect(r.skipped).toEqual([{ employeeId: 2, userId: 'u1', reason: 'duplicateEmail' }]);
+    expect(r.skipped).toEqual([{ employeeId: 2, name: 'E2', userId: 'u1', reason: 'duplicateEmail' }]);
   });
 
   it('inactive manager whose user gets disabled → updateManager null + managerNoAccount', () => {
@@ -164,13 +164,13 @@ describe('odoo diff', () => {
   it('parent_id to non-existent employee → managerNoAccount; create gets null', () => {
     const r = computeOdooDiff([emp(1, { managerId: 77 })], [], opts());
     expect(r.changes[0]).toMatchObject({ managerRef: null });
-    expect(r.skipped).toEqual([{ employeeId: 1, reason: 'managerNoAccount' }]);
+    expect(r.skipped).toEqual([{ employeeId: 1, name: 'E1', reason: 'managerNoAccount' }]);
   });
 
   it('self-manager → skip managerCycle, no manager change', () => {
     const r = computeOdooDiff([emp(1, { managerId: 1 })], [], opts());
     expect(r.changes[0]).toMatchObject({ type: 'create', managerRef: null });
-    expect(r.skipped).toEqual([{ employeeId: 1, reason: 'managerCycle' }]);
+    expect(r.skipped).toEqual([{ employeeId: 1, name: 'E1', reason: 'managerCycle' }]);
   });
 
   it('admin who is also an employee gets updates but never disable', () => {

@@ -11,6 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { saveMappingAction } from '../../../_actions/odoo';
 import { LEVELS } from '../../_components/fields';
+import { withToast } from './with-toast';
+
+const saved = withToast(saveMappingAction);
 
 type Row = { id: number; pattern: string; level: string };
 
@@ -37,7 +40,7 @@ export function MappingCard({ enabled, mappings }: { enabled: boolean; mappings:
         <CardDescription>{t('mappingDesc')}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ActionForm action={saveMappingAction} className="space-y-4" testId="odoo-mapping-form">
+        <ActionForm action={saved} className="space-y-4" testId="odoo-mapping-form">
           <div className="flex items-center gap-2">
             <Checkbox id={enabledId} name="titleMappingEnabled" defaultChecked={enabled} />
             <Label htmlFor={enabledId}>{t('mappingEnabled')}</Label>

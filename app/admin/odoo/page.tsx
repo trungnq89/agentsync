@@ -57,8 +57,8 @@ export default async function AdminOdooPage() {
           encryptionReady: settings.encryptionReady,
         }}
       />
-      <ModeCard mode={settings.mode} scheduleHours={settings.scheduleHours} />
-      <MappingCard enabled={settings.titleMappingEnabled} mappings={settings.titleMappings} />
+      <ModeCard key={`${settings.mode}-${settings.scheduleHours}`} mode={settings.mode} scheduleHours={settings.scheduleHours} />
+      <MappingCard key={`${settings.titleMappingEnabled}-${JSON.stringify(settings.titleMappings)}`} enabled={settings.titleMappingEnabled} mappings={settings.titleMappings} />
       <SyncPanel mode={settings.mode} locked={!settings.encryptionReady || !settings.hasApiKey} pendingCount={pendingCount} />
 
       <Card>

@@ -39,6 +39,19 @@ async function rejects(p: Promise<unknown>) {
 }
 const byEmail = async (email: string) => (await testDb.select().from(users).where(eq(users.email, email)))[0];
 
+describe('applySync selection validation', () => {
+  it('rejects non-array / non-string selections without failing the run', async () => {
+    const p = await previewSync(testDb, admin);
+    for (const bad of ['create:e1', [1, 2], { a: 1 }]) {
+      const err = await rejects(applySync(testDb, admin, p.runId, bad as unknown as string[]));
+      expect(err.key).toBe('odooSelectionInvalid');
+      expect(err.code).toBe('VALIDATION');
+    }
+    const [run] = await testDb.select().from(odooSyncRuns).where(eq(odooSyncRuns.id, p.runId));
+    expect(run.status).toBe('previewed');
+  });
+});
+
 describe('odoo sync', () => {
   it('preview stores run and returns changes', async () => {
     const p = await previewSync(testDb, admin);

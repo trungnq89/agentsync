@@ -29,6 +29,8 @@ export type Change =
 
 export type Skip = {
   employeeId?: number;
+  /** Odoo employee name, when the skip concerns an employee. */
+  name?: string;
   userId?: string;
   reason: 'noEmail' | 'duplicateEmail' | 'managerCycle' | 'managerNoAccount';
 };
@@ -231,5 +233,9 @@ export function computeOdooDiff(employeesIn: OdooEmployee[], usersIn: ExistingUs
   changes.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   skipped.sort((a, b) => (a.employeeId ?? 0) - (b.employeeId ?? 0) || (a.userId ?? '').localeCompare(b.userId ?? '') || a.reason.localeCompare(b.reason));
   untouchedLocal.sort();
-  return { changes, skipped, untouchedLocal };
+  const named = skipped.map((s) => {
+    const n = s.employeeId !== undefined ? empById.get(s.employeeId)?.name : undefined;
+    return n ? { ...s, name: n } : s;
+  });
+  return { changes, skipped: named, untouchedLocal };
 }

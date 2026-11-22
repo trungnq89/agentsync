@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { saveModeAction } from '../../../_actions/odoo';
+import { withToast } from './with-toast';
 
+const saved = withToast(saveModeAction);
 const MODES = ['review', 'full', 'incremental'] as const;
 const SCHEDULES = [0, 1, 6, 24] as const;
 type Mode = (typeof MODES)[number];
@@ -24,7 +26,7 @@ export function ModeCard({ mode: initial, scheduleHours }: { mode: Mode; schedul
         <CardTitle>{t('modeTitle')}</CardTitle>
       </CardHeader>
       <CardContent>
-        <ActionForm action={saveModeAction} className="grid gap-4 sm:grid-cols-2" testId="odoo-mode-form">
+        <ActionForm action={saved} className="grid gap-4 sm:grid-cols-2" testId="odoo-mode-form">
           <FormField name="mode" label={t('mode')} hint={t(MODE_DESC[mode])}>
             <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
               <SelectTrigger>

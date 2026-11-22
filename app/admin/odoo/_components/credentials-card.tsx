@@ -12,7 +12,7 @@ const csvCell = (v: string) => {
 };
 
 /** Temporary passwords, shown once. The CSV is built here from state; nothing is sent to the server. */
-export function CredentialsCard({ credentials }: { credentials: Cred[] }) {
+export function CredentialsCard({ credentials, onDismiss }: { credentials: Cred[]; onDismiss: () => void }) {
   const t = useTranslations('odoo');
   const copy = async () => {
     try {
@@ -52,6 +52,9 @@ export function CredentialsCard({ credentials }: { credentials: Cred[] }) {
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={download}>
             {t('downloadCsv')}
+          </Button>
+          <Button type="button" size="sm" onClick={onDismiss} data-testid="credentials-dismiss">
+            {t('credentialsDismiss')}
           </Button>
         </div>
       </CardContent>

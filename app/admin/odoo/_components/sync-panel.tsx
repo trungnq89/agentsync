@@ -40,6 +40,7 @@ export function SyncPanel({ mode, locked, pendingCount }: { mode: string; locked
   const [counts, setCounts] = useState<Counts | null>(null);
   const [creds, setCreds] = useState<Cred[] | null>(null);
   const [pendingLeft, setPendingLeft] = useState(pendingCount);
+  const hasCreds = !!creds && creds.length > 0;
   const review = preview?.mode === 'review';
 
   const blocked = useMemo(
@@ -129,15 +130,17 @@ export function SyncPanel({ mode, locked, pendingCount }: { mode: string; locked
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={doPreview} disabled={locked || pending} loading={pending}>
+            <Button type="button" onClick={doPreview} disabled={locked || pending || hasCreds} loading={pending}>
               {t('preview')}
             </Button>
             {mode === 'incremental' && (
-              <Button type="button" variant="outline" onClick={doRunNow} disabled={locked || pending}>
+              <Button type="button" variant="outline" onClick={doRunNow} disabled={locked || pending || hasCreds}>
                 {t('runNow')}
               </Button>
             )}
           </div>
+
+          {hasCreds && <p className="text-sm text-muted-foreground">{t('credentialsLocked')}</p>}
 
           {error && (
             <p role="alert" data-testid="odoo-sync-error" className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger-foreground">
@@ -209,7 +212,7 @@ export function SyncPanel({ mode, locked, pendingCount }: { mode: string; locked
                   <ul className="space-y-1 text-sm text-muted-foreground">
                     {preview.skipped.map((s, i) => (
                       <li key={i} className="break-words">
-                        {s.who}: {t(`skip_${s.reason}`)}
+                        {s.name ?? '?'}{s.employeeId !== undefined ? ` (#${s.employeeId})` : ''}: {t(`skip_${s.reason}`)}
                       </li>
                     ))}
                   </ul>
@@ -238,7 +241,7 @@ export function SyncPanel({ mode, locked, pendingCount }: { mode: string; locked
         </CardContent>
       </Card>
 
-      {creds && creds.length > 0 && <CredentialsCard credentials={creds} />}
+      {creds && creds.length > 0 && <CredentialsCard credentials={creds} onDismiss={() => setCreds(null)} />}
 
       <Card>
         <CardHeader>
@@ -247,7 +250,7 @@ export function SyncPanel({ mode, locked, pendingCount }: { mode: string; locked
         </CardHeader>
         <CardContent>
           {pendingLeft > 0 ? (
-            <Button type="button" variant="outline" onClick={reveal} disabled={pending}>
+            <Button type="button" variant="outline" onClick={reveal} disabled={pending || hasCreds}>
               {t('pendingReveal')}
             </Button>
           ) : (

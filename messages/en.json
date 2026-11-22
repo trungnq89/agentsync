@@ -190,7 +190,6 @@
     "tabOdoo": "Odoo"
   },
   "odoo": {
-    "title": "Odoo HR sync",
     "metaTitle": "Odoo",
     "connectionTitle": "Connection",
     "connectionDesc": "Read-only access to the Odoo HR employees. The API key is stored encrypted and never shown again.",
@@ -235,14 +234,12 @@
     "syncTitle": "Synchronize",
     "syncDesc": "Preview shows what would change. Nothing is written until you apply.",
     "preview": "Preview",
-    "previewing": "Loading...",
     "apply": "Apply",
     "applyTitle": "Apply these changes?",
     "applyDesc": "{count} change(s) will be applied.",
     "applyFullWarning": "Full mode overwrites names, managers and levels of linked accounts with the Odoo values and disables accounts that are no longer active in Odoo. Admin accounts are never disabled.",
     "applyDone": "Sync applied",
     "runNow": "Run now",
-    "runNowDone": "Sync finished",
     "noChanges": "Nothing to change.",
     "selectChange": "Apply this change",
     "type_create": "Create account",
@@ -265,8 +262,6 @@
     "resultCounts": "Created {created}, linked {linked}, updated {updated}, disabled {disabled}, skipped {skipped}",
     "credentialsTitle": "Temporary passwords",
     "credentialsDesc": "Shown only once. Share each password with its owner; they must change it at first sign-in.",
-    "colEmail": "Email",
-    "colPassword": "Password",
     "copy": "Copy all",
     "copied": "Copied",
     "downloadCsv": "Download CSV",
@@ -276,18 +271,15 @@
     "pendingNone": "No pending passwords.",
     "historyTitle": "Sync history",
     "historyEmpty": "No runs yet.",
-    "colWhen": "When",
-    "colMode": "Mode",
-    "colTrigger": "Trigger",
-    "colRunStatus": "Status",
-    "colCounts": "Counts",
     "trigger_manual": "Manual",
     "trigger_schedule": "Scheduled",
     "status_running": "Running",
     "status_previewed": "Previewed",
     "status_applied": "Applied",
     "status_failed": "Failed",
-    "skippedLabel": "Skipped"
+    "skippedLabel": "Skipped",
+    "credentialsDismiss": "I have saved these passwords",
+    "credentialsLocked": "Dismiss the temporary passwords first; they cannot be shown again."
   },
   "status": {
     "pending_confirmation": "Pending confirmation",
@@ -428,7 +420,8 @@
     "passwordMismatch": "The passwords do not match.",
     "credentialsRequired": "Username and password are required.",
     "systemError": "A system error occurred. Please try again later.",
-    "notFoundHint": "Use list_my_tasks to see your tasks."
+    "notFoundHint": "Use list_my_tasks to see your tasks.",
+    "odooSelectionInvalid": "The selection of changes is invalid. Run a new preview and try again."
   },
   "mcp": {
     "noTasks": "No tasks.",

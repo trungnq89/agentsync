@@ -190,7 +190,6 @@
     "tabOdoo": "Odoo"
   },
   "odoo": {
-    "title": "Đồng bộ nhân sự Odoo",
     "metaTitle": "Odoo",
     "connectionTitle": "Kết nối",
     "connectionDesc": "Truy cập chỉ đọc vào danh sách nhân viên Odoo HR. Khóa API được lưu mã hóa và không hiện lại.",
@@ -235,14 +234,12 @@
     "syncTitle": "Đồng bộ",
     "syncDesc": "Xem trước cho biết những gì sẽ thay đổi. Chưa có gì được ghi cho tới khi bạn áp dụng.",
     "preview": "Xem trước",
-    "previewing": "Đang tải...",
     "apply": "Áp dụng",
     "applyTitle": "Áp dụng các thay đổi này?",
     "applyDesc": "Sẽ áp dụng {count} thay đổi.",
     "applyFullWarning": "Chế độ toàn bộ sẽ ghi đè tên, quản lý và cấp của các tài khoản đã liên kết bằng dữ liệu Odoo, và vô hiệu hóa tài khoản không còn hoạt động trong Odoo. Tài khoản admin không bao giờ bị vô hiệu hóa.",
     "applyDone": "Đã áp dụng đồng bộ",
     "runNow": "Chạy ngay",
-    "runNowDone": "Đã chạy xong",
     "noChanges": "Không có gì để thay đổi.",
     "selectChange": "Áp dụng thay đổi này",
     "type_create": "Tạo tài khoản",
@@ -265,8 +262,6 @@
     "resultCounts": "Tạo {created}, liên kết {linked}, cập nhật {updated}, vô hiệu hóa {disabled}, bỏ qua {skipped}",
     "credentialsTitle": "Mật khẩu tạm",
     "credentialsDesc": "Chỉ hiện một lần. Hãy gửi từng mật khẩu cho chủ tài khoản; họ phải đổi mật khẩu ở lần đăng nhập đầu.",
-    "colEmail": "Email",
-    "colPassword": "Mật khẩu",
     "copy": "Sao chép tất cả",
     "copied": "Đã sao chép",
     "downloadCsv": "Tải CSV",
@@ -276,18 +271,15 @@
     "pendingNone": "Không có mật khẩu nào đang chờ.",
     "historyTitle": "Lịch sử đồng bộ",
     "historyEmpty": "Chưa có lần chạy nào.",
-    "colWhen": "Thời gian",
-    "colMode": "Chế độ",
-    "colTrigger": "Kích hoạt",
-    "colRunStatus": "Trạng thái",
-    "colCounts": "Số lượng",
     "trigger_manual": "Thủ công",
     "trigger_schedule": "Theo lịch",
     "status_running": "Đang chạy",
     "status_previewed": "Đã xem trước",
     "status_applied": "Đã áp dụng",
     "status_failed": "Thất bại",
-    "skippedLabel": "Bỏ qua"
+    "skippedLabel": "Bỏ qua",
+    "credentialsDismiss": "Tôi đã lưu các mật khẩu này",
+    "credentialsLocked": "Hãy đóng bảng mật khẩu tạm trước; không thể hiện lại."
   },
   "status": {
     "pending_confirmation": "Chờ xác nhận",
@@ -428,7 +420,8 @@
     "passwordMismatch": "Mật khẩu nhập lại không khớp.",
     "credentialsRequired": "Cần nhập tên đăng nhập và mật khẩu.",
     "systemError": "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.",
-    "notFoundHint": "Dùng list_my_tasks để xem việc của bạn."
+    "notFoundHint": "Dùng list_my_tasks để xem việc của bạn.",
+    "odooSelectionInvalid": "Lựa chọn thay đổi không hợp lệ. Hãy chạy xem trước mới rồi thử lại."
   },
   "mcp": {
     "noTasks": "Không có việc nào.",

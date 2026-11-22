@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { loginAs } from '../helpers/auth';
+import { createDb } from '../../src/db/client';
+import { users } from '../../src/db/schema';
 import { resetE2eDb } from '../helpers/e2e-db';
 import { startFakeOdoo, type FakeOdooEmployee } from '../helpers/fake-odoo';
 
@@ -82,6 +84,19 @@ test('connection, review-mode apply with unticked row, one-time credentials, for
   const password = (await creds.getByTestId('credential-row').filter({ hasText: 'bob@x.com' }).getByTestId('credential-password').textContent())!.trim();
   expect(password).toHaveLength(16);
 
+  const db = createDb(process.env.DATABASE_URL_E2E!);
+  try {
+    const emails = (await db.select({ email: users.email }).from(users)).map((u) => u.email);
+    expect(emails).toContain('alice@x.com');
+    expect(emails).toContain('bob@x.com');
+    expect(emails).not.toContain('carol@x.com');
+  } finally {
+    await db.$client.end();
+  }
+
+  // One-time passwords are protected: Preview stays disabled until the card is dismissed.
+  await expect(page.getByRole('button', { name: 'Xem trước' })).toBeDisabled();
+
   await page.reload();
   await expect(page.getByTestId('odoo-credentials')).toHaveCount(0);
 
@@ -109,6 +124,9 @@ test('full mode with an admin missing from Odoo keeps the admin working', async 
   await expect(page.getByTestId('odoo-result')).toBeVisible();
   await page.context().clearCookies();
   await loginAs(page, ADMIN.username, ADMIN.password);
+  await expect(page.getByTestId('nav-admin')).toBeVisible();
+  await page.goto('/admin');
+  await expect(page).toHaveURL(/\/admin$/);
 });
 
 test('unticking a manager create warns on the creates that depend on it', async ({ page }) => {
@@ -134,5 +152,48 @@ for (const locale of ['vi', 'en'] as const) {
     await page.getByRole('button', { name: locale === 'vi' ? 'Xem trước' : 'Preview' }).click();
     await expect(page.getByTestId('change-row').first()).toBeVisible();
     expect(await overflow(page)).toBe(false);
+
+    await page.getByRole('button', { name: locale === 'vi' ? 'Áp dụng' : 'Apply' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: locale === 'vi' ? 'Áp dụng' : 'Apply' }).click();
+    await expect(page.getByTestId('odoo-credentials')).toBeVisible();
+    await page.getByTestId('odoo-mapping-form').getByRole('button', { name: locale === 'vi' ? 'Thêm dòng' : 'Add row' }).click();
+    await expect(page.getByTestId('mapping-row')).toHaveCount(1);
+    await expect(page.getByTestId('odoo-run').first()).toBeVisible();
+    expect(await overflow(page)).toBe(false);
   });
 }
+
+test('mode and mapping cards keep the saved values after submit (no form-reset snap-back)', async ({ page }) => {
+  await loginAs(page, ADMIN.username, ADMIN.password);
+  await page.goto('/admin/odoo');
+
+  const modeForm = page.getByTestId('odoo-mode-form');
+  await chooseMode(page, 'Chỉ thêm người mới (tự động)');
+  await expect(modeForm.getByLabel('Chế độ', { exact: true })).toContainText('Chỉ thêm người mới');
+  await expect(modeForm.getByLabel('Chạy mỗi')).toBeVisible();
+
+  const mapForm = page.getByTestId('odoo-mapping-form');
+  await mapForm.getByRole('checkbox', { name: 'Ánh xạ chức danh sang cấp' }).click();
+  await mapForm.getByRole('button', { name: 'Thêm dòng' }).click();
+  await mapForm.getByLabel('Chức danh chứa').fill('CTO');
+  await mapForm.getByRole('row').or(mapForm.getByTestId('mapping-row')).first().getByLabel('Cấp').click();
+  await page.getByRole('option', { name: 'Director', exact: true }).click();
+  await mapForm.getByRole('button', { name: 'Lưu ánh xạ' }).click();
+  await expect(page.getByText('Đã lưu ánh xạ')).toBeVisible();
+  await expect(mapForm.getByRole('checkbox', { name: 'Ánh xạ chức danh sang cấp' })).toBeChecked();
+  await expect(mapForm.getByTestId('mapping-row').getByLabel('Cấp')).toContainText('Director');
+
+  await page.reload();
+  await expect(page.getByTestId('odoo-mode-form').getByLabel('Chế độ', { exact: true })).toContainText('Chỉ thêm người mới');
+  await expect(page.getByTestId('odoo-mapping-form').getByRole('checkbox', { name: 'Ánh xạ chức danh sang cấp' })).toBeChecked();
+  await expect(page.getByTestId('odoo-mapping-form').getByTestId('mapping-row').getByLabel('Cấp')).toContainText('Director');
+});
+
+test('audit: settings send-mode radios keep the saved value after submit', async ({ page }) => {
+  await loginAs(page, ADMIN.username, ADMIN.password);
+  await page.goto('/settings');
+  await page.getByLabel('Tự động', { exact: true }).check();
+  await page.getByRole('button', { name: 'Lưu' }).first().click();
+  await expect(page.getByText('Đã lưu chế độ gửi')).toBeVisible();
+  await expect(page.getByLabel('Tự động', { exact: true })).toBeChecked();
+});
