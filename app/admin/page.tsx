@@ -31,6 +31,7 @@ export default async function AdminPage() {
     user: {
       id: u.id,
       username: u.username,
+      email: u.email,
       displayName: u.displayName,
       level: u.level,
       managerId: u.managerId,
@@ -74,6 +75,9 @@ export default async function AdminPage() {
             </FormField>
             <FormField name="displayName" label={t('displayName')}>
               <Input required />
+            </FormField>
+            <FormField name="email" label={t('email')}>
+              <Input type="email" autoComplete="off" />
             </FormField>
             <FormField name="password" label={t('password')}>
               <Input type="password" autoComplete="new-password" required />

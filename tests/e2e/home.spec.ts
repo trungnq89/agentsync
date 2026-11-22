@@ -105,7 +105,7 @@ for (const locale of ['vi-VN', 'en-US']) {
     const ctx = await browser.newContext({ viewport: { width: 375, height: 800 }, locale, baseURL });
     const page = await ctx.newPage();
     await page.goto('/login');
-    await page.getByLabel(/^(Tên đăng nhập|Username)$/).fill('manager1');
+    await page.getByLabel(/^(Tên đăng nhập|Username)/).fill('manager1');
     await page.getByLabel(/^(Mật khẩu|Password)$/).fill(PW);
     await page.getByRole('button', { name: /^(Đăng nhập|Sign in)$/ }).click();
     await expect(page).toHaveURL('/');

@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { odooSettings, odooSyncRuns, pendingCredentials, sessions, users, type OdooRunCounts } from '@/db/schema';
 import { hashPassword } from '../auth/password';
@@ -270,10 +270,15 @@ async function applyRun(
   const prehashed: Prehashed = new Map();
   const [pre] = await db.select().from(odooSyncRuns).where(eq(odooSyncRuns.id, runId));
   if (pre?.preview && pre.status === 'previewed') {
-    for (const c of selectChanges(pre.mode, pre.preview as Preview)) {
-      if (c.type !== 'create') continue;
-      const password = generateTempPassword();
-      prehashed.set(c.employeeId, { password, hash: await hashPassword(password) });
+    try {
+      for (const c of selectChanges(pre.mode, pre.preview as Preview)) {
+        if (c.type !== 'create') continue;
+        const password = generateTempPassword();
+        prehashed.set(c.employeeId, { password, hash: await hashPassword(password) });
+      }
+    } catch {
+      await recordFailure(db, runId, new DomainError('VALIDATION', 'odooApplyFailed'));
+      throw new DomainError('VALIDATION', 'odooApplyFailed');
     }
   }
   try {
@@ -350,8 +355,39 @@ export async function countPendingCredentials(db: Db, actor: Actor): Promise<num
   return r?.n ?? 0;
 }
 
+const STALE_RUN_MS = 30 * 60 * 1000;
+
+/** Runs stuck in `running` (process died mid-sync) are marked failed after 30 minutes. */
+async function sweepStaleRuns(db: Db, now: Date = new Date()): Promise<void> {
+  await db
+    .update(odooSyncRuns)
+    .set({ status: 'failed', errorKey: 'odooUnreachable', finishedAt: now })
+    .where(and(eq(odooSyncRuns.status, 'running'), lt(odooSyncRuns.startedAt, new Date(now.getTime() - STALE_RUN_MS))));
+}
+
+/** Runs the incremental sync when the schedule says it is due. Never throws. */
+export async function runScheduledSyncIfDue(db: Db, now: Date, deps: SyncDeps = {}): Promise<void> {
+  try {
+    await sweepStaleRuns(db, now);
+    const [cfg] = await db.select().from(odooSettings).where(eq(odooSettings.id, 1));
+    if (!cfg || cfg.mode !== 'incremental' || cfg.scheduleHours <= 0) return;
+    if (!(await loadOdooConnection(db))) return;
+    const [last] = await db
+      .select({ startedAt: odooSyncRuns.startedAt })
+      .from(odooSyncRuns)
+      .where(eq(odooSyncRuns.trigger, 'schedule'))
+      .orderBy(desc(odooSyncRuns.startedAt))
+      .limit(1);
+    if (last && now.getTime() - last.startedAt.getTime() < cfg.scheduleHours * 3_600_000) return;
+    await runIncrementalSync(db, 'schedule', undefined, deps);
+  } catch {
+    // runIncrementalSync already recorded a failed run; the scheduler must never throw.
+  }
+}
+
 export async function listSyncRuns(db: Db, actor: Actor, limit = 20) {
   requireAdmin(actor);
+  await sweepStaleRuns(db);
   return db
     .select({
       id: odooSyncRuns.id,

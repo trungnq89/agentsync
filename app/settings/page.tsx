@@ -23,7 +23,7 @@ export async function generateMetadata() {
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
-  const actor = await getActor();
+  const actor = await getActor({ allowMustChange: true });
   const [t, tSendMode, tc, locale] = await Promise.all([
     getTranslations('settings'),
     getTranslations('sendMode'),
@@ -36,6 +36,13 @@ export default async function SettingsPage() {
   return (
     <main className="space-y-6">
       <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
+
+      {actor.mustChangePassword && (
+        <div role="alert" data-testid="must-change-notice" className="rounded-lg border border-warning bg-warning-soft p-4 text-warning-foreground">
+          <p className="font-semibold">{t('mustChangeTitle')}</p>
+          <p className="text-sm">{t('mustChangeDesc')}</p>
+        </div>
+      )}
 
       <Card>
         <CardHeader>

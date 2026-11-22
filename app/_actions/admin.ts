@@ -30,6 +30,7 @@ export async function createUserAction(_p: FormState, form: FormData): Promise<F
       level: level(form),
       managerId: managerId(form),
       isAdmin: form.get('isAdmin') === 'on',
+      email: str(form, 'email'),
     });
     revalidatePath('/admin');
     return { ok: (await getTranslations('admin'))('userCreated', { username }) };
@@ -44,6 +45,7 @@ export async function updateUserAction(_p: FormState, form: FormData): Promise<F
       level: level(form),
       managerId: managerId(form),
       isAdmin: form.get('isAdmin') === 'on',
+      email: str(form, 'email'),
     });
     revalidatePath('/admin');
     return { ok: (await getTranslations('admin'))('userSaved') };

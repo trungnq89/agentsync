@@ -155,3 +155,21 @@ describe('org', () => {
     await updateUser(testDb, admin, admin.id, { isAdmin: false });
   });
 });
+
+describe('user email', () => {
+  it('create/update normalize, validate and enforce unique email', async () => {
+    const { createUser, updateUser } = await import('@/server/org');
+    const admin = await makeUser({ isAdmin: true });
+    const u = await createUser(testDb, admin, { username: 'em1', displayName: 'E', password: 'password-1', level: 'member', email: ' Em1@X.com ' });
+    expect(u.email).toBe('em1@x.com');
+    await expect(createUser(testDb, admin, { username: 'em2', displayName: 'E', password: 'password-1', level: 'member', email: 'EM1@x.com' }))
+      .rejects.toMatchObject({ code: 'VALIDATION', params: { field: 'email' } });
+    await expect(createUser(testDb, admin, { username: 'em3', displayName: 'E', password: 'password-1', level: 'member', email: 'not-an-email' }))
+      .rejects.toMatchObject({ code: 'VALIDATION', key: 'invalidEmail', params: { field: 'email' } });
+    const v = await createUser(testDb, admin, { username: 'em4', displayName: 'E', password: 'password-1', level: 'member' });
+    expect(v.email).toBeNull();
+    await expect(updateUser(testDb, admin, v.id, { email: 'em1@x.com' })).rejects.toMatchObject({ params: { field: 'email' } });
+    expect((await updateUser(testDb, admin, v.id, { email: ' New@X.com' })).email).toBe('new@x.com');
+    expect((await updateUser(testDb, admin, v.id, { email: '' })).email).toBeNull();
+  });
+});

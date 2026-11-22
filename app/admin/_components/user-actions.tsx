@@ -16,6 +16,7 @@ import { CheckField, LevelField, ManagerField, type Person } from './fields';
 export type AdminUser = {
   id: string;
   username: string;
+  email: string | null;
   displayName: string;
   level: string;
   managerId: string | null;
@@ -52,6 +53,9 @@ export function UserActions({ user, people }: { user: AdminUser; people: Person[
             <input type="hidden" name="userId" value={user.id} />
             <FormField name="displayName" label={t('displayName')}>
               <Input defaultValue={user.displayName} required />
+            </FormField>
+            <FormField name="email" label={t('email')}>
+              <Input type="email" defaultValue={user.email ?? ''} autoComplete="off" />
             </FormField>
             <LevelField defaultValue={user.level} />
             <ManagerField people={people} value={user.managerId} excludeId={user.id} />

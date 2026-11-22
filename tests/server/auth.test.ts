@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { agentTokens, users } from '@/db/schema';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
 import { login, getSessionUser, logout } from '@/server/auth/session';
+import { changeMyPassword } from '@/server/account';
 import { createAgentToken, authenticateAgentToken, revokeAgentToken } from '@/server/auth/tokens';
 import { testDb } from '../helpers/db';
 import { makeUser } from '../helpers/factories';
@@ -101,5 +102,37 @@ describe('agent tokens', () => {
     const { token, record } = await createAgentToken(testDb, a.id, 'l');
     await expect(revokeAgentToken(testDb, b.id, record.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect((await authenticateAgentToken(testDb, token)).id).toBe(a.id);
+  });
+});
+
+describe('email login and forced change', () => {
+  it('login with uppercase email and spaces', async () => {
+    const u = await userWithPw('pw-12345', { username: 'someone', email: 'ann@x.com' });
+    const r = await login(testDb, '  Ann@X.COM ', 'pw-12345');
+    expect(r.user.id).toBe(u.id);
+  });
+
+  it('login with username still works', async () => {
+    const u = await userWithPw('pw-12345', { username: 'erin', email: 'erin@x.com' });
+    expect((await login(testDb, 'erin', 'pw-12345')).user.id).toBe(u.id);
+  });
+
+  it('wrong password same error for email and username', async () => {
+    await userWithPw('pw-12345', { username: 'frank', email: 'frank@x.com' });
+    const msgs = [];
+    for (const id of ['frank', 'FRANK@x.com', 'nobody@x.com']) {
+      const e = await login(testDb, id, 'nope').catch((x) => x);
+      expect(e).toMatchObject({ code: 'UNAUTHORIZED', key: 'badLogin' });
+      msgs.push(e.message);
+    }
+    expect(new Set(msgs).size).toBe(1);
+  });
+
+  it('token rejected while mustChangePassword; accepted after changeMyPassword', async () => {
+    const u = await userWithPw('pw-12345', { username: 'gina', mustChangePassword: true });
+    const { token } = await createAgentToken(testDb, u.id, 'l');
+    await expect(authenticateAgentToken(testDb, token)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await changeMyPassword(testDb, u, 'pw-12345', 'new-password-1');
+    expect((await authenticateAgentToken(testDb, token)).id).toBe(u.id);
   });
 });

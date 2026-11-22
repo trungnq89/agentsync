@@ -32,7 +32,7 @@
   "auth": {
     "title": "Đăng nhập",
     "subtitle": "Đăng nhập để tiếp tục dùng AgentSync.",
-    "username": "Tên đăng nhập",
+    "username": "Tên đăng nhập hoặc email",
     "password": "Mật khẩu",
     "submit": "Đăng nhập",
     "logo": "Logo AgentSync"
@@ -109,6 +109,8 @@
   },
   "settings": {
     "title": "Cài đặt",
+    "mustChangeTitle": "Bạn cần đổi mật khẩu",
+    "mustChangeDesc": "Mật khẩu hiện tại là mật khẩu tạm. Hãy đặt mật khẩu mới bên dưới để tiếp tục dùng AgentSync.",
     "preferences": "Tùy chọn",
     "preferencesDesc": "Ngôn ngữ và giao diện áp dụng cho tài khoản của bạn trên mọi thiết bị.",
     "language": "Ngôn ngữ",
@@ -150,6 +152,7 @@
     "staleSaved": "Đã lưu ngưỡng",
     "createTitle": "Tạo người dùng",
     "username": "Tên đăng nhập",
+    "email": "Email (không bắt buộc)",
     "displayName": "Tên hiển thị",
     "password": "Mật khẩu",
     "level": "Cấp",
@@ -254,7 +257,7 @@
     "odooSyncBusy": "Đang có một lần đồng bộ Odoo khác chạy. Hãy thử lại sau giây lát.",
     "odooPreviewExpired": "Bản xem trước đã hết hạn hoặc đã được áp dụng. Hãy xem trước lại.",
     "odooRunNotFound": "Không tìm thấy lần đồng bộ.",
-    "odooApplyFailed": "Không thể áp dụng đồng bộ. Chưa có thay đổi nào được ghi. Hãy thử lại.",
+    "odooApplyFailed": "Không thể áp dụng đồng bộ. Chưa có thay đổi nào được ghi. Hãy chạy xem trước mới rồi thử lại.",
     "odooKeyMissing": "Khóa mã hóa Odoo (SETTINGS_ENCRYPTION_KEY) bị thiếu hoặc không hợp lệ.",
     "odooUrlInvalid": "Hãy nhập URL http(s) hợp lệ.",
     "odooModeInvalid": "Chế độ đồng bộ không hợp lệ.",
@@ -273,6 +276,8 @@
     "managerCycle": "Quản lý này tạo thành vòng lặp trong sơ đồ tổ chức.",
     "managerNotFound": "Không tìm thấy quản lý được chọn.",
     "managerDisabled": "Không thể chọn người đã bị vô hiệu hóa làm quản lý.",
+    "invalidEmail": "Hãy nhập địa chỉ email hợp lệ.",
+    "emailTaken": "Email này đã được tài khoản khác sử dụng.",
     "usernameTaken": "Tên đăng nhập đã tồn tại.",
     "lastAdmin": "Phải còn ít nhất một quản trị viên đang hoạt động.",
     "invalidPreference": "Giá trị tùy chọn không hợp lệ.",

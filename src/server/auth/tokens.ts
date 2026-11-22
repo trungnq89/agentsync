@@ -31,7 +31,8 @@ export async function authenticateAgentToken(db: Db, bearer: string, now: Date =
     !row ||
     !timingSafeEqual(Buffer.from(row.token.tokenHash), Buffer.from(hash)) ||
     row.token.revokedAt ||
-    row.user.disabledAt
+    row.user.disabledAt ||
+    row.user.mustChangePassword
   ) {
     throw new DomainError('UNAUTHORIZED', 'badToken');
   }

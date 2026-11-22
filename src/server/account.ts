@@ -41,7 +41,7 @@ export async function changeMyPassword(
     throw new DomainError('VALIDATION', 'wrongCurrentPassword', { field: 'current' });
   }
   assertPasswordLength(next, 'next');
-  await db.update(users).set({ passwordHash: await hashPassword(next) }).where(eq(users.id, actor.id));
+  await db.update(users).set({ passwordHash: await hashPassword(next), mustChangePassword: false }).where(eq(users.id, actor.id));
   await db
     .delete(sessions)
     .where(keepSessionId ? and(eq(sessions.userId, actor.id), ne(sessions.id, keepSessionId)) : eq(sessions.userId, actor.id));

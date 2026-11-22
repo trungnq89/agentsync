@@ -14,10 +14,16 @@ export const getOptionalActor = cache(async (): Promise<User | null> => {
   return getSessionUser(getDb(), id);
 });
 
-/** Current user, or redirect to /login. */
-export async function getActor(): Promise<User> {
+export const MUST_CHANGE_URL = '/settings?mustChange=1';
+
+/**
+ * Current user, or redirect to /login. A user who must change their password is sent to
+ * the settings page; only that page and its password action pass `allowMustChange`.
+ */
+export async function getActor(opts: { allowMustChange?: boolean } = {}): Promise<User> {
   const user = await getOptionalActor();
   if (!user) redirect('/login');
+  if (user.mustChangePassword && !opts.allowMustChange) redirect(MUST_CHANGE_URL);
   return user;
 }
 

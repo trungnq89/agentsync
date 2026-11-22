@@ -32,7 +32,7 @@
   "auth": {
     "title": "Sign in",
     "subtitle": "Sign in to continue to AgentSync.",
-    "username": "Username",
+    "username": "Username or email",
     "password": "Password",
     "submit": "Sign in",
     "logo": "AgentSync logo"
@@ -109,6 +109,8 @@
   },
   "settings": {
     "title": "Settings",
+    "mustChangeTitle": "You must change your password",
+    "mustChangeDesc": "Your password is temporary. Set a new one below to keep using AgentSync.",
     "preferences": "Preferences",
     "preferencesDesc": "Language and appearance apply to your account on every device.",
     "language": "Language",
@@ -150,6 +152,7 @@
     "staleSaved": "Threshold saved",
     "createTitle": "Create user",
     "username": "Username",
+    "email": "Email (optional)",
     "displayName": "Display name",
     "password": "Password",
     "level": "Level",
@@ -254,7 +257,7 @@
     "odooSyncBusy": "Another Odoo sync is running. Try again in a moment.",
     "odooPreviewExpired": "This preview has expired or was already applied. Run a new preview.",
     "odooRunNotFound": "Sync run not found.",
-    "odooApplyFailed": "The sync could not be applied. No changes were made. Try again.",
+    "odooApplyFailed": "The sync could not be applied. No changes were made. Run a new preview and try again.",
     "odooKeyMissing": "The Odoo encryption key (SETTINGS_ENCRYPTION_KEY) is missing or invalid.",
     "odooUrlInvalid": "Enter a valid http(s) URL.",
     "odooModeInvalid": "Invalid sync mode.",
@@ -273,6 +276,8 @@
     "managerCycle": "This manager would create a loop in the org chart.",
     "managerNotFound": "The selected manager was not found.",
     "managerDisabled": "A disabled user cannot be chosen as manager.",
+    "invalidEmail": "Enter a valid email address.",
+    "emailTaken": "This email is already used by another account.",
     "usernameTaken": "This username is already taken.",
     "lastAdmin": "At least one active administrator must remain.",
     "invalidPreference": "Invalid preference value.",

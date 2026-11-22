@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, ne } from 'drizzle-orm';
+import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { sessions, users, type User } from '@/db/schema';
 import { assertPasswordLength, hashPassword } from './auth/password';
@@ -14,6 +14,19 @@ function assertLevel(level: string) {
 }
 function assertDisplayName(name: string) {
   if (!name.trim()) throw new DomainError('VALIDATION', 'displayNameRequired', { field: 'displayName' });
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** '' / blank means "no email" (null); otherwise trimmed, lowercased and format-checked. */
+function normalizeEmail(raw: string | null | undefined): string | null {
+  const e = (raw ?? '').trim().toLowerCase();
+  if (!e) return null;
+  if (!EMAIL_RE.test(e)) throw new DomainError('VALIDATION', 'invalidEmail', { field: 'email' });
+  return e;
+}
+async function assertEmailFree(db: Db, email: string, exceptId?: string) {
+  const rows = await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = ${email}`);
+  if (rows.some((r) => r.id !== exceptId)) throw new DomainError('VALIDATION', 'emailTaken', { field: 'email' });
 }
 
 const userNotFound = () => new DomainError('NOT_FOUND', 'notFoundUser');
@@ -67,10 +80,13 @@ export async function createUser(
     level: Level;
     managerId?: string | null;
     isAdmin?: boolean;
+    email?: string | null;
   },
 ): Promise<User> {
   requireAdmin(actor);
   assertLevel(input.level);
+  const email = normalizeEmail(input.email);
+  if (email) await assertEmailFree(db, email);
   assertDisplayName(input.displayName);
   assertPasswordLength(input.password);
   const managerId = input.managerId || null;
@@ -86,6 +102,7 @@ export async function createUser(
       level: input.level,
       managerId,
       isAdmin: input.isAdmin ?? false,
+      email,
     })
     .returning();
   return u;
@@ -101,6 +118,7 @@ export async function updateUser(
     managerId: string | null;
     isAdmin: boolean;
     disabled: boolean;
+    email: string | null;
   }>,
   now: Date = new Date(),
 ): Promise<User> {
@@ -122,6 +140,8 @@ export async function updateUser(
       throw new DomainError('VALIDATION', 'lastAdmin');
     }
   }
+  const email = patch.email === undefined ? undefined : normalizeEmail(patch.email);
+  if (email && email !== (existing.email ?? '').toLowerCase()) await assertEmailFree(db, email, id);
   // '' means "no manager".
   const managerId = patch.managerId === '' ? null : patch.managerId;
   // An unchanged (possibly now-disabled) manager stays valid when other fields are saved.
@@ -131,6 +151,7 @@ export async function updateUser(
   if (patch.displayName !== undefined) set.displayName = patch.displayName.trim();
   if (patch.level !== undefined) set.level = patch.level;
   if (managerId !== undefined) set.managerId = managerId;
+  if (email !== undefined) set.email = email;
   if (patch.isAdmin !== undefined) set.isAdmin = patch.isAdmin;
   if (patch.disabled !== undefined) set.disabledAt = patch.disabled ? now : null;
   if (Object.keys(set).length === 0) return existing;
@@ -144,7 +165,7 @@ export async function setPassword(db: Db, actor: Actor, id: string, pw: string):
   assertPasswordLength(pw);
   const rows = await db
     .update(users)
-    .set({ passwordHash: await hashPassword(pw) })
+    .set({ passwordHash: await hashPassword(pw), mustChangePassword: true })
     .where(eq(users.id, id))
     .returning({ id: users.id });
   if (rows.length === 0) throw userNotFound();

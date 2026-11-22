@@ -80,3 +80,17 @@ describe('admin lists and settings', () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+describe('mustChangePassword flag', () => {
+  it('changeMyPassword clears it; admin setPassword sets it', async () => {
+    const admin = await makeUser({ isAdmin: true });
+    const a = await makeUser({ passwordHash: await hashPassword('old-password'), mustChangePassword: true });
+    await changeMyPassword(testDb, a, 'old-password', 'new-password-1');
+    const [row] = await testDb.select().from(users).where(eq(users.id, a.id));
+    expect(row.mustChangePassword).toBe(false);
+    const { setPassword } = await import('@/server/org');
+    await setPassword(testDb, admin, a.id, 'temp-password-9');
+    const [row2] = await testDb.select().from(users).where(eq(users.id, a.id));
+    expect(row2.mustChangePassword).toBe(true);
+  });
+});

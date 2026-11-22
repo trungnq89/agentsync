@@ -39,7 +39,7 @@ export async function sendModeAction(_p: FormState, form: FormData): Promise<For
 }
 
 export async function changePasswordAction(_p: FormState, form: FormData): Promise<FormState> {
-  const actor = await getActor();
+  const actor = await getActor({ allowMustChange: true });
   return run(async () => {
     const sessionId = (await cookies()).get(SESSION_COOKIE)?.value;
     const next = String(form.get('next') ?? '');

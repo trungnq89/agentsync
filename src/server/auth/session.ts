@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { sessions, users, type User } from '@/db/schema';
 import { DomainError } from '../errors';
@@ -9,8 +9,14 @@ const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 let dummyHash: Promise<string> | undefined;
 
-export async function login(db: Db, username: string, pw: string): Promise<{ sessionId: string; user: User }> {
-  const [user] = await db.select().from(users).where(eq(users.username, username));
+export async function login(db: Db, identifier: string, pw: string): Promise<{ sessionId: string; user: User }> {
+  const email = identifier.trim().toLowerCase();
+  // Exact username wins over an email match when both could apply.
+  const matches = await db
+    .select()
+    .from(users)
+    .where(or(eq(users.username, identifier), sql`lower(${users.email}) = ${email}`));
+  const user = matches.find((u) => u.username === identifier) ?? matches[0];
   // Always run a verification so unknown users take about as long as known ones.
   const ok = await verifyPassword(user?.passwordHash ?? (await (dummyHash ??= hashPassword('dummy'))), pw);
   if (!user || !ok || user.disabledAt) throw new DomainError('UNAUTHORIZED', 'badLogin');
