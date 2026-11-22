@@ -135,6 +135,13 @@ describe('odoo diff', () => {
     expect(gone.changes.map((c) => c.key)).toEqual(['link:u1']);
   });
 
+  it('re-linked local user is not in untouchedLocal', () => {
+    const users = [usr('u1', { email: 'new@x.com', source: 'local', odooEmployeeId: 1, displayName: 'E2' })];
+    const r = computeOdooDiff([emp(2, { email: 'new@x.com' })], users, opts());
+    expect(r.changes.map((c) => c.key)).toEqual(['link:u1']);
+    expect(r.untouchedLocal).toEqual([]);
+  });
+
   it('active employee email owned by user linked to a different active employee → skip duplicateEmail, no create', () => {
     const users = [usr('u1', { email: 'a@x.com', source: 'odoo', odooEmployeeId: 1, displayName: 'E1' })];
     const r = computeOdooDiff([emp(1, { email: 'other@x.com' }), emp(2, { email: 'a@x.com' })], users, opts());

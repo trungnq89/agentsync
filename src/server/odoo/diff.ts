@@ -80,8 +80,7 @@ export function computeOdooDiff(employeesIn: OdooEmployee[], usersIn: ExistingUs
   for (const [eid, u] of userByEmpId) if (empById.has(eid)) { matched.set(eid, u); claimed.add(u.id); }
   const toCreate: OdooEmployee[] = [];
   const relinked = new Set<string>();
-  const sorted = [...employees].sort((a, b) => a.id - b.id);
-  for (const e of sorted) {
+  for (const e of employees) {
     if (matched.has(e.id)) continue;
     if (!e.active) continue;
     const em = normEmail(e.email);
@@ -102,6 +101,7 @@ export function computeOdooDiff(employeesIn: OdooEmployee[], usersIn: ExistingUs
         if (x && matched.get(x.id) === u) matched.delete(x.id);
         matched.set(e.id, u);
         relinked.add(u.id);
+        claimed.add(u.id);
         changes.push({ key: `link:${u.id}`, type: 'link', userId: u.id, employeeId: e.id });
       } else {
         skipped.push({ employeeId: e.id, userId: u.id, reason: 'duplicateEmail' });
@@ -146,7 +146,7 @@ export function computeOdooDiff(employeesIn: OdooEmployee[], usersIn: ExistingUs
     return nid ? { ok: true, node: nid } : { ok: false };
   };
 
-  for (const e of sorted) {
+  for (const e of employees) {
     const u = matched.get(e.id);
     if (u && e.active && full && !u.disabled) {
       const r = resolveManager(e);
@@ -213,7 +213,7 @@ export function computeOdooDiff(employeesIn: OdooEmployee[], usersIn: ExistingUs
     });
   }
   if (full) {
-    for (const e of sorted) {
+    for (const e of employees) {
       const u = matched.get(e.id);
       if (!u || !e.active || u.disabled) continue;
       const n = nodes.get(`u:${u.id}`)!;

@@ -22,14 +22,14 @@ const relName = (v: unknown): string | null => (Array.isArray(v) ? str(v[1]) : n
 function mapEmployee(raw: unknown): OdooEmployee {
   if (!raw || typeof raw !== 'object') throw bad();
   const r = raw as Record<string, unknown>;
-  if (typeof r.id !== 'number' || typeof r.name !== 'string') throw bad();
+  if (typeof r.id !== 'number' || typeof r.name !== 'string' || typeof r.active !== 'boolean') throw bad();
   return {
     id: r.id,
     name: r.name,
     email: str(r.work_email),
     managerId: relId(r.parent_id),
     jobTitle: str(r.job_title) ?? relName(r.job_id),
-    active: r.active !== false,
+    active: r.active,
   };
 }
 
@@ -46,20 +46,25 @@ export function createOdooClient(conn: OdooConnection, opts: Opts = {}) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', method: 'call', params: { service, method, args }, id: nextId++ }),
+        redirect: 'manual',
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
       throw new DomainError('VALIDATION', 'odooUnreachable');
     }
+    // Redirects are never followed (the API key must not be re-POSTed elsewhere): any non-2xx is bad.
+    if (!res.ok) throw bad();
+    let text: string;
+    try {
+      text = await res.text();
+    } catch {
+      // body read timed out / connection dropped
+      throw new DomainError('VALIDATION', 'odooUnreachable');
+    }
     let json: unknown;
     try {
-      if (!res.ok) throw new Error('http');
-      json = await res.json();
-    } catch (e) {
-      // body read may also time out / drop
-      if (e instanceof Error && e.name !== 'SyntaxError' && e.message !== 'http') {
-        throw new DomainError('VALIDATION', 'odooUnreachable');
-      }
+      json = JSON.parse(text);
+    } catch {
       throw bad();
     }
     if (!json || typeof json !== 'object') throw bad();
