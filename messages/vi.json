@@ -247,6 +247,11 @@
     "cancel": "Hủy việc"
   },
   "errors": {
+    "odooKeyMissing": "Khóa mã hóa Odoo (SETTINGS_ENCRYPTION_KEY) bị thiếu hoặc không hợp lệ.",
+    "odooUrlInvalid": "Hãy nhập URL http(s) hợp lệ.",
+    "odooModeInvalid": "Chế độ đồng bộ không hợp lệ.",
+    "odooScheduleInvalid": "Lịch chạy phải là tắt, hoặc 1, 6 hay 24 giờ.",
+    "odooMappingsInvalid": "Ánh xạ chức danh tối đa 50 dòng, mỗi dòng có mẫu và cấp bậc hợp lệ.",
     "invalidSendMode": "Chế độ gửi không hợp lệ.",
     "wrongCurrentPassword": "Mật khẩu hiện tại không đúng.",
     "notFoundTask": "Không tìm thấy việc này.",

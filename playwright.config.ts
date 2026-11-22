@@ -17,6 +17,8 @@ export default defineConfig({
     url: `http://localhost:${PORT}/login`,
     timeout: 120_000,
     reuseExistingServer: false,
-    env: { DATABASE_URL: e2eUrl, APP_URL: `http://localhost:${PORT}`, DEFAULT_LOCALE: 'vi' },
+    env: { DATABASE_URL: e2eUrl, APP_URL: `http://localhost:${PORT}`, DEFAULT_LOCALE: 'vi',
+      SETTINGS_ENCRYPTION_KEY: process.env.SETTINGS_ENCRYPTION_KEY ?? 'dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktMTIzNDU=',
+    },
   },
 });

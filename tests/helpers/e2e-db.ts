@@ -21,6 +21,7 @@ export async function resetE2eDb(admin: { username: string; password: string }):
   try {
     await db.execute(sql.raw(`TRUNCATE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`));
     await db.insert(schema.appSettings).values({ id: 1, staleBusinessDays: 3 });
+    await db.insert(schema.odooSettings).values({ id: 1 });
     await seedAdmin(db, admin.username, admin.password);
   } finally {
     await db.$client.end();

@@ -247,6 +247,11 @@
     "cancel": "Cancel task"
   },
   "errors": {
+    "odooKeyMissing": "The Odoo encryption key (SETTINGS_ENCRYPTION_KEY) is missing or invalid.",
+    "odooUrlInvalid": "Enter a valid http(s) URL.",
+    "odooModeInvalid": "Invalid sync mode.",
+    "odooScheduleInvalid": "The schedule must be off, or 1, 6 or 24 hours.",
+    "odooMappingsInvalid": "Title mappings allow at most 50 rows, each with a pattern and a valid level.",
     "invalidSendMode": "Invalid send mode.",
     "wrongCurrentPassword": "The current password is incorrect.",
     "notFoundTask": "Task not found.",

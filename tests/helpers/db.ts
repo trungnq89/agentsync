@@ -25,4 +25,5 @@ export async function resetDb(): Promise<void> {
   assertTestDb();
   await testDb.execute(sql.raw(`TRUNCATE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`));
   await testDb.insert(schema.appSettings).values({ id: 1, staleBusinessDays: 3 });
+  await testDb.insert(schema.odooSettings).values({ id: 1 });
 }

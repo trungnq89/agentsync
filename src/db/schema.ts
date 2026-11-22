@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  pgTable, pgEnum, uuid, text, boolean, integer, date, jsonb, timestamp, unique, check, type AnyPgColumn,
+  pgTable, pgEnum, uuid, text, boolean, integer, date, jsonb, timestamp, unique, check, uniqueIndex, type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 export const userLevel = pgEnum('user_level', ['director', 'manager', 'leader', 'member']);
@@ -34,8 +34,14 @@ export const users = pgTable('users', {
   locale: text('locale'),
   theme: text('theme').notNull().default('system'),
   disabledAt: ts('disabled_at'),
+  email: text('email'),
+  odooEmployeeId: integer('odoo_employee_id').unique(),
+  mustChangePassword: boolean('must_change_password').notNull().default(false),
+  source: text('source').notNull().default('local'),
   createdAt: createdAt(),
 }, (t) => [
+  uniqueIndex('users_email_lower_uq').on(sql`lower(${t.email})`),
+  check('users_source_check', sql`${t.source} in ('local','odoo')`),
   check('users_locale_check', sql`${t.locale} in ('en','vi')`),
   check('users_theme_check', sql`${t.theme} in ('system','light','dark')`),
 ]);
@@ -152,6 +158,50 @@ export const appSettings = pgTable('app_settings', {
   id: integer('id').primaryKey().default(1),
   staleBusinessDays: integer('stale_business_days').notNull().default(3),
 }, (t) => [check('app_settings_singleton', sql`${t.id} = 1`)]);
+
+export type TitleMapping = { pattern: string; level: 'director' | 'manager' | 'leader' | 'member' };
+
+export const odooSettings = pgTable('odoo_settings', {
+  id: integer('id').primaryKey().default(1),
+  url: text('url'),
+  database: text('database'),
+  login: text('login'),
+  apiKeyEnc: text('api_key_enc'),
+  mode: text('mode').notNull().default('review'),
+  scheduleHours: integer('schedule_hours').notNull().default(0),
+  titleMappingEnabled: boolean('title_mapping_enabled').notNull().default(false),
+  titleMappings: jsonb('title_mappings').$type<TitleMapping[]>().notNull().default([]),
+}, (t) => [
+  check('odoo_settings_singleton', sql`${t.id} = 1`),
+  check('odoo_settings_mode_check', sql`${t.mode} in ('full','incremental','review')`),
+  check('odoo_settings_schedule_check', sql`${t.scheduleHours} in (0,1,6,24)`),
+]);
+
+export type OdooRunCounts = Record<string, number>;
+
+export const odooSyncRuns = pgTable('odoo_sync_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  mode: text('mode').notNull(),
+  trigger: text('trigger').notNull(),
+  actorId: uuid('actor_id').references(() => users.id),
+  startedAt: ts('started_at').notNull().defaultNow(),
+  finishedAt: ts('finished_at'),
+  status: text('status').notNull(),
+  counts: jsonb('counts').$type<OdooRunCounts>().notNull().default({}),
+  preview: jsonb('preview').$type<unknown>(),
+  errorKey: text('error_key'),
+}, (t) => [
+  check('odoo_sync_runs_trigger_check', sql`${t.trigger} in ('manual','schedule')`),
+  check('odoo_sync_runs_status_check', sql`${t.status} in ('previewed','applied','failed')`),
+]);
+
+export const pendingCredentials = pgTable('pending_credentials', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  runId: uuid('run_id').notNull().references(() => odooSyncRuns.id),
+  secretEnc: text('secret_enc').notNull(),
+  createdAt: createdAt(),
+});
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
