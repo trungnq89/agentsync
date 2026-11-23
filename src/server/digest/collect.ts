@@ -6,7 +6,6 @@ import { needsAttention, type AttentionItem, type AttentionKind } from '@/server
 import { getPendingFeedback, type PendingFeedback } from '@/server/tasks/activity';
 import { currentPlan } from '@/server/tasks/internal';
 import { ACTIVE_STATUSES, DONE_STATUSES } from '@/server/tasks/lifecycle';
-import { defaultTimezone } from './prefs';
 
 export type DigestData = {
   manager: {
@@ -34,7 +33,10 @@ function localDate(d: Date, timezone: string): string {
   return `${g('year')}-${g('month')}-${g('day')}`;
 }
 
-export async function collectDigestData(db: Db, user: User, since: Date, now: Date): Promise<DigestData> {
+export async function collectDigestData(
+  db: Db, user: User,
+  { since, now, timezone }: { since: Date; now: Date; timezone: string },
+): Promise<DigestData> {
   // needsAttention only looks at current, enabled direct reports and public tasks.
   const items = (await needsAttention(db, user, now)).filter((i) => !i.ownerIsMe);
   const awaiting = items.filter((i) => AWAITING.includes(i.kind));
@@ -56,7 +58,7 @@ export async function collectDigestData(db: Db, user: User, since: Date, now: Da
   const fb = await getPendingFeedback(db, user);
   const answers = fb.answersToMyQuestions.filter((a) => !!a.answeredAt && a.answeredAt.getTime() > since.getTime());
 
-  const tz = user.digestTimezone ?? defaultTimezone();
+  const tz = timezone;
   const today = localDate(now, tz);
   const soonLimit = localDate(new Date(now.getTime() + 2 * DAY_MS), tz);
   const own = (await db.select().from(tasks).where(and(eq(tasks.ownerId, user.id), isNull(tasks.completedAt))))

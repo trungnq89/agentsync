@@ -16,10 +16,13 @@ export function escapeMrkdwn(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+const SEGMENTER = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 /** Collapse whitespace, cut to `max` characters, then escape. */
 function clip(raw: string, max: number): string {
-  const flat = raw.replace(/\s+/g, ' ').trim();
-  const cut = flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+  const flat = raw.replace(/\s+/g, ' ').trim().normalize('NFC');
+  const graphemes = Array.from(SEGMENTER.segment(flat), (x) => x.segment);
+  const cut = graphemes.length > max ? `${graphemes.slice(0, max - 1).join('')}…` : flat;
   return escapeMrkdwn(cut);
 }
 
@@ -32,6 +35,8 @@ export function buildDigest(d: DigestData, opts: BuildOpts): { text: string; blo
   const base = opts.appUrl.replace(/\/+$/, '');
   const link = (taskId: string, title: string) => `<${base}/tasks/${taskId}|${clip(title, MAX_TITLE)}>`;
   const dateStr = new Intl.DateTimeFormat(opts.locale, { timeZone: opts.timezone, dateStyle: 'medium' }).format(opts.now);
+  const fmtDue = (iso: string) =>
+    new Intl.DateTimeFormat(opts.locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
   const header = t('header', { date: dateStr });
 
   const blocks: Block[] = [{ type: 'header', text: { type: 'plain_text', text: header.slice(0, 150) } }];
@@ -77,7 +82,7 @@ export function buildDigest(d: DigestData, opts: BuildOpts): { text: string; blo
   group(t('changesRequested'), mine.changesRequested.map((c) => `${link(c.taskId, c.title)}${c.note ? ` — ${clip(c.note, MAX_NOTE)}` : ''}`));
   group(t('questions'), mine.questionsForMe.map((q) => `${link(q.taskId, q.title)} — ${clip(q.body, MAX_NOTE)}`));
   group(t('answers'), mine.answers.map((a) => `${link(a.taskId, a.title)} — ${clip(a.answer, MAX_NOTE)}`));
-  group(t('dueSoon'), mine.dueSoon.map((x) => `${link(x.taskId, x.title)} — ${x.overdue ? t('overdue', { date: x.dueDate }) : t('due', { date: x.dueDate })}`));
+  group(t('dueSoon'), mine.dueSoon.map((x) => `${link(x.taskId, x.title)} — ${x.overdue ? t('overdue', { date: fmtDue(x.dueDate) }) : t('due', { date: fmtDue(x.dueDate) })}`));
   if (mine.pendingApprovalSteps > 0) section([t('pendingSteps', { count: mine.pendingApprovalSteps })]);
   if (blocks.length > mineBlocksStart) blocks.splice(mineBlocksStart, 0, { type: 'divider' });
 
