@@ -5,6 +5,8 @@ import { DomainError, translateError } from '@/server/errors';
 export type FormState = {
   error?: string;
   ok?: string;
+  /** Neutral, non-error notice (e.g. the action was already done); raises an info toast. */
+  info?: string;
   token?: string;
   /** Per-field messages (VALIDATION errors carrying `params.field`). */
   fieldErrors?: Record<string, string>;

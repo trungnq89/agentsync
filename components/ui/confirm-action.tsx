@@ -47,6 +47,7 @@ export function ConfirmAction({
       setOpen(false);
       // The dialog (and its ActionForm) unmounts on close, so the form's own toast would never fire.
       if (res.ok) toast.success(res.ok);
+      else if (res.info) toast.info(res.info);
     }
     return res;
   };

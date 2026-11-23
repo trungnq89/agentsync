@@ -43,7 +43,8 @@
     "emptyHint": "Chưa có việc hay người nào để hiển thị. Hãy làm theo hướng dẫn cài đặt agent (Cài đặt, tạo token, rồi cài skill cho Claude Code hoặc Codex) để agent bắt đầu đồng bộ công việc.",
     "doneActive": "{done} việc xong · {active} việc đang làm",
     "updated": "cập nhật {when}",
-    "pageTitle": "Tổng quan đội ngũ"
+    "pageTitle": "Tổng quan đội ngũ",
+    "pendingApprovals": "{count} chờ duyệt"
   },
   "person": {
     "back": "Trang chủ",
@@ -51,7 +52,13 @@
     "today": "Hôm nay",
     "todayWithDate": "Hôm nay {date}",
     "agreedDue": "Hạn thống nhất {date}",
-    "done": "Xong"
+    "done": "Xong",
+    "confirmerTitle": "Người xác nhận checkpoint",
+    "confirmerHint": "Ai đánh dấu các bước trong plan của người này là xong.",
+    "confirmerMember": "Thành viên tự xác nhận",
+    "confirmerManager": "Tôi (quản lý) duyệt",
+    "confirmerSave": "Lưu",
+    "toastConfirmerSaved": "Đã lưu người xác nhận checkpoint"
   },
   "task": {
     "back": "Trang chủ",
@@ -105,7 +112,23 @@
     "edited": "đã sửa",
     "showMore": "Xem thêm",
     "showLess": "Thu gọn",
-    "progress": "Tiến độ công việc"
+    "progress": "Tiến độ công việc",
+    "stepPending": "Chờ duyệt",
+    "confirmedByMember": "✓ {name} xác nhận",
+    "confirmedByManager": "✓ Quản lý duyệt",
+    "confirmedWhen": "{who} · {when}",
+    "stepApprove": "Đạt",
+    "stepReject": "Chưa đạt",
+    "approveAll": "Duyệt tất cả",
+    "approveAllTitle": "Duyệt tất cả các bước đang chờ?",
+    "approveAllDesc": "Mọi bước đang chờ duyệt của việc này sẽ được đánh dấu xong.",
+    "rejectTitle": "Bước chưa đạt",
+    "rejectDesc": "Nêu rõ còn thiếu gì. Chủ việc sẽ thấy ghi chú này và bước quay về đang làm.",
+    "rejectSend": "Trả lại",
+    "toastApproved": "Đã duyệt bước",
+    "toastRejected": "Đã trả lại bước",
+    "toastApprovedAll": "Đã duyệt các bước",
+    "pendingSteps": "{count} bước chờ duyệt"
   },
   "settings": {
     "title": "Cài đặt",

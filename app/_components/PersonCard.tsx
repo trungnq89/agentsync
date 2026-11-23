@@ -21,8 +21,11 @@ export function PersonCard({ card, now = new Date() }: { card: Card; now?: Date 
         <div className="truncate text-sm font-semibold" title={card.displayName}>
           {card.displayName}
         </div>
-        {(card.hasBlocked || card.hasAwaitingReview) && (
+        {(card.hasBlocked || card.hasAwaitingReview || card.pendingApprovals > 0) && (
           <div className="flex flex-wrap gap-1">
+            {card.pendingApprovals > 0 && (
+              <Badge tone="info" data-testid="pending-approvals">{t('pendingApprovals', { count: card.pendingApprovals })}</Badge>
+            )}
             {card.hasBlocked && <Badge tone="danger">{tAttention('blocked')}</Badge>}
             {card.hasAwaitingReview && <Badge tone="info">{tAttention('awaiting_review')}</Badge>}
           </div>

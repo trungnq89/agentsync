@@ -43,7 +43,8 @@
     "emptyHint": "There are no tasks or people to display. Follow the agent setup guide (Settings, create a token, then install the skill for Claude Code or Codex) so your agent can start syncing work.",
     "doneActive": "{done} done · {active} in progress",
     "updated": "updated {when}",
-    "pageTitle": "Team overview"
+    "pageTitle": "Team overview",
+    "pendingApprovals": "{count} awaiting approval"
   },
   "person": {
     "back": "Home",
@@ -51,7 +52,13 @@
     "today": "Today",
     "todayWithDate": "Today {date}",
     "agreedDue": "Agreed due date {date}",
-    "done": "Done"
+    "done": "Done",
+    "confirmerTitle": "Checkpoint confirmer",
+    "confirmerHint": "Who marks this person's plan steps as done.",
+    "confirmerMember": "Member confirms themselves",
+    "confirmerManager": "I approve",
+    "confirmerSave": "Save",
+    "toastConfirmerSaved": "Checkpoint confirmer saved"
   },
   "task": {
     "back": "Home",
@@ -105,7 +112,23 @@
     "edited": "edited",
     "showMore": "Show more",
     "showLess": "Collapse",
-    "progress": "Task progress"
+    "progress": "Task progress",
+    "stepPending": "Awaiting approval",
+    "confirmedByMember": "✓ {name} confirmed",
+    "confirmedByManager": "✓ Manager approved",
+    "confirmedWhen": "{who} · {when}",
+    "stepApprove": "Approve",
+    "stepReject": "Not approved",
+    "approveAll": "Approve all",
+    "approveAllTitle": "Approve all pending steps?",
+    "approveAllDesc": "Every step waiting for approval on this task will be marked done.",
+    "rejectTitle": "Step not approved",
+    "rejectDesc": "Explain what is missing. The task owner will see this note and the step returns to in progress.",
+    "rejectSend": "Send back",
+    "toastApproved": "Step approved",
+    "toastRejected": "Step sent back",
+    "toastApprovedAll": "Steps approved",
+    "pendingSteps": "{count, plural, one {# step awaiting approval} other {# steps awaiting approval}}"
   },
   "settings": {
     "title": "Settings",

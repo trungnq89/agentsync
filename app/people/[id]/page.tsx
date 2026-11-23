@@ -8,6 +8,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { DomainError } from '@/server/errors';
 import { personTimeline } from '@/server/tasks/queries';
+import { ConfirmerCard } from '../../_components/ConfirmerCard';
 import { Timeline } from '../../_components/Timeline';
 import { getActor } from '../../_lib/actor';
 
@@ -48,6 +49,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           <Badge className="mt-1">{tLevel(data.person.level)}</Badge>
         </div>
       </div>
+      {data.canSetConfirmer && <ConfirmerCard userId={data.person.id} value={data.checkpointConfirmer} />}
       <Timeline tasks={data.tasks} now={now} />
     </main>
   );

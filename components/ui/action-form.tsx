@@ -33,6 +33,7 @@ export function ActionForm({
 
   useEffect(() => {
     if (state.ok) toast.success(successToast ?? state.ok);
+    else if (state.info) toast.info(state.info);
     // Each submission yields a new state object, so depend on it rather than on the message.
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
