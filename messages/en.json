@@ -364,6 +364,7 @@
     "notFoundTask": "Task not found.",
     "adminOnly": "Only administrators can perform this action.",
     "staleDaysRange": "The number of working days must be a whole number from 1 to 30.",
+    "invalidConfirmer": "Invalid checkpoint confirmer, use member or manager.",
     "invalidLevel": "Invalid level.",
     "displayNameRequired": "Display name cannot be empty.",
     "notFoundUser": "User not found.",

@@ -7,6 +7,7 @@ import {
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
 import { isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
+import { normalizePlanSteps } from './confirm';
 import { asDb, currentPlan, lifecycleCtx, requireOwner, type PlanVersion } from './internal';
 import { initialStatus, nextStatus, TERMINAL_STATUSES, type TaskAction, type TaskStatus } from './lifecycle';
 
@@ -157,7 +158,7 @@ export async function changePlan(
 
     try {
       await tx.insert(planVersions).values({
-        taskId, version: current.version + 1, kind, reason, steps: input.steps, createdAt: now,
+        taskId, version: current.version + 1, kind, reason, steps: normalizePlanSteps(input.steps, current.steps), createdAt: now,
       });
     } catch (e) {
       const code = (e as { code?: string; cause?: { code?: string } });

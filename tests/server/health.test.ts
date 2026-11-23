@@ -53,6 +53,11 @@ describe('computeHealth', () => {
 
 describe('progressPct', () => {
   const plan = { steps: [{ title: 'a', status: 'done' }, { title: 'b', status: 'todo' }, { title: 'c', status: 'todo' }] } as never;
-  it('uses steps, rounded', () => expect(progressPct(plan, null)).toBe(33));
-  it('uses override when set', () => expect(progressPct(plan, 80)).toBe(80));
+  it('uses steps, rounded', () => expect(progressPct(plan)).toBe(33));
+  it('ignores any override', () => expect(progressPct(plan, 80)).toBe(33));
+  it('does not count pending_approval steps', () => {
+    const p = { steps: [{ title: 'a', status: 'done' }, { title: 'b', status: 'pending_approval' }] } as never;
+    expect(progressPct(p)).toBe(50);
+  });
+  it('empty plan is 0', () => expect(progressPct({ steps: [] } as never)).toBe(0));
 });

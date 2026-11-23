@@ -82,7 +82,7 @@ async function loadMetrics(db: Db, rows: Task[], now: Date): Promise<Map<string,
     out.set(t.id, {
       plan, lastActivityAt, blocker, ...h,
       planChangedAt: plan?.createdAt,
-      progress: plan ? progressPct(plan, t.progressOverride) : (t.progressOverride ?? 0),
+      progress: plan ? progressPct(plan) : 0,
     });
   }
   return out;

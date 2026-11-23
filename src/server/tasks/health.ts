@@ -4,8 +4,9 @@ import type { PlanVersion } from './internal';
 
 export type Health = 'on_track' | 'at_risk' | 'blocked';
 
-export function progressPct(plan: Pick<PlanVersion, 'steps'>, override: number | null): number {
-  if (override !== null) return override;
+/** Share of confirmed (`done`) steps. Agent-reported overrides are ignored. */
+export function progressPct(plan: Pick<PlanVersion, 'steps'>, _override?: number | null): number {
+  void _override;
   const total = plan.steps.length;
   if (total === 0) return 0;
   return Math.round((plan.steps.filter((s) => s.status === 'done').length / total) * 100);

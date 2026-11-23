@@ -41,7 +41,7 @@ const errorReply = (message: string) => ({
 
 const planStep = z.object({
   title: z.string().describe('Step title'),
-  status: z.enum(['todo', 'doing', 'done']).describe('Step status'),
+  status: z.enum(['todo', 'doing']).describe('Step status (todo or doing; done is set by confirmation)'),
 });
 const isoDate = z.string().refine(isValidIsoDate, 'Invalid date, use the YYYY-MM-DD format.');
 const taskId = z.string().describe('Task ID (from list_my_tasks)');

@@ -364,6 +364,7 @@
     "notFoundTask": "Không tìm thấy việc này.",
     "adminOnly": "Chỉ quản trị viên mới có quyền thực hiện thao tác này.",
     "staleDaysRange": "Số ngày làm việc phải là số nguyên từ 1 đến 30.",
+    "invalidConfirmer": "Người xác nhận checkpoint không hợp lệ, dùng member hoặc manager.",
     "invalidLevel": "Cấp không hợp lệ.",
     "displayNameRequired": "Tên hiển thị không được để trống.",
     "notFoundUser": "Không tìm thấy người dùng.",

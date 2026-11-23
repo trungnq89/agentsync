@@ -5,8 +5,9 @@ import type { PlanStep } from '@/db/schema';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatRelative } from '../_lib/format';
 
-const ICON = { todo: Circle, doing: CircleDot, done: CircleCheck } as const;
-const LABEL = { todo: 'stepTodo', doing: 'stepDoing', done: 'stepDone' } as const;
+// pending_approval is rendered like doing until the confirmation UI lands (later task).
+const ICON = { todo: Circle, doing: CircleDot, pending_approval: CircleDot, done: CircleCheck } as const;
+const LABEL = { todo: 'stepTodo', doing: 'stepDoing', pending_approval: 'stepDoing', done: 'stepDone' } as const;
 
 export function PlanSummary({
   steps, history, now,
