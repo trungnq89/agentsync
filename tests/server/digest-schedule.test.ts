@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { digestDeliveries, questions, slackSettings, users, type User } from '@/db/schema';
 import { encryptSecret } from '@/server/secret';
@@ -13,6 +13,7 @@ import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
 import { startFakeSlack } from '../helpers/fake-slack';
 
+type DigestTransportLike = ReturnType<typeof slackTransport>;
 const TOKEN = 'xoxb-test-token';
 const MIN = 60_000;
 const MON_0830 = new Date('2026-11-23T01:30:00Z'); // Mon 08:30 Asia/Ho_Chi_Minh
@@ -176,7 +177,7 @@ describe('runDigestsIfDue', () => {
     expect((await run(MON_0830)).aborted).toBe('slackAuthFailed');
     expect((await settings()).lastError).toBe('slackAuthFailed');
     expect(await rows()).toHaveLength(0);
-    expect((await run(at(MON_0830, 1))).sent).toBe(1);
+    expect((await run(at(MON_0830, 16))).sent).toBe(1); // after the 15 min back-off
     const s = await settings();
     expect(s.lastError).toBeNull();
     expect(s.lastErrorAt).toBeNull();
@@ -271,6 +272,104 @@ describe('runDigestsIfDue', () => {
     const next = at(MON_0830, 24 * 60);
     expect(await run(next)).toMatchObject({ sent: 0, skipped: 1 });
     expect(fake.posts).toHaveLength(1);
+  });
+});
+
+describe('review fixes', () => {
+  it('M4: backs off after an auth failure and a newly saved token works on the next tick', async () => {
+    await member('a');
+    await testDb.update(slackSettings).set({ botTokenEnc: encryptSecret('xoxb-wrong') });
+    expect((await run(MON_0830)).aborted).toBe('slackAuthFailed');
+    const first = (await settings()).lastErrorAt;
+    expect(await run(at(MON_0830, 1))).toEqual({ sent: 0, skipped: 0, failed: 0 });
+    expect((await settings()).lastErrorAt).toEqual(first);
+    await saveSlackSettings(testDb, admin, { botToken: TOKEN });
+    expect((await settings()).pausedUntil).toBeNull();
+    expect((await run(at(MON_0830, 2))).sent).toBe(1);
+  });
+
+  it('M2: honours Retry-After before the next run', async () => {
+    await member('a');
+    fake.failNext({ method: 'chat.postMessage', status: 429, retryAfter: 120 });
+    expect((await run(MON_0830)).aborted).toBe('slackRateLimited');
+    expect(await run(at(MON_0830, 1))).toEqual({ sent: 0, skipped: 0, failed: 0 });
+    expect(fake.posts).toHaveLength(0);
+    expect((await run(at(MON_0830, 3))).sent).toBe(1);
+  });
+
+  it('M1: the retry gap counts from the failure time, not the run start', async () => {
+    await member('a');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(MON_0830);
+      const slow = (): DigestTransportLike => ({
+        channel: 'slack',
+        resolveRecipient: async () => 'UA',
+        send: async () => {
+          vi.setSystemTime(at(MON_0830, 4));
+          throw new (await import('@/server/errors')).DomainError('VALIDATION', 'slackUnavailable');
+        },
+      });
+      expect((await runDigestsIfDue(testDb, MON_0830, slow)).failed).toBe(1);
+      vi.useRealTimers();
+      expect((await run(at(MON_0830, 6))).sent).toBe(0); // only 2 min after the failure
+      expect((await run(at(MON_0830, 10))).sent).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('M3: a bad timezone or a throwing transport does not stop other users', async () => {
+    const bad = await member('bad');
+    await testDb.update(users).set({ digestTimezone: 'Not/AZone' }).where(eq(users.id, bad.id));
+    await member('boom');
+    await member('ok');
+    const t = (token: string) => {
+      const real = transport(token);
+      return {
+        ...real,
+        send: async (db: never, u: { email: string | null }, m: never) => {
+          if (u.email === 'boom@x.com') throw new Error('kaput');
+          return real.send(db, u as never, m);
+        },
+      };
+    };
+    const r = await runDigestsIfDue(testDb, MON_0830, t as never);
+    expect(r.sent).toBe(1);
+    expect(r.failed).toBeGreaterThanOrEqual(2);
+    expect(fake.posts.map((p) => p.channel)).toEqual(['UOK']);
+    expect((await rows()).find((x) => x.error === 'unknown')).toBeTruthy();
+  });
+
+  it('M5: a stale claimed row is reclaimed and sent once', async () => {
+    const u = await member('a');
+    await testDb.insert(digestDeliveries).values({
+      userId: u.id, localDate: '2026-11-23', status: 'failed', attempts: 0, error: 'claimed', updatedAt: at(MON_0830, -6),
+    });
+    expect((await run(MON_0830)).sent).toBe(1);
+    expect(fake.posts).toHaveLength(1);
+    expect((await rows())[0].status).toBe('sent');
+  });
+
+  it('I1: a dropped lock connection does not crash and the lock is freed', async () => {
+    await member('a');
+    const t = (token: string) => {
+      const real = transport(token);
+      return {
+        ...real,
+        send: async (db: never, u: never, m: never) => {
+          await testDb.$client.query(
+            "select pg_terminate_backend(pid) from pg_locks where locktype = 'advisory' and granted and pid <> pg_backend_pid()",
+          );
+          await new Promise((r) => setTimeout(r, 200));
+          return real.send(db, u, m);
+        },
+      };
+    };
+    const r = await runDigestsIfDue(testDb, MON_0830, t as never);
+    expect(r.sent).toBe(1);
+    await testDb.delete(digestDeliveries);
+    expect((await run(MON_0830)).sent).toBe(1);
   });
 });
 

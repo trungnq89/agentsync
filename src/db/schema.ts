@@ -214,6 +214,7 @@ export const slackSettings = pgTable('slack_settings', {
   defaultTimezone: text('default_timezone'),
   lastError: text('last_error'),
   lastErrorAt: ts('last_error_at'),
+  pausedUntil: ts('paused_until'),
 }, (t) => [check('slack_settings_singleton', sql`${t.id} = 1`)]);
 
 export type SlackSettingsRow = typeof slackSettings.$inferSelect;

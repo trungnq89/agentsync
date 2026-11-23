@@ -19,7 +19,9 @@ const NO_RETRY = ['slackUserNotFound', 'noEmail'];
 /** Session-level advisory lock key, distinct from anything the Odoo sync uses. */
 const LOCK_NAME = 'agentsync-digest';
 
-export type DigestRunResult = { sent: number; skipped: number; failed: number; aborted?: string };
+export type DigestAbortKey = 'slackAuthFailed' | 'slackRateLimited' | 'encryptionKeyMissing';
+export type DigestRunResult = { sent: number; skipped: number; failed: number; aborted?: DigestAbortKey };
+const AUTH_BACKOFF_MS = 15 * 60_000;
 type MakeTransport = (token: string) => DigestTransport;
 const defaultTransport: MakeTransport = (token) => slackTransport(createSlackClient(token));
 
@@ -92,7 +94,9 @@ function userLocale(u: Pick<User, 'locale'>) {
 }
 
 async function recordSlackError(db: Db, key: string, now: Date) {
-  await db.update(slackSettings).set({ lastError: key, lastErrorAt: now }).where(eq(slackSettings.id, 1));
+  await db.update(slackSettings)
+    .set({ lastError: key, lastErrorAt: now, pausedUntil: new Date(now.getTime() + AUTH_BACKOFF_MS) })
+    .where(eq(slackSettings.id, 1));
 }
 
 /** The run without the advisory lock; per-user claims alone prevent duplicates. */
@@ -101,26 +105,30 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
   const settings = await readSlackSettingsRow(db);
   const appUrl = process.env.APP_URL?.trim();
   if (!settings.enabled || !settings.botTokenEnc || !appUrl) return result;
+  if (settings.pausedUntil && settings.pausedUntil.getTime() > now.getTime()) return result;
+  const t0 = Date.now();
+  /** Failure time: injected `now` advanced by real time spent in this run. */
+  const stamp = () => new Date(now.getTime() + (Date.now() - t0));
 
   let token: string | null;
   try {
     token = await loadSlackToken(db);
-  } catch (e) {
-    const key = e instanceof DomainError ? e.key : 'unknown';
-    await recordSlackError(db, key, now);
-    return { ...result, aborted: key };
+  } catch {
+    await recordSlackError(db, 'encryptionKeyMissing', now);
+    return { ...result, aborted: 'encryptionKeyMissing' };
   }
   if (!token) return result;
   const transport = makeTransport(token);
 
   const active = await db.select().from(users).where(isNull(users.disabledAt));
   for (const u of active) {
-    const prefs = effectiveDigestPrefs(u, settings);
-    const { due, localDate } = isDue(prefs, now);
-    if (!due) continue;
-    const claim = await claimRow(db, u.id, localDate, now);
-    if (!claim) continue;
+    let claim: Claim | null = null;
     try {
+      const prefs = effectiveDigestPrefs(u, settings);
+      const { due, localDate } = isDue(prefs, now);
+      if (!due) continue;
+      claim = await claimRow(db, u.id, localDate, now);
+      if (!claim) continue;
       const since = await sinceFor(db, u.id, now);
       const data = await collectDigestData(db, u, { since, now, timezone: prefs.timezone });
       if (isDigestEmpty(data)) {
@@ -134,15 +142,26 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
       result.sent++;
     } catch (e) {
       const key = e instanceof DomainError ? e.key : 'unknown';
-      if (key === 'slackAuthFailed' || key === 'slackRateLimited' || key === 'encryptionKeyMissing') {
+      if (claim && (key === 'slackAuthFailed' || key === 'slackRateLimited')) {
         await claim.release();
-        if (key !== 'slackRateLimited') await recordSlackError(db, key, now);
+        if (key === 'slackRateLimited') {
+          const ra = e instanceof DomainError && typeof e.params?.retryAfter === 'number' ? e.params.retryAfter : 60;
+          await db.update(slackSettings).set({ pausedUntil: new Date(now.getTime() + ra * 1000) }).where(eq(slackSettings.id, 1));
+        } else {
+          await recordSlackError(db, key, now);
+        }
         return { ...result, aborted: key };
       }
-      await db.update(digestDeliveries)
-        .set({ status: 'failed', attempts: claim.attempts + 1, error: key, updatedAt: now })
-        .where(eq(digestDeliveries.id, claim.id));
       result.failed++;
+      if (claim) {
+        try {
+          await db.update(digestDeliveries)
+            .set({ status: 'failed', attempts: claim.attempts + 1, error: key, updatedAt: stamp() })
+            .where(eq(digestDeliveries.id, claim.id));
+        } catch {
+          // Row stays 'claimed' and is retried after the gap.
+        }
+      }
     }
   }
   if (result.sent > 0) {
@@ -157,16 +176,28 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
  */
 export async function runDigestsIfDue(db: Db, now: Date, makeTransport: MakeTransport = defaultTransport): Promise<DigestRunResult> {
   const conn = await db.$client.connect();
+  // A checked-out client has no pool error listener; without one a dropped backend would crash the process.
+  let connErr: Error | undefined;
+  const onErr = (e: Error) => { connErr ??= e; };
+  conn.on('error', onErr);
   try {
     const { rows } = await conn.query('select pg_try_advisory_lock(hashtext($1)) as ok', [LOCK_NAME]);
     if (!rows[0]?.ok) return { sent: 0, skipped: 0, failed: 0 };
     try {
       return await runDigestsUnlocked(db, now, makeTransport);
     } finally {
-      await conn.query('select pg_advisory_unlock(hashtext($1))', [LOCK_NAME]);
+      try {
+        await conn.query('select pg_advisory_unlock(hashtext($1))', [LOCK_NAME]);
+      } catch (e) {
+        connErr ??= e as Error; // destroyed below, which ends the session and frees the lock
+      }
     }
+  } catch (e) {
+    connErr ??= e as Error;
+    throw e;
   } finally {
-    conn.release();
+    conn.off('error', onErr);
+    conn.release(connErr);
   }
 }
 

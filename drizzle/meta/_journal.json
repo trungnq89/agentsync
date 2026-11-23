@@ -64,6 +64,13 @@
       "when": 1795446778644,
       "tag": "0008_deep_ulik",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795454002869,
+      "tag": "0009_illegal_magdalene",
+      "breakpoints": true
     }
   ]
 }

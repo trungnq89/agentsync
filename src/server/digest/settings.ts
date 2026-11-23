@@ -57,6 +57,7 @@ export async function saveSlackSettings(db: Db, actor: Actor, input: SlackSettin
       set.botTokenEnc = encryptSecret(token);
       set.lastError = null;
       set.lastErrorAt = null;
+      set.pausedUntil = null;
     }
     if (input.enabled !== undefined) {
       if (input.enabled) {
