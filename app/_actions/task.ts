@@ -73,8 +73,8 @@ export async function reviewCheckpointAction(_p: FormState, form: FormData): Pro
     try {
       await reviewCheckpoint(getDb(), actor, taskId, stepTitle, decision, str(form, 'note') || undefined);
     } catch (e) {
-      // Someone else (or an earlier click) already handled the step: informational, not an error.
-      if (e instanceof DomainError && e.key === 'stepNotPending') {
+      // A repeated approval (someone else or an earlier click handled the step) is informational; a stale reject is a real error.
+      if (decision === 'approved' && e instanceof DomainError && e.key === 'stepNotPending') {
         revalidatePath(`/tasks/${taskId}`);
         return { info: (await domainMessage(e)).message };
       }

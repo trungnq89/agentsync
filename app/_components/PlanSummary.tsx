@@ -10,6 +10,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Textarea } from '@/components/ui/textarea';
 import { reviewCheckpointAction } from '../_actions/task';
 import { ApproveStepButton } from './ApproveStepButton';
+import { PlanDetails } from './PlanDetails';
 import { formatRelative } from '../_lib/format';
 
 const ICON = { todo: Circle, doing: CircleDot, pending_approval: Hourglass, done: CircleCheck } as const;
@@ -34,7 +35,7 @@ export function PlanSummary({
   return (
     <Card data-testid="plan-summary">
       <CardContent className="pt-4">
-        <details className="group" open={pendingCount > 0}>
+        <PlanDetails initialOpen={pendingCount > 0}>
           <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-1 text-sm font-semibold">
             <span>{t('plan')}</span>
             <span className="font-normal text-muted-foreground">{t('planProgress', { done: doneCount, total: steps.length })}</span>
@@ -50,7 +51,7 @@ export function PlanSummary({
                   <span className="sr-only">{t(LABEL[s.status])}:</span>
                   <div className="min-w-0 flex-1">
                     <span className={`break-words ${s.status === 'done' ? 'text-muted-foreground' : ''}`}>{s.title}</span>
-                    {s.status === 'pending_approval' && <Badge tone="info" className="ml-2 align-middle">{t('stepPending')}</Badge>}
+                    {s.status === 'pending_approval' && <Badge tone="info" className="ml-2 align-middle" aria-hidden="true">{t('stepPending')}</Badge>}
                     {s.status === 'done' && s.confirmedBy && (
                       <div className="text-xs text-muted-foreground" data-testid="step-confirmed">
                         {t('confirmedWhen', {
@@ -68,7 +69,7 @@ export function PlanSummary({
                           confirmLabel={t('rejectSend')}
                           tone="primary"
                           action={reviewCheckpointAction}
-                          trigger={<Button type="button" size="sm" variant="outline" data-testid="step-reject">{t('stepReject')}</Button>}
+                          trigger={<Button type="button" size="sm" variant="outline" aria-label={`${t('stepReject')}: ${s.title}`} data-testid="step-reject">{t('stepReject')}</Button>}
                           fields={
                             <>
                               <input type="hidden" name="taskId" value={taskId} />
@@ -98,12 +99,15 @@ export function PlanSummary({
                   <>
                     <input type="hidden" name="taskId" value={taskId} />
                     <input type="hidden" name="decision" value="approved" />
+                    <ul className="list-disc space-y-1 pl-5 text-sm" data-testid="approve-all-steps">
+                      {steps.filter((s) => s.status === 'pending_approval').map((s, i) => <li key={i} className="break-words">{s.title}</li>)}
+                    </ul>
                   </>
                 }
               />
             </div>
           )}
-        </details>
+        </PlanDetails>
         {revisions.length > 0 && (
           <p className="mt-3 break-words text-xs text-muted-foreground">
             {t('planRevisions', { count: revisions.length })}

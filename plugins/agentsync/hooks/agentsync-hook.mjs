@@ -5,7 +5,7 @@
  * @typedef {{ claimed: string[], reminded: string[], completionRemindedAt?: string }} TaskState
  * @typedef {{ currentTaskId?: string, tasks: Record<string, TaskState>, outstanding: boolean, updatedAt: string }} Session
  * @typedef {{ id: string, status: string, mode: string, effectiveConfirmer?: string, statusChangedAt: string, steps: { title: string, status: string }[] }} Plan
- * @typedef {{ type: 'none' } | { type: 'remindSteps', steps: string[] } | { type: 'remindComplete', mode: 'project' | 'executive' }} Action
+ * @typedef {{ type: 'none' } | { type: 'remindSteps', steps: string[], confirmer: 'member' | 'manager' } | { type: 'remindComplete', mode: 'project' | 'executive' }} Action
  * @typedef {{ taskIds: string[], checkpoints: string[], events: { kind: 'task' | 'checkpoint', value: string }[] }} Markers
  */
 
@@ -157,6 +157,7 @@ export function decide(session, plan, opts) {
   if (pendingKeys.some((c) => !ts.reminded.includes(c))) {
     return out({ reminded: [...pendingKeys] }, {
       type: 'remindSteps',
+      confirmer: managerConfirms ? 'manager' : 'member',
       steps: pendingKeys.map((c) => byTitle.get(c)?.original ?? c),
     });
   }
@@ -180,6 +181,9 @@ export function reasonFor(action) {
       'AgentSync: you reported these plan steps as finished, but they are not marked done on the server:',
       list,
       'Call update_progress with stepsCompleted set to exactly these step titles (copy them verbatim) and a short progress note.',
+      action.confirmer === 'member'
+        ? 'These steps go to the member: ask the member whether they are done, and once they say yes call update_progress with memberConfirmed: true.'
+        : 'Omit memberConfirmed: the steps go to the manager, so wait for manager approval.',
       'If your send mode is review, show the member the draft and wait for approval first.',
     ].join('\n');
   }

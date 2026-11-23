@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  pgTable, pgEnum, uuid, text, boolean, integer, date, jsonb, timestamp, unique, check, uniqueIndex, type AnyPgColumn,
+  pgTable, pgEnum, uuid, text, boolean, integer, date, jsonb, timestamp, unique, check, uniqueIndex, index, type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 export const userLevel = pgEnum('user_level', ['director', 'manager', 'leader', 'member']);
@@ -114,6 +114,7 @@ export const checkpointReviews = pgTable('checkpoint_reviews', {
   consumedAt: ts('consumed_at'),
 }, (t) => [
   check('checkpoint_reviews_decision_check', sql`${t.decision} in ('approved','rejected')`),
+  index('checkpoint_reviews_task_idx').on(t.taskId),
 ]);
 
 export const updates = pgTable('updates', {

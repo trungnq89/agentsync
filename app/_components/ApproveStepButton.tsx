@@ -24,7 +24,7 @@ export function ApproveStepButton({ taskId, stepTitle }: { taskId: string; stepT
       else if (res.ok) toast.success(res.ok);
     });
   return (
-    <Button type="button" size="sm" disabled={pending} onClick={onClick} data-testid="step-approve">
+    <Button type="button" size="sm" aria-label={`${t('stepApprove')}: ${stepTitle}`} disabled={pending} onClick={onClick} data-testid="step-approve">
       {t('stepApprove')}
     </Button>
   );

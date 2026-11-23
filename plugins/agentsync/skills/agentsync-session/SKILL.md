@@ -28,14 +28,14 @@ When you finish a step of the task's plan:
 
 **If `effectiveConfirmer` is `member`:**
 
-1. Do NOT print the marker yet. Summarize what you did for that step and ASK the member: "Is step X done?" (use the exact step title; reply in the member's language).
+1. Do NOT print the marker yet. Summarize what you did for that step and ASK the member: "Is step X done?" (use the exact step title; reply in the member's language). If `sendMode` is `review`, ask once: show the draft update together with the question ("step X done, send this?"); one yes covers both the confirmation and the send.
 2. If the member says no or wants changes: keep working. Print no marker and do not call `update_progress` for that step.
-3. Only after the member says yes: print the checkpoint marker (see "Marker format" below) with the step title exactly as written in the plan, then call `update_progress` with `stepsCompleted` set to that exact title and `memberConfirmed` set to `true` (following the `sendMode` rule: with `review`, show the draft and wait for the member to agree first). Never set `memberConfirmed` to `true` without the member's explicit yes in this conversation.
+3. Only after the member says yes: print the checkpoint marker (see "Marker format" below) with the step title exactly as written in the plan, then call `update_progress` with `stepsCompleted` set to that exact title and `memberConfirmed` set to `true` (following the `sendMode` rule; in `review` mode the single yes from step 1 already covers the draft, so do not ask again). Never set `memberConfirmed` to `true` without the member's explicit yes in this conversation.
 
 **If `effectiveConfirmer` is `manager`:**
 
 1. Print the checkpoint marker with the exact step title, then call `update_progress` with `stepsCompleted` for that step and WITHOUT `memberConfirmed` (following the `sendMode` rule).
-2. Tell the member: step X was sent to the manager for approval and is waiting. Keep working on other steps; the step shows as pending until the manager approves or rejects it.
+2. Tell the member: step X was sent to the manager for approval and is waiting. Keep working on other steps; the step shows as pending until the manager approves or rejects it. Once every step is approved, call `set_task_status` with `action` `complete` (or remind the member to).
 
 Print one marker per finished step. A stop hook reads these markers and reminds you if the step is still not reported on the server. It is only a safety net: do not wait for the reminder. If a reminder arrives, follow it, still respecting `sendMode` and the confirmation rule above.
 

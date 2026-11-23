@@ -266,6 +266,14 @@ describe('mcp tools', () => {
       expect(text(again)).toContain('No step is waiting');
     });
 
+    it('rejecting a step that is not pending is a real error', async () => {
+      const { t, member, manager } = await world('manager');
+      await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A'], source: 'auto' });
+      await call(manager, 'review_checkpoint', { taskId: t.id, stepTitle: 'A', decision: 'approved' });
+      const rej = await call(manager, 'review_checkpoint', { taskId: t.id, stepTitle: 'A', decision: 'rejected', note: 'too late' });
+      expect(rej.isError).toBe(true);
+    });
+
     it('review_checkpoint by a non-manager (owner or stranger) is an error', async () => {
       const { t, member } = await world('manager');
       await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A'], source: 'auto' });

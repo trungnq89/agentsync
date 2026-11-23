@@ -108,7 +108,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       taskId,
       body: z.string().describe('Update text'),
       stepsCompleted: z.array(z.string()).optional().describe('Titles of the steps just completed'),
-      progressPct: z.number().int().min(0).max(100).optional().describe('Progress 0-100'),
+      progressPct: z.number().int().min(0).max(100).optional().describe('Ignored (kept for compatibility): progress is computed from confirmed steps'),
       memberConfirmed: z.boolean().optional().describe('Set true only after the member agreed the reported steps are done'),
       expectedEndDate: isoDate.optional().describe('New expected end date, YYYY-MM-DD'),
       source: z.enum(['auto', 'reviewed']).describe('auto = sent by the agent, reviewed = approved by the user'),
@@ -306,7 +306,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         );
       } catch (e) {
         // A repeat approve (or a stale click) is not a failure: nothing is waiting.
-        if (e instanceof DomainError && e.key === 'stepNotPending') {
+        if (decision === 'approved' && e instanceof DomainError && e.key === 'stepNotPending') {
           return done(t('errors.stepNotPending'), { approved: 0, rejected: 0 });
         }
         throw e;

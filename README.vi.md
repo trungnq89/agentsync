@@ -26,8 +26,9 @@ English: [README.md](README.md)
 
 ## Tính năng
 
-- **Bảng cho quản lý:** nhân sự chia theo cấp, danh sách "cần chú ý" (chờ xác nhận, chờ review, đang kẹt, trễ hạn, lâu không cập nhật) và timeline từng người.
+- **Bảng cho quản lý:** nhân sự chia theo cấp, danh sách "cần chú ý" (chờ xác nhận, checkpoint chờ duyệt, chờ review, đang kẹt, trễ hạn, lâu không cập nhật) và timeline từng người.
 - **Plan do agent viết, quản lý xác nhận:** agent của thành viên soạn plan; quản lý trực tiếp xác nhận hoặc yêu cầu sửa. Các thay đổi plan sau đó được lưu thành các bản điều chỉnh.
+- **Xác nhận checkpoint:** một bước chỉ được tính là xong khi đã được xác nhận: thành viên tự xác nhận (agent hỏi họ) hoặc quản lý trực tiếp duyệt, và quản lý chọn cách nào cho từng người. Tiến độ % là số bước đã xác nhận chia tổng số bước.
 - **Hook Stop (checkpoint):** sau mỗi lượt của agent, hook nhắc agent báo cáo các bước đã xong. Hỗ trợ Claude Code, Codex và Antigravity (chưa thử trên bản cài thật).
 - **MCP cho thành viên và quản lý:** agent của thành viên đồng bộ plan, tiến độ và câu hỏi; agent của quản lý đọc được bảng và gửi phản hồi.
 - **Review giải pháp cho việc code:** hoàn thành việc dạng project sẽ gửi tóm tắt giải pháp (vấn đề, giải pháp, phương án đã loại, rủi ro, kiểm thử, link PR) cho quản lý review.
@@ -89,7 +90,14 @@ Mỗi người dùng tạo token agent trong **Cài đặt** và cài plugin t�
 
 ## Hook checkpoint
 
-Hook `Stop` (tùy chọn) chạy sau mỗi lượt của agent. Khi agent in ra `AGENTSYNC-CHECKPOINT: <tên bước>` cho một bước mà AgentSync chưa ghi nhận là xong, hook nhắc agent gửi cập nhật tiến độ (chế độ gửi của bạn vẫn áp dụng: ở chế độ `review` bạn xem bản nháp trước). Đây là lớp bảo hiểm bên cạnh các skill vốn đã yêu cầu agent báo cáo từng bước. Chi tiết: mục 5 trong [docs/install-agent.vi.md](docs/install-agent.vi.md).
+Hook `Stop` (tùy chọn) chạy sau mỗi lượt của agent. Khi agent in ra `AGENTSYNC-CHECKPOINT: <tên bước>` cho một bước mà AgentSync chưa ghi nhận là đã báo (xong hoặc đang chờ duyệt), hook nhắc agent gửi cập nhật tiến độ (chế độ gửi của bạn vẫn áp dụng: ở chế độ `review` bạn xem bản nháp trước). Đây là lớp bảo hiểm bên cạnh các skill vốn đã yêu cầu agent báo cáo từng bước. Chi tiết: mục 5 trong [docs/install-agent.vi.md](docs/install-agent.vi.md).
+
+## Nâng cấp
+
+1. `git pull`, rồi build lại và khởi động lại AgentSync (cơ sở dữ liệu tự migrate khi khởi động).
+2. Claude Code dùng `--plugin-dir` sẽ lấy plugin mới (0.2.0) từ thư mục vừa pull. Với Codex và cách cài thay thế, hãy chép lại các skill từ `plugins/agentsync/skills`, nếu không agent vẫn dùng skill cũ và không hỏi xác nhận đúng cách.
+3. Tiến độ % giờ là số bước đã xác nhận chia tổng số bước. Giá trị tiến độ nhập tay bị bỏ qua, nên một số việc có thể hiện phần trăm khác.
+4. Việc đang thực hiện cần xác nhận hết các bước mới hoàn thành được. Hãy báo từng bước còn lại (thành viên xác nhận, hoặc quản lý duyệt) trước.
 
 ## Đồng bộ nhân sự Odoo
 

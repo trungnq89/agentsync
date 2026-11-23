@@ -1,0 +1,1 @@
+CREATE INDEX "checkpoint_reviews_task_idx" ON "checkpoint_reviews" USING btree ("task_id");

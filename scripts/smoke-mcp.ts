@@ -49,7 +49,7 @@ async function main() {
   }
   if (!taskId) throw new Error('create_task did not return a task id');
 
-  await call('update_progress', { taskId, body: 'Smoke: đã xong bước 1', stepsCompleted: ['Bước 1'], progressPct: 50, source: 'auto' });
+  await call('update_progress', { taskId, body: 'Smoke: đã xong bước 1', stepsCompleted: ['Bước 1'], memberConfirmed: true, source: 'auto' });
   await call('get_pending_feedback', {});
   const list = await call('list_my_tasks', {});
   if (!list.some((c) => c.text?.includes(taskId))) throw new Error('list_my_tasks does not include the new task');

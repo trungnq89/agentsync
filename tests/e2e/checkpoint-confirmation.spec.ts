@@ -62,6 +62,7 @@ test('manager sets confirmer, then approves, rejects and approves all', async ({
   await step1.getByTestId('step-approve').click();
   await expect(step1).toHaveAttribute('data-status', 'done');
   await expect(step1.getByTestId('step-confirmed')).toContainText('✓ Quản lý duyệt');
+  await expect(step1.getByTestId('step-confirmed')).toBeVisible();
 
   await leaderReports('Bước 2');
   await page.goto(`/tasks/${id}`);
@@ -80,6 +81,7 @@ test('manager sets confirmer, then approves, rejects and approves all', async ({
   await page.goto(`/tasks/${id}`);
   await expect(step2).toHaveAttribute('data-status', 'pending_approval');
   await page.getByTestId('approve-all').click();
+  await expect(page.getByTestId('approve-all-steps')).toContainText('Bước 2');
   await page.getByRole('alertdialog').getByRole('button', { name: 'Duyệt tất cả' }).click();
   await expect(step2).toHaveAttribute('data-status', 'done');
   await expect(page.getByTestId('approve-all')).toHaveCount(0);
@@ -100,6 +102,24 @@ test('a repeated approval shows an info toast, not an error', async ({ page, bro
   await page.getByTestId('step-approve').click();
   await expect(page.locator('[data-sonner-toast]')).toContainText('Không có bước nào đang chờ duyệt');
   await expect(page.locator('p[role="alert"]')).toHaveCount(0);
+});
+
+test('a stale reject of an already approved step shows an error, not an info toast', async ({ page, browser }) => {
+  await loginAs(page, 'manager1', PW);
+  await managerConfirms(page);
+  const id = await leaderReports('Bước 1');
+  await page.goto(`/tasks/${id}`);
+  const other = await browser.newPage();
+  await loginAs(other, 'manager1', PW);
+  await other.goto(`/tasks/${id}`);
+  await other.getByTestId('step-approve').click();
+  await expect(other.getByTestId('plan-step').filter({ hasText: 'Bước 1' })).toHaveAttribute('data-status', 'done');
+  await other.close();
+  await page.getByTestId('step-reject').click();
+  const dialog = page.getByRole('alertdialog');
+  await dialog.getByLabel('Ghi chú').fill('Quá muộn');
+  await dialog.getByRole('button', { name: 'Trả lại' }).click();
+  await expect(dialog).toContainText('Không có bước nào đang chờ duyệt');
 });
 
 test('a member does not see the confirmer card', async ({ page }) => {
@@ -127,6 +147,7 @@ for (const locale of ['vi', 'en'] as const) {
     await expect(page.getByTestId('step-approve')).toBeVisible();
     expect(await overflow(page)).toBe(false);
     await page.getByTestId('step-reject').click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
     expect(await overflow(page)).toBe(false);
   });
 }
