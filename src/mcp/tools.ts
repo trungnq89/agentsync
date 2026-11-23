@@ -9,6 +9,7 @@ import { DomainError, translateError } from '@/server/errors';
 import {
   answerQuestion, askQuestion, getPendingFeedback, postUpdate, resolveQuestion, reviewSolution, submitSolutionSummary,
 } from '@/server/tasks/activity';
+import { reviewCheckpoint, setCheckpointConfirmer } from '@/server/tasks/confirm';
 import {
   changePlan, confirmTask, createTask, makePublic, requestChanges, setTaskStatus,
 } from '@/server/tasks/service';
@@ -102,7 +103,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(t('mcp.taskCreated', { title: task.title, id: task.id }), task);
     });
 
-  tool('update_progress', 'Post a progress update on one of your tasks.',
+  tool('update_progress', 'Post a progress update on one of your tasks. When reporting stepsCompleted and the task\'s effectiveConfirmer is member, ask the member first and pass memberConfirmed: true; when it is manager, omit it and the steps go to the manager for approval.',
     {
       taskId,
       body: z.string().describe('Update text'),
@@ -190,7 +191,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(t('mcp.summarySubmitted'), s);
     });
 
-  tool('get_pending_feedback', 'Show pending feedback: plan change requests, questions, answers, review results.',
+  tool('get_pending_feedback', 'Show pending feedback: plan change requests, questions, answers, review results, and rejectedCheckpoints (steps the manager sent back with a note; rework them, then report the step again).',
     {},
     async (_a, actor) => {
       const f = await getPendingFeedback(db, actor);
@@ -204,14 +205,24 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
             (rv.note ? t('mcp.feedbackReviewNote', { note: rv.note }) : ''),
         );
       }
+      for (const r of f.rejectedCheckpoints) {
+        lines.push(t('mcp.feedbackRejected', { title: r.title, step: r.stepTitle, note: r.note }));
+      }
       return done(lines.length === 1 ? t('mcp.feedbackNone') : lines.join('\n'), f);
     });
 
-  tool('get_my_settings', 'Show your settings, including sendMode (auto = send automatically, review = review before sending).',
+  tool('get_my_settings', 'Show your settings, including sendMode (auto = send automatically, review = review before sending) and checkpointConfirmer (the default who confirms finished steps; the effective confirmer per task is effectiveConfirmer in list_my_tasks/task_detail).',
     {},
     async (_a, actor) => {
-      const data = { sendMode: actor.sendMode, displayName: actor.displayName, level: actor.level };
-      return done(t('mcp.settingsLine', { name: actor.displayName, level: t(`level.${actor.level}`), mode: t(`sendMode.${actor.sendMode}`) }), data);
+      const data = {
+        sendMode: actor.sendMode, displayName: actor.displayName, level: actor.level,
+        checkpointConfirmer: actor.checkpointConfirmer,
+      };
+      return done(
+        t('mcp.settingsLine', { name: actor.displayName, level: t(`level.${actor.level}`), mode: t(`sendMode.${actor.sendMode}`) }) +
+          t('mcp.settingsConfirmer', { who: t(`mcp.confirmer${actor.checkpointConfirmer === 'manager' ? 'Manager' : 'Member'}`) }),
+        data,
+      );
     });
 
   // ------------------------------------------------------------ manager
@@ -277,5 +288,38 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     async ({ taskId: id, verdict, note }, actor) => {
       const task = await reviewSolution(db, actor, id, verdict, note, now());
       return done(t('mcp.reviewResult', { verdict: t(`verdict.${verdict}`) }), task);
+    });
+
+  tool('review_checkpoint', 'Approve or reject steps waiting for your approval (direct manager only). Omit stepTitle to approve all pending steps of the task; rejecting needs stepTitle and a note.',
+    {
+      taskId,
+      stepTitle: z.string().optional().describe('Exact step title; omit to approve every pending step (approved only)'),
+      decision: z.enum(['approved', 'rejected']),
+      note: z.string().optional().describe('Required when decision is rejected'),
+    },
+    async ({ taskId: id, stepTitle, decision, note }, actor) => {
+      try {
+        const r = await reviewCheckpoint(db, actor, id, stepTitle ?? null, decision, note, now());
+        return done(
+          decision === 'approved' ? t('mcp.checkpointApproved', { count: r.approved }) : t('mcp.checkpointRejected'),
+          r,
+        );
+      } catch (e) {
+        // A repeat approve (or a stale click) is not a failure: nothing is waiting.
+        if (e instanceof DomainError && e.key === 'stepNotPending') {
+          return done(t('errors.stepNotPending'), { approved: 0, rejected: 0 });
+        }
+        throw e;
+      }
+    });
+
+  tool('set_checkpoint_confirmer', 'Choose who confirms finished steps for one of your direct reports: member (they confirm themselves) or manager (you approve each step). Direct manager only.',
+    { userId: z.string().describe('User ID of your direct report'), confirmer: z.enum(['member', 'manager']) },
+    async ({ userId, confirmer }, actor) => {
+      const u = await setCheckpointConfirmer(db, actor, userId, confirmer);
+      return done(
+        t('mcp.confirmerSet', { name: u.displayName, who: t(`mcp.confirmer${confirmer === 'manager' ? 'Manager' : 'Member'}`) }),
+        { userId: u.id, displayName: u.displayName, checkpointConfirmer: u.checkpointConfirmer },
+      );
     });
 }

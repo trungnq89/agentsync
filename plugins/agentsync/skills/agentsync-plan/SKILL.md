@@ -34,6 +34,10 @@ AGENTSYNC-TASK: <taskId>
 
 7. Tell the member the task was created and is now "Pending confirmation" for the manager to confirm.
 
+## Revising a plan later
+
+Step status is owned by the server. When you call `revise_plan`, resend the existing steps unchanged by title and set each to `todo` or `doing` only; the server keeps confirmed (`done` or waiting for approval) steps as they are. A step you rename or add starts again from `todo` and must be confirmed again. You cannot mark a step `done` through the plan: steps become done only through the confirmation flow in `update_progress`.
+
 ## Rules
 
 - Dates are always YYYY-MM-DD (for example 2026-11-27). Convert "Friday" or "next week" to a concrete date and repeat it to the member for confirmation.

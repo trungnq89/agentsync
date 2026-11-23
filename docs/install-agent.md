@@ -68,6 +68,7 @@ bearer_token_env_var = "AGENTSYNC_TOKEN"
 - The agent always replies in the language you use. What it reads from AgentSync follows the language chosen in Settings (or the install's default language).
 - The default send mode is `review`: the agent lets you approve every submission first. Switch to `auto` on the Settings page.
 - The agent only sends summaries, never code, secrets or customer data.
+- Finished steps are confirmed before they count. By default (confirmer `member`) the agent shows what it did and asks you "Is step X done?" before reporting it; only your yes marks the step done. If your manager chose to approve your steps themselves (confirmer `manager`), the agent sends the step for approval and tells you it is waiting. A step your manager rejects comes back to "doing" with a note, which the agent shows at the start of your next session. Progress counts only confirmed steps, and a task can be completed only when every step is done. Managers approve with `review_checkpoint` (one step or all pending steps of a task) and choose the confirmer for a direct report with `set_checkpoint_confirmer`.
 
 ## 5. Checkpoint hook
 

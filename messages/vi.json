@@ -493,6 +493,16 @@
     "settingsLine": "{name} ({level}) — chế độ gửi: {mode}.",
     "confirmed": "Đã xác nhận.",
     "changesRequested": "Đã yêu cầu sửa plan.",
+    "confirmerLabel": "người xác nhận checkpoint: {who}",
+    "confirmerMember": "thành viên",
+    "confirmerManager": "quản lý",
+    "settingsConfirmer": " Người xác nhận checkpoint: {who}.",
+    "detailConfirmer": "Người xác nhận checkpoint: {who}",
+    "stepPending": " (chờ quản lý duyệt)",
+    "feedbackRejected": "- Checkpoint bị trả về ở **{title}**, bước \"{step}\" (quay lại đang làm): {note}",
+    "checkpointApproved": "{count, plural, other {Đã duyệt # bước.}}",
+    "checkpointRejected": "Đã trả bước về \"đang làm\".",
+    "confirmerSet": "{name}: người xác nhận checkpoint giờ là {who}.",
     "reviewResult": "{verdict}."
   },
   "theme": {

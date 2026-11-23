@@ -140,7 +140,7 @@ describe('mcp tools', () => {
   it('get_my_settings returns sendMode, displayName, level', async () => {
     const me = await makeUser({ displayName: 'Lan', sendMode: 'auto' });
     const r = await call(await connect(() => me), 'get_my_settings');
-    expect(JSON.parse(r.content[1].text)).toEqual({ sendMode: 'auto', displayName: 'Lan', level: 'member' });
+    expect(JSON.parse(r.content[1].text)).toEqual({ sendMode: 'auto', displayName: 'Lan', level: 'member', checkpointConfirmer: 'member' });
   });
 
   it('non-domain errors are not leaked', async () => {
@@ -203,5 +203,93 @@ describe('mcp tools', () => {
       if (prev === undefined) delete process.env.DEFAULT_LOCALE;
       else process.env.DEFAULT_LOCALE = prev;
     }
+  });
+
+  describe('checkpoint confirmation', () => {
+    const data = (r: Res) => JSON.parse(r.content[1].text);
+    async function world(confirmer: 'member' | 'manager') {
+      const mgr = await makeUser({ level: 'manager' });
+      const me = await makeUser({ managerId: mgr.id, checkpointConfirmer: confirmer });
+      const t = await makeTask(me.id, { status: 'in_progress', steps: ['A', 'B'] });
+      return { mgr, me, t, member: await connect(() => me, 'en'), manager: await connect(() => mgr, 'en') };
+    }
+
+    it('member mode end to end: needs memberConfirmed, then done', async () => {
+      const { me, t, member } = await world('member');
+      expect(data(await call(member, 'get_my_settings')).checkpointConfirmer).toBe('member');
+      expect(data(await call(member, 'list_my_tasks'))[0].effectiveConfirmer).toBe('member');
+      const no = await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A'], source: 'auto' });
+      expect(no.isError).toBe(true);
+      expect(text(no)).toContain('memberConfirmed');
+      const ok = await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A'], memberConfirmed: true, source: 'auto' });
+      expect(ok.isError).toBeFalsy();
+      const d = data(await call(member, 'task_detail', { taskId: t.id }));
+      expect(d.plan.steps[0]).toMatchObject({ title: 'A', status: 'done', confirmedBy: 'member', confirmedById: me.id });
+      expect(d.effectiveConfirmer).toBe('member');
+    });
+
+    it('manager mode end to end: pending, needs_attention, reject with note, rework, approve', async () => {
+      const { t, member, manager } = await world('manager');
+      expect(data(await call(member, 'list_my_tasks'))[0].effectiveConfirmer).toBe('manager');
+      await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A', 'B'], source: 'auto' });
+      expect(data(await call(member, 'task_detail', { taskId: t.id })).plan.steps.map((s: { status: string }) => s.status))
+        .toEqual(['pending_approval', 'pending_approval']);
+      const att = await call(manager, 'needs_attention');
+      expect(text(att)).toContain('Checkpoints awaiting approval');
+      expect(text(att)).toContain('2');
+
+      const noNote = await call(manager, 'review_checkpoint', { taskId: t.id, stepTitle: 'A', decision: 'rejected' });
+      expect(noNote.isError).toBe(true);
+      const rej = await call(manager, 'review_checkpoint', { taskId: t.id, stepTitle: 'A', decision: 'rejected', note: 'Missing tests' });
+      expect(rej.isError).toBeFalsy();
+      const fb = await call(member, 'get_pending_feedback');
+      expect(text(fb)).toContain('Missing tests');
+      expect(data(fb).rejectedCheckpoints).toHaveLength(1);
+
+      const appr = await call(manager, 'review_checkpoint', { taskId: t.id, stepTitle: 'B', decision: 'approved' });
+      expect(appr.isError).toBeFalsy();
+      await call(member, 'update_progress', { taskId: t.id, body: 'fixed', stepsCompleted: ['A'], source: 'auto' });
+      expect(data(await call(member, 'get_pending_feedback')).rejectedCheckpoints).toHaveLength(0);
+      const all = await call(manager, 'review_checkpoint', { taskId: t.id, decision: 'approved' });
+      expect(all.isError).toBeFalsy();
+      const steps = data(await call(manager, 'task_detail', { taskId: t.id })).plan.steps;
+      expect(steps.map((s: { status: string }) => s.status)).toEqual(['done', 'done']);
+      expect(steps[0].confirmedBy).toBe('manager');
+    });
+
+    it('repeat approve-all is an informative non-error', async () => {
+      const { t, member, manager } = await world('manager');
+      await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A'], source: 'auto' });
+      expect((await call(manager, 'review_checkpoint', { taskId: t.id, decision: 'approved' })).isError).toBeFalsy();
+      const again = await call(manager, 'review_checkpoint', { taskId: t.id, decision: 'approved' });
+      expect(again.isError).toBeFalsy();
+      expect(text(again)).toContain('No step is waiting');
+    });
+
+    it('review_checkpoint by a non-manager (owner or stranger) is an error', async () => {
+      const { t, member } = await world('manager');
+      await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A'], source: 'auto' });
+      expect((await call(member, 'review_checkpoint', { taskId: t.id, decision: 'approved' })).isError).toBe(true);
+      const other = await makeUser({ level: 'manager' });
+      const stranger = await connect(() => other, 'en');
+      expect((await call(stranger, 'review_checkpoint', { taskId: t.id, decision: 'approved' })).isError).toBe(true);
+    });
+
+    it('set_checkpoint_confirmer: direct manager only', async () => {
+      const { me, member, manager } = await world('member');
+      const bad = await call(member, 'set_checkpoint_confirmer', { userId: me.id, confirmer: 'manager' });
+      expect(bad.isError).toBe(true);
+      const ok = await call(manager, 'set_checkpoint_confirmer', { userId: me.id, confirmer: 'manager' });
+      expect(ok.isError).toBeFalsy();
+      expect(data(ok).checkpointConfirmer).toBe('manager');
+      expect(data(ok).passwordHash).toBeUndefined();
+      expect((await call(manager, 'set_checkpoint_confirmer', { userId: me.id, confirmer: 'boss' })).isError).toBe(true);
+    });
+
+    it("revise_plan/planStep with status 'pending_approval' is rejected too", async () => {
+      const { t, member } = await world('member');
+      const r = await call(member, 'revise_plan', { taskId: t.id, steps: [{ title: 'A', status: 'pending_approval' }] });
+      expect(r.isError).toBe(true);
+    });
   });
 });

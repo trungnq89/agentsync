@@ -68,6 +68,7 @@ bearer_token_env_var = "AGENTSYNC_TOKEN"
 - Chế độ gửi mặc định là `review`: agent cho bạn duyệt trước mọi lần gửi. Đổi sang `auto` ở trang Cài đặt.
 - Agent luôn trả lời bạn bằng ngôn ngữ bạn đang dùng. Nội dung agent đọc từ AgentSync theo ngôn ngữ bạn chọn trong Cài đặt (hoặc ngôn ngữ mặc định của hệ thống).
 - Agent chỉ gửi bản tóm tắt, không gửi code, secret hay dữ liệu khách hàng.
+- Bước đã xong phải được xác nhận mới được tính. Mặc định (người xác nhận là `member`) agent tóm tắt việc đã làm và hỏi bạn "Bước X đã đạt chưa?" trước khi báo; chỉ khi bạn đồng ý bước mới thành xong. Nếu quản lý chọn tự duyệt bước của bạn (người xác nhận là `manager`), agent gửi bước đi chờ duyệt và báo bạn là đang chờ. Bước bị quản lý "Chưa đạt" quay về "đang làm" kèm ghi chú, agent nhắc ở đầu phiên sau. Tiến độ chỉ tính bước đã xác nhận, và việc chỉ hoàn thành khi mọi bước đã xong. Quản lý duyệt bằng `review_checkpoint` (một bước hoặc mọi bước đang chờ của một việc) và chọn người xác nhận cho nhân sự trực tiếp bằng `set_checkpoint_confirmer`.
 
 ## 5. Checkpoint hook
 

@@ -1,6 +1,6 @@
 ---
 name: agentsync-manager
-description: Use when a manager asks about team status, which tasks need attention, the weekly digest, or wants to confirm a plan, request changes, ask or answer a question, or review a solution summary in AgentSync.
+description: Use when a manager asks about team status, which tasks need attention, the weekly digest, or wants to confirm a plan, request changes, ask or answer a question, review a solution summary, or approve or reject checkpoint steps in AgentSync.
 ---
 
 # Manager: track and respond through AgentSync
@@ -23,6 +23,16 @@ Always reply to the manager in the language they use.
 - Ask a member: `ask_question`.
 - Answer a member's blocker or question: `answer_blocker` with `questionId` and `answer`.
 - Review a solution summary: `review_solution` with `verdict` set to `approved` or `changes_needed`. `note` is required for `changes_needed`.
+
+## Approving checkpoints
+
+Some members send finished steps to you for approval (their checkpoint confirmer is `manager`).
+
+- See what is waiting: `needs_attention` lists items of kind "Checkpoints awaiting approval" with the task id. Open one with `task_detail`; steps waiting for approval are marked `[~]`.
+- Approve or reject one step: `review_checkpoint` with `taskId`, `stepTitle` (exact title) and `decision` set to `approved` or `rejected`. A `note` is required for `rejected` (say exactly what is missing); the step goes back to `doing` and the member sees your note at the start of their next session.
+- Approve everything pending on a task: `review_checkpoint` with `taskId` and `decision` set to `approved`, no `stepTitle`. Rejecting is always per step. If nothing is pending (for example it was already approved) the tool says so; that is not an error.
+- Choose who confirms for a direct report: `set_checkpoint_confirmer` with `userId` and `confirmer` set to `member` (they confirm themselves) or `manager` (you approve each step). Only the direct manager can do this, and the setting stays with the member if their manager changes.
+- Before approving all, show the manager which steps will be approved and wait for agreement.
 
 ## Rules
 

@@ -493,6 +493,16 @@
     "settingsLine": "{name} ({level}) — send mode: {mode}.",
     "confirmed": "Confirmed.",
     "changesRequested": "Plan changes requested.",
+    "confirmerLabel": "checkpoints confirmed by: {who}",
+    "confirmerMember": "member",
+    "confirmerManager": "manager",
+    "settingsConfirmer": " Checkpoint confirmer: {who}.",
+    "detailConfirmer": "Checkpoint confirmer: {who}",
+    "stepPending": " (awaiting manager approval)",
+    "feedbackRejected": "- Checkpoint rejected on **{title}**, step \"{step}\" (back to doing): {note}",
+    "checkpointApproved": "{count, plural, one {# step approved.} other {# steps approved.}}",
+    "checkpointRejected": "Step rejected and sent back to doing.",
+    "confirmerSet": "{name}: checkpoint confirmer is now {who}.",
     "reviewResult": "{verdict}."
   },
   "theme": {
