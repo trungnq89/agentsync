@@ -577,5 +577,24 @@
     "usage": "Usage: SEED_ADMIN_PASSWORD=<p> pnpm seed:admin --username <u>   (or enter the password when prompted)",
     "passwordPrompt": "Admin password: ",
     "adminCreated": "Admin \"{username}\" created."
+  },
+  "digest": {
+    "headerTitle": "AgentSync digest",
+    "header": "AgentSync digest · {date}",
+    "testNotice": "Test message",
+    "nothing": "Nothing needs your attention right now.",
+    "awaiting": "Waiting for your review",
+    "problems": "Problems",
+    "team": "Team since the last digest: {active} active, {doneSince} done, {createdSince} new.",
+    "rejected": "Rejected checkpoints",
+    "changesRequested": "Changes requested",
+    "questions": "Questions for you",
+    "answers": "New answers",
+    "dueSoon": "Due soon",
+    "overdue": "overdue since {date}",
+    "due": "due {date}",
+    "pendingSteps": "{count, plural, one {# step of yours is waiting for approval.} other {# steps of yours are waiting for approval.}}",
+    "more": "… and {count} more",
+    "summary": "{count, plural, one {# item} other {# items}}"
   }
 }

@@ -577,5 +577,24 @@
     "usage": "Cách dùng: SEED_ADMIN_PASSWORD=<mật khẩu> pnpm seed:admin --username <tên đăng nhập>   (hoặc nhập mật khẩu khi được hỏi)",
     "passwordPrompt": "Mật khẩu admin: ",
     "adminCreated": "Đã tạo admin \"{username}\"."
+  },
+  "digest": {
+    "headerTitle": "Tổng hợp AgentSync",
+    "header": "Tổng hợp AgentSync · {date}",
+    "testNotice": "Tin thử",
+    "nothing": "Hiện không có gì cần chú ý.",
+    "awaiting": "Chờ bạn duyệt",
+    "problems": "Có vấn đề",
+    "team": "Team kể từ lần gửi trước: {active} đang làm, {doneSince} xong, {createdSince} mới tạo.",
+    "rejected": "Bước bị từ chối",
+    "changesRequested": "Yêu cầu chỉnh sửa",
+    "questions": "Câu hỏi cho bạn",
+    "answers": "Câu trả lời mới",
+    "dueSoon": "Sắp đến hạn",
+    "overdue": "quá hạn từ {date}",
+    "due": "hạn {date}",
+    "pendingSteps": "{count} bước của bạn đang chờ duyệt.",
+    "more": "… và {count} mục khác",
+    "summary": "{count} mục"
   }
 }
