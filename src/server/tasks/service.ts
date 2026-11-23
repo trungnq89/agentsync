@@ -7,7 +7,7 @@ import {
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
 import { isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
-import { normalizePlanSteps } from './confirm';
+import { assertUniqueStepTitles, normalizePlanSteps } from './confirm';
 import { asDb, currentPlan, lifecycleCtx, requireOwner, type PlanVersion } from './internal';
 import { initialStatus, nextStatus, TERMINAL_STATUSES, type TaskAction, type TaskStatus } from './lifecycle';
 
@@ -39,6 +39,7 @@ export async function createTask(
     throw new DomainError('VALIDATION', 'invalidDate');
   }
   if (input.steps.length === 0) throw new DomainError('VALIDATION', 'planNeedsStep');
+  assertUniqueStepTitles(input.steps);
   if (input.agreedDueDate < input.startDate) {
     throw new DomainError('VALIDATION', 'dueBeforeStart');
   }
@@ -130,6 +131,7 @@ export async function changePlan(
   now: Date = new Date(),
 ): Promise<Task> {
   if (input.steps.length === 0) throw new DomainError('VALIDATION', 'planNeedsStep');
+  assertUniqueStepTitles(input.steps.map((x) => x.title));
   if (input.expectedEndDate !== undefined && !isValidIsoDate(input.expectedEndDate)) {
     throw new DomainError('VALIDATION', 'invalidDate');
   }

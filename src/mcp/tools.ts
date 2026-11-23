@@ -41,7 +41,7 @@ const errorReply = (message: string) => ({
 
 const planStep = z.object({
   title: z.string().describe('Step title'),
-  status: z.enum(['todo', 'doing']).describe('Step status (todo or doing; done is set by confirmation)'),
+  status: z.enum(['todo', 'doing']).describe('todo or doing only. Confirmed (done/pending) state is kept by the server by title; send completed steps unchanged'),
 });
 const isoDate = z.string().refine(isValidIsoDate, 'Invalid date, use the YYYY-MM-DD format.');
 const taskId = z.string().describe('Task ID (from list_my_tasks)');
@@ -119,7 +119,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(t('mcp.updateSent'), u);
     });
 
-  tool('revise_plan', 'Revise the plan of a task.',
+  tool('revise_plan', 'Revise the plan of a task. Step status is server-owned: send completed steps unchanged by title with status todo or doing; confirmed state is kept by title (renaming a step resets it to todo).',
     {
       taskId,
       steps: z.array(planStep).describe('All steps of the new plan'),

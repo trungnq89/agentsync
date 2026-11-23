@@ -28,6 +28,14 @@ const newTask = {
 };
 
 describe('mcp tools', () => {
+  it("revise_plan rejects step status 'done' (server-owned)", async () => {
+    const me = await makeUser();
+    const t = await makeTask(me.id, { status: 'in_progress' });
+    const c = await connect(() => me);
+    const r = await call(c, 'revise_plan', { taskId: t.id, steps: [{ title: 'Bước 1', status: 'done' }] });
+    expect(r.isError).toBe(true);
+  });
+
   it('create_task then list_my_tasks contains it with status "Chờ xác nhận"', async () => {
     const mgr = await makeUser({ level: 'manager' });
     const me = await makeUser({ managerId: mgr.id });

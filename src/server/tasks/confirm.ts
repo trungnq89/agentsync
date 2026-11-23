@@ -26,13 +26,20 @@ export async function setCheckpointConfirmer(
 ): Promise<User> {
   const notFound = () => new DomainError('NOT_FOUND', 'notFoundUser');
   if (!isUuid(userId)) throw notFound();
-  const [target] = await db.select().from(users).where(eq(users.id, userId));
-  if (!target || !isCurrentManagerOf(actor, target)) throw notFound();
-  if (!CONFIRMERS.includes(confirmer)) {
-    throw new DomainError('VALIDATION', 'invalidConfirmer', { field: 'confirmer' });
-  }
-  const [updated] = await db.update(users).set({ checkpointConfirmer: confirmer }).where(eq(users.id, userId)).returning();
-  return updated;
+  return db.transaction(async (tx) => {
+    const [target] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
+    if (!target || !isCurrentManagerOf(actor, target)) throw notFound();
+    if (!CONFIRMERS.includes(confirmer)) {
+      throw new DomainError('VALIDATION', 'invalidConfirmer', { field: 'confirmer' });
+    }
+    const [updated] = await tx.update(users).set({ checkpointConfirmer: confirmer }).where(eq(users.id, userId)).returning();
+    return updated;
+  });
+}
+
+/** Step titles identify steps, so they must be unique within a plan. */
+export function assertUniqueStepTitles(titles: string[]): void {
+  if (new Set(titles).size !== titles.length) throw new DomainError('VALIDATION', 'duplicateStepTitle');
 }
 
 /**

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { planVersions, users } from '@/db/schema';
 import { effectiveConfirmer, setCheckpointConfirmer } from '@/server/tasks/confirm';
-import { changePlan, getCurrentPlan } from '@/server/tasks/service';
+import { changePlan, createTask, getCurrentPlan } from '@/server/tasks/service';
 import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
 
@@ -101,5 +101,17 @@ describe('changePlan owns step status', () => {
     const { member, t } = await seeded([{ title: 'A', status: 'done', ...conf }]);
     await changePlan(testDb, member, t.id, { steps: [{ title: 'A2', status: 'done' }] });
     expect((await getCurrentPlan(testDb, t.id)).steps).toEqual([{ title: 'A2', status: 'todo' }]);
+  });
+});
+
+describe('duplicate step titles', () => {
+  it('changePlan and createTask reject duplicates', async () => {
+    const member = await makeUser();
+    const t = await makeTask(member.id, { status: 'in_progress' });
+    await expect(changePlan(testDb, member, t.id, { steps: [{ title: 'A', status: 'todo' }, { title: 'A', status: 'doing' }] }))
+      .rejects.toMatchObject({ code: 'VALIDATION', key: 'duplicateStepTitle' });
+    await expect(createTask(testDb, member, {
+      title: 'x', mode: 'executive', agreedOutcome: 'y', startDate: '2026-11-23', agreedDueDate: '2026-11-30', steps: ['A', 'A'],
+    })).rejects.toMatchObject({ code: 'VALIDATION', key: 'duplicateStepTitle' });
   });
 });
