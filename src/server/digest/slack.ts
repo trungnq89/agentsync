@@ -1,12 +1,18 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import { users, type User } from '@/db/schema';
 import { DomainError } from '../errors';
 
 export type SlackMessage = { text: string; blocks?: unknown[] };
 
-const AUTH_ERRORS = new Set(['invalid_auth', 'not_authed', 'account_inactive', 'token_revoked']);
-const RECIPIENT_GONE = new Set(['user_not_found', 'channel_not_found']);
+// Whole-token / workspace problems: Task 4 stops the run on these instead of failing each user.
+const AUTH_ERRORS = new Set([
+  'invalid_auth', 'not_authed', 'account_inactive', 'token_revoked', 'token_expired', 'missing_scope',
+  'not_allowed_token_type', 'no_permission', 'team_access_not_granted', 'access_denied', 'ekm_access_denied',
+  'messages_tab_disabled', 'org_login_required',
+]);
+const RATE_LIMITED = new Set(['ratelimited', 'rate_limited', 'message_limit_exceeded']);
+const RECIPIENT_GONE = new Set(['user_not_found', 'channel_not_found', 'is_archived']);
 
 /** Error params carry only Slack's own error code (never the token or message text). */
 function slackError(code: string, retryAfter?: number): DomainError {
@@ -14,7 +20,7 @@ function slackError(code: string, retryAfter?: number): DomainError {
   if (AUTH_ERRORS.has(code)) return new DomainError('VALIDATION', 'slackAuthFailed', { code: safe });
   if (code === 'users_not_found') return new DomainError('VALIDATION', 'slackUserNotFound', { code: safe });
   if (RECIPIENT_GONE.has(code)) return new DomainError('VALIDATION', 'slackRecipientGone', { code: safe });
-  if (code === 'ratelimited') return new DomainError('VALIDATION', 'slackRateLimited', { code: safe, retryAfter: retryAfter ?? 60 });
+  if (RATE_LIMITED.has(code)) return new DomainError('VALIDATION', 'slackRateLimited', { code: safe, retryAfter: retryAfter ?? 60 });
   return new DomainError('VALIDATION', 'slackUnavailable', { code: safe });
 }
 
@@ -77,36 +83,35 @@ export function createSlackClient(
 
 export type SlackClient = ReturnType<typeof createSlackClient>;
 
+type RecipientUser = Pick<User, 'id' | 'email' | 'slackUserId'>;
+
 export interface DigestTransport {
   channel: 'slack';
-  resolveRecipient(db: Db, user: Pick<User, 'id' | 'email' | 'slackUserId'>): Promise<string>;
-  send(recipient: string, msg: SlackMessage): Promise<void>;
+  /** Cached slackUserId, else lookup by email and cache. Throws noEmail | slackUserNotFound. */
+  resolveRecipient(db: Db, user: RecipientUser): Promise<string>;
+  /** Resolves, posts, and on slackRecipientGone clears the cached id (only if unchanged) before rethrowing. */
+  send(db: Db, user: RecipientUser, msg: SlackMessage): Promise<void>;
 }
 
 export function slackTransport(client: SlackClient): DigestTransport {
-  // recipient id -> owning user id, so send() can clear the cached match on slackRecipientGone
-  const owners = new Map<string, { db: Db; userId: string }>();
+  async function resolveRecipient(db: Db, user: RecipientUser): Promise<string> {
+    if (user.slackUserId) return user.slackUserId;
+    const email = user.email?.trim().toLowerCase();
+    if (!email) throw new DomainError('VALIDATION', 'noEmail');
+    const id = await client.lookupByEmail(email);
+    await db.update(users).set({ slackUserId: id }).where(eq(users.id, user.id));
+    return id;
+  }
   return {
     channel: 'slack',
-    async resolveRecipient(db, user) {
-      if (user.slackUserId) {
-        owners.set(user.slackUserId, { db, userId: user.id });
-        return user.slackUserId;
-      }
-      const email = user.email?.trim().toLowerCase();
-      if (!email) throw new DomainError('VALIDATION', 'noEmail');
-      const id = await client.lookupByEmail(email);
-      await db.update(users).set({ slackUserId: id }).where(eq(users.id, user.id));
-      owners.set(id, { db, userId: user.id });
-      return id;
-    },
-    async send(recipient, msg) {
+    resolveRecipient,
+    async send(db, user, msg) {
+      const recipient = await resolveRecipient(db, user);
       try {
         await client.postMessage(recipient, msg);
       } catch (e) {
         if (e instanceof DomainError && e.key === 'slackRecipientGone') {
-          const o = owners.get(recipient);
-          if (o) await o.db.update(users).set({ slackUserId: null }).where(eq(users.id, o.userId));
+          await db.update(users).set({ slackUserId: null }).where(and(eq(users.id, user.id), eq(users.slackUserId, recipient)));
         }
         throw e;
       }

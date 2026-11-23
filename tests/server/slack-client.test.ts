@@ -66,6 +66,35 @@ describe('slack client', () => {
     expect((await rejects(c.postMessage('U1', { text: 'x' }))).key).toBe('slackUnavailable');
   });
 
+  it('whole-token/workspace codes -> slackAuthFailed, keeping the code', async () => {
+    const f = await start();
+    const c = createSlackClient(TOKEN, f.url);
+    for (const code of ['token_expired', 'missing_scope', 'not_allowed_token_type', 'no_permission', 'team_access_not_granted', 'access_denied', 'ekm_access_denied', 'messages_tab_disabled', 'org_login_required', 'account_inactive']) {
+      f.failNext({ method: 'chat.postMessage', error: code });
+      const e = await rejects(c.postMessage('U1', { text: 'x' }));
+      expect([code, e.key, e.params?.code]).toEqual([code, 'slackAuthFailed', code]);
+    }
+  });
+
+  it('rate_limited / message_limit_exceeded (HTTP 200) -> slackRateLimited; is_archived -> slackRecipientGone', async () => {
+    const f = await start();
+    const c = createSlackClient(TOKEN, f.url);
+    for (const code of ['rate_limited', 'message_limit_exceeded']) {
+      f.failNext({ method: 'chat.postMessage', error: code });
+      const e = await rejects(c.postMessage('U1', { text: 'x' }));
+      expect([code, e.key, e.params?.code]).toEqual([code, 'slackRateLimited', code]);
+      expect(typeof e.params?.retryAfter).toBe('number');
+    }
+    f.failNext({ method: 'chat.postMessage', error: 'is_archived' });
+    expect((await rejects(c.postMessage('U1', { text: 'x' }))).key).toBe('slackRecipientGone');
+  });
+
+  it('429 without Retry-After defaults retryAfter to 60', async () => {
+    const f = await start({ failNext: { method: 'chat.postMessage', status: 429 } });
+    const e = await rejects(createSlackClient(TOKEN, f.url).postMessage('U1', { text: 'x' }));
+    expect(e.params?.retryAfter).toBe(60);
+  });
+
   it('timeout -> slackUnavailable', async () => {
     const f = await start({ delayMs: 300 });
     const e = await rejects(createSlackClient(TOKEN, f.url, { timeoutMs: 50 }).authTest());
@@ -74,35 +103,52 @@ describe('slack client', () => {
 });
 
 describe('slack transport', () => {
-  it('looks up once, caches slackUserId, clears it on channel_not_found', async () => {
+  it('send looks up once, caches slackUserId, clears it on channel_not_found', async () => {
     const f = await start();
     const t = slackTransport(createSlackClient(TOKEN, f.url));
     expect(t.channel).toBe('slack');
     const u = await makeUser({ email: ' Ann@X.com ' });
-    const r1 = await t.resolveRecipient(testDb, u);
-    expect(r1).toBe('U1');
+    await t.send(testDb, u, { text: 'hi' });
     expect(f.lookups).toEqual(['ann@x.com']);
+    expect(f.posts).toEqual([{ channel: 'U1', text: 'hi', blocks: undefined }]);
     const [row] = await testDb.select().from(users).where(eq(users.id, u.id));
     expect(row.slackUserId).toBe('U1');
-    expect(await t.resolveRecipient(testDb, row)).toBe('U1');
-    expect(f.lookups).toHaveLength(1);
 
-    await t.send('U1', { text: 'hi' });
-    expect(f.posts).toHaveLength(1);
+    await t.send(testDb, row, { text: 'again' });
+    expect(f.lookups).toHaveLength(1);
+    expect(f.posts).toHaveLength(2);
 
     f.failNext({ method: 'chat.postMessage', error: 'channel_not_found' });
-    const e = await rejects(t.send('U1', { text: 'hi' }));
+    const e = await rejects(t.send(testDb, row, { text: 'hi' }));
     expect(e.key).toBe('slackRecipientGone');
     const [after] = await testDb.select().from(users).where(eq(users.id, u.id));
     expect(after.slackUserId).toBeNull();
   });
 
-  it('no email -> noEmail; unknown email -> slackUserNotFound', async () => {
+  it('a recipient re-matched in between is not wiped', async () => {
     const f = await start();
     const t = slackTransport(createSlackClient(TOKEN, f.url));
+    const u = await makeUser({ email: 'ann@x.com', slackUserId: 'UOLD' });
+    await testDb.update(users).set({ slackUserId: 'UNEW' }).where(eq(users.id, u.id));
+    f.failNext({ method: 'chat.postMessage', error: 'channel_not_found' });
+    const e = await rejects(t.send(testDb, u, { text: 'hi' })); // stale snapshot still says UOLD
+    expect(e.key).toBe('slackRecipientGone');
+    const [after] = await testDb.select().from(users).where(eq(users.id, u.id));
+    expect(after.slackUserId).toBe('UNEW');
+  });
+
+  it('resolveRecipient: caches, noEmail, slackUserNotFound', async () => {
+    const f = await start();
+    const t = slackTransport(createSlackClient(TOKEN, f.url));
+    const u = await makeUser({ email: 'ann@x.com' });
+    expect(await t.resolveRecipient(testDb, u)).toBe('U1');
+    const [row] = await testDb.select().from(users).where(eq(users.id, u.id));
+    expect(row.slackUserId).toBe('U1');
+    expect(await t.resolveRecipient(testDb, row)).toBe('U1');
+    expect(f.lookups).toHaveLength(1);
     const noMail = await makeUser({ email: null });
     expect((await rejects(t.resolveRecipient(testDb, noMail))).key).toBe('noEmail');
     const stranger = await makeUser({ email: 'zed@x.com' });
-    expect((await rejects(t.resolveRecipient(testDb, stranger))).key).toBe('slackUserNotFound');
+    expect((await rejects(t.send(testDb, stranger, { text: 'x' }))).key).toBe('slackUserNotFound');
   });
 });

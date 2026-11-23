@@ -50,6 +50,8 @@ export async function startFakeSlack(opts: Opts) {
       if (req.method !== 'POST') return reply(200, { ok: false, error: 'invalid_method' });
       if (method === 'auth.test') return reply(200, { ok: true, team: 'Acme Team', user: 'agentsync-bot' });
       if (method === 'users.lookupByEmail') {
+        // Like Slack, this method ignores JSON bodies (only form/query params count).
+        if (ct.includes('application/json')) params = {};
         const email = String(params.email ?? '');
         lookups.push(email);
         const id = opts.usersByEmail[email];
