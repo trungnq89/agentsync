@@ -1,7 +1,7 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, notInArray } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import {
-  managerFeedback, planVersions, solutionSummaries, tasks, users,
+  checkpointReviews, managerFeedback, planVersions, solutionSummaries, tasks, users,
   type PlanStep, type Task,
 } from '@/db/schema';
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
@@ -169,6 +169,16 @@ export async function changePlan(
       }
       throw e;
     }
+    // Rejections for steps that no longer exist (renamed/removed) can never be re-reported.
+    await tx
+      .update(checkpointReviews)
+      .set({ consumedAt: now })
+      .where(and(
+        eq(checkpointReviews.taskId, taskId),
+        eq(checkpointReviews.decision, 'rejected'),
+        isNull(checkpointReviews.consumedAt),
+        notInArray(checkpointReviews.stepTitle, input.steps.map((x) => x.title)),
+      ));
     if (nextState) {
       await tx
         .update(managerFeedback)

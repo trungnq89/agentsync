@@ -61,8 +61,8 @@ export async function postUpdate(
       if (unknown.length > 0) {
         throw new DomainError('VALIDATION', 'unknownSteps', { steps: unknown.join(', ') });
       }
-      // Lock the owner row so a concurrent confirmer change is serialised with this report.
-      const [owner] = await tx.select().from(users).where(eq(users.id, task.ownerId)).for('update');
+      // Share-lock the owner row so a concurrent confirmer change is serialised with this report.
+      const [owner] = await tx.select().from(users).where(eq(users.id, task.ownerId)).for('share');
       const confirmer = effectiveConfirmer(task, owner);
       const changing = plan.steps.filter((s) => done.includes(s.title) && s.status !== 'done'
         && !(confirmer === 'manager' && s.status === 'pending_approval'));
