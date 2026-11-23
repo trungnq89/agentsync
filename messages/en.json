@@ -455,7 +455,13 @@
     "credentialsRequired": "Username and password are required.",
     "systemError": "A system error occurred. Please try again later.",
     "notFoundHint": "Use list_my_tasks to see your tasks.",
-    "odooSelectionInvalid": "The selection of changes is invalid. Run a new preview and try again."
+    "odooSelectionInvalid": "The selection of changes is invalid. Run a new preview and try again.",
+    "invalidDigestTime": "Choose a time in 15-minute steps, for example 08:30.",
+    "digestDaysRequired": "Choose at least one day of the week.",
+    "invalidTimezone": "Choose a valid time zone.",
+    "slackTokenRequired": "Save a Slack bot token before turning Slack on.",
+    "slackAppUrlRequired": "Set APP_URL on the server before turning Slack on.",
+    "encryptionKeyMissing": "The encryption key (SETTINGS_ENCRYPTION_KEY) is missing or invalid."
   },
   "mcp": {
     "noTasks": "No tasks.",
