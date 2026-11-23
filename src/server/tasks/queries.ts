@@ -138,7 +138,7 @@ export async function teamOverview(
       activeCount: active.length,
       hasBlocked: active.some((t) => metrics.get(t.id)!.blocker),
       hasAwaitingReview: mine.some((t) => t.status === 'awaiting_review'),
-      pendingApprovals: mine.reduce((n, t) => n + metrics.get(t.id)!.pendingSteps, 0),
+      pendingApprovals: mine.filter((t) => !TERMINAL_STATUSES.includes(t.status)).reduce((n, t) => n + metrics.get(t.id)!.pendingSteps, 0),
       lastActivityAt: times.length ? new Date(Math.max(...times)) : null,
     };
   });
@@ -197,7 +197,7 @@ export async function needsAttention(db: Db, actor: Actor, now: Date = new Date(
     const owner = nameBy.get(t.ownerId)!;
     if (t.status === 'pending_confirmation') push('pending_confirmation', t, owner, '', t.statusChangedAt, { detailKey: 'pendingConfirmation' });
     if (t.status === 'awaiting_review') push('awaiting_review', t, owner, '', t.statusChangedAt, { detailKey: 'awaitingReview' });
-    if (m.pendingSteps > 0) {
+    if (m.pendingSteps > 0 && !TERMINAL_STATUSES.includes(t.status)) {
       push('checkpoint_pending', t, owner, '', t.statusChangedAt, {
         detailKey: 'checkpointPending', detailParams: { count: m.pendingSteps },
       });

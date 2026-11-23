@@ -240,14 +240,13 @@ describe('checkpoint confirmation queries', () => {
 
   it('needsAttention checkpoint_pending: manager only, count, ordered after awaiting_review, not for private', async () => {
     const { manager, member, t } = await pendingSetup();
-    const other = await makeTask(member.id, { status: 'awaiting_review', mode: 'project' });
+    await makeTask(member.id, { status: 'awaiting_review', mode: 'project' });
     const items = await needsAttention(testDb, manager, NOW);
     const kinds = items.map((i) => i.kind);
     expect(kinds.indexOf('awaiting_review')).toBeLessThan(kinds.indexOf('checkpoint_pending'));
     const cp = items.filter((i) => i.kind === 'checkpoint_pending');
     expect(cp).toHaveLength(1);
     expect(cp[0]).toMatchObject({ taskId: t.id, detailKey: 'checkpointPending', detailParams: { count: 2 } });
-    expect(other.id).not.toBe(t.id);
     // the owner and an unrelated user do not get it
     expect((await needsAttention(testDb, member, NOW)).some((i) => i.kind === 'checkpoint_pending')).toBe(false);
     const stranger = await makeUser({ level: 'manager' });
@@ -316,5 +315,14 @@ describe('checkpoint confirmation queries', () => {
     const plan = await getOwnTaskPlan(testDb, member, t.id);
     expect(plan.effectiveConfirmer).toBe('manager');
     expect(plan.steps[0]).toEqual({ title: 'A', status: 'pending_approval' });
+  });
+
+  it('pending steps on a cancelled task are not counted nor listed for attention', async () => {
+    const { manager, member, t } = await pendingSetup();
+    await testDb.update(tasks).set({ status: 'cancelled', statusChangedAt: NOW }).where(eq(tasks.id, t.id));
+    expect((await needsAttention(testDb, manager, NOW)).some((i) => i.kind === 'checkpoint_pending')).toBe(false);
+    const card = (await teamOverview(testDb, manager, NOW)).tiers.flatMap((x) => x.people).find((p) => p.userId === member.id)!;
+    expect(card.pendingApprovals).toBe(0);
+    expect((await taskDetail(testDb, manager, t.id, NOW)).canReviewCheckpoint).toBe(false);
   });
 });

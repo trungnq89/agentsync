@@ -4,7 +4,7 @@
 /**
  * @typedef {{ claimed: string[], reminded: string[], completionRemindedAt?: string }} TaskState
  * @typedef {{ currentTaskId?: string, tasks: Record<string, TaskState>, outstanding: boolean, updatedAt: string }} Session
- * @typedef {{ id: string, status: string, mode: string, statusChangedAt: string, steps: { title: string, status: string }[] }} Plan
+ * @typedef {{ id: string, status: string, mode: string, effectiveConfirmer?: string, statusChangedAt: string, steps: { title: string, status: string }[] }} Plan
  * @typedef {{ type: 'none' } | { type: 'remindSteps', steps: string[] } | { type: 'remindComplete', mode: 'project' | 'executive' }} Action
  * @typedef {{ taskIds: string[], checkpoints: string[], events: { kind: 'task' | 'checkpoint', value: string }[] }} Markers
  */
@@ -102,9 +102,6 @@ export function applyTurn(session, markers) {
       if (t && !st.claimed.includes(t)) {
         tasks[current] = { ...st, claimed: [...st.claimed, t] };
         (added[current] ??= []).push(t);
-      } else if (t) {
-        // Re-printed marker for a step claimed before (e.g. rejected back to doing): check the server again.
-        outstanding = true;
       }
     }
   }
@@ -126,8 +123,10 @@ export function decide(session, plan, opts) {
   if (plan === null || !id) return { session, action: none };
   const ts = session.tasks[id] ?? { claimed: [], reminded: [] };
 
-  /** @type {Map<string, { original: string, done: boolean, handled: boolean }>} */
+  /** @type {Map<string, { original: string, done: boolean, handled: boolean, awaiting: boolean }>} */
   const byTitle = new Map();
+  // Nobody can approve a leftover pending step when the member is the effective confirmer: treat it as unreported.
+  const managerConfirms = plan.effectiveConfirmer !== 'member';
   const steps = plan.steps.filter((st) => st && typeof st.title === 'string');
   for (const st of steps) {
     const key = st.title.trim();
@@ -136,17 +135,20 @@ export function decide(session, plan, opts) {
       original: prev ? prev.original : st.title,
       done: (prev ? prev.done : true) && st.status === 'done',
       // pending_approval counts as reported: the agent has nothing left to send for it.
-      handled: (prev ? prev.handled : true) && (st.status === 'done' || st.status === 'pending_approval'),
+      handled: (prev ? prev.handled : true) && (st.status === 'done' || (st.status === 'pending_approval' && managerConfirms)),
+      awaiting: (prev ? prev.awaiting : true) && st.status === 'pending_approval' && managerConfirms,
     });
   }
-  const pendingKeys = ts.claimed.filter((c) => byTitle.has(c) && !byTitle.get(c)?.handled);
+  // A step waiting for approval is released from the claim: only a re-printed marker (after a rejection) re-claims it.
+  const claimed = ts.claimed.filter((c) => !byTitle.get(c)?.awaiting);
+  const pendingKeys = claimed.filter((c) => byTitle.has(c) && !byTitle.get(c)?.handled);
   const allDone = steps.length > 0 && steps.every((st) => st.status === 'done');
   const outstanding = pendingKeys.length > 0 || (allDone && !TERMINAL_STATUSES.includes(plan.status));
   const keptReminded = ts.reminded.filter((r) => pendingKeys.includes(r));
 
   /** @param {Partial<TaskState>} patch @param {Action} action */
   const out = (patch, action) => ({
-    session: { ...session, outstanding, tasks: { ...session.tasks, [id]: { ...ts, reminded: keptReminded, ...patch } } },
+    session: { ...session, outstanding, tasks: { ...session.tasks, [id]: { ...ts, claimed, reminded: keptReminded, ...patch } } },
     action,
   });
 

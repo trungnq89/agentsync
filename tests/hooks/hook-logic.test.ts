@@ -278,20 +278,27 @@ describe('decide with pending_approval', () => {
     expect(go(base({ claimed: ['A', 'B'] }), plan([['A', 'done'], ['B', 'pending_approval']])).action).toEqual({ type: 'none' });
     expect(go(base({ claimed: ['A', 'B'] }), plan([['A', 'done'], ['B', 'done']])).action).toMatchObject({ type: 'remindComplete' });
   });
-  it('rejected step back to doing + marker printed again → reminded again', () => {
-    // 1. agent claims A, hook reminds
-    let s = base({ claimed: ['A'] });
-    let r = go(s, plan([['A', 'doing']]));
+  it('rejected step is not reminded on a later poll, only after its marker is re-printed', () => {
+    let r = go(base({ claimed: ['A'] }), plan([['A', 'doing']]));
     expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'] });
-    // 2. agent reports, server says pending_approval: reminded dropped, nothing outstanding
     r = go(r.session, plan([['A', 'pending_approval']]));
     expect(r.action).toEqual({ type: 'none' });
+    expect(t1(r).claimed).toEqual([]);
     expect(t1(r).reminded).toEqual([]);
-    // 3. manager rejected -> doing; A is claimed and no longer reminded, so the next server look reminds again
-    expect(go(r.session, plan([['A', 'doing']])).action).toEqual({ type: 'remindSteps', steps: ['A'] });
-    // 3b. but the marker re-printed makes the hook look at the server again
-    s = applyTurn(r.session, parseMarkers('AGENTSYNC-CHECKPOINT: A')).session;
-    expect(s.outstanding).toBe(true);
-    expect(s.tasks.t1.claimed).toEqual(['A']);
+    // manager rejected A (doing); another claim keeps the hook polling, A is not nagged
+    const s = applyTurn(r.session, parseMarkers('AGENTSYNC-CHECKPOINT: B')).session;
+    r = go(s, plan([['A', 'doing'], ['B', 'doing']]));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['B'] });
+    // agent re-prints A's marker -> claimed again -> reminded as new
+    const re = applyTurn(r.session, parseMarkers('AGENTSYNC-CHECKPOINT: A'));
+    expect(re.newCheckpoints).toEqual(['A']);
+    r = go(re.session, plan([['A', 'doing'], ['B', 'pending_approval']]));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'] });
+  });
+  it('leftover pending_approval when the member is the effective confirmer is treated as unreported', () => {
+    const r = go(base({ claimed: ['A'] }), plan([['A', 'pending_approval']], { effectiveConfirmer: 'member' }));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'] });
+    expect(t1(r).claimed).toEqual(['A']);
+    expect(go(base({ claimed: ['A'] }), plan([['A', 'pending_approval']], { effectiveConfirmer: 'manager' })).action).toEqual({ type: 'none' });
   });
 });
