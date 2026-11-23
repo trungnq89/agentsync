@@ -43,6 +43,20 @@
       "when": 1795336515824,
       "tag": "0005_odoo_runs_running",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795440255767,
+      "tag": "0006_dashing_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795442562461,
+      "tag": "0007_nappy_maestro",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { tasks, updates, questions, planVersions } from '@/db/schema';
+import { tasks, updates, questions, planVersions, users } from '@/db/schema';
 import {
   listMyTasks, needsAttention, personTimeline, taskDetail, teamOverview, weeklyDigest,
 } from '@/server/tasks/queries';
+import { progressPct } from '@/server/tasks/health';
+import { postUpdate } from '@/server/tasks/activity';
+import { reviewCheckpoint } from '@/server/tasks/confirm';
+import { getOwnTaskPlan } from '@/server/tasks/queries';
 import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
 
@@ -202,9 +206,123 @@ describe('getOwnTaskPlan', () => {
     const { manager, member } = await chain();
     const t = await makeTask(member.id, { status: 'in_progress', steps: ['A', 'B'] });
     const plan = await getOwnTaskPlan(testDb, member, t.id);
-    expect(Object.keys(plan)).toEqual(['id', 'status', 'mode', 'statusChangedAt', 'steps']);
+    expect(Object.keys(plan)).toEqual(['id', 'status', 'mode', 'statusChangedAt', 'effectiveConfirmer', 'steps']);
     expect(plan.steps).toEqual([{ title: 'A', status: 'todo' }, { title: 'B', status: 'todo' }]);
     expect(plan.statusChangedAt).toBe(t.statusChangedAt.toISOString());
     await expect(getOwnTaskPlan(testDb, manager, t.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
+describe('checkpoint confirmation queries', () => {
+  async function pendingSetup() {
+    const manager = await makeUser({ level: 'manager' });
+    const member = await makeUser({ managerId: manager.id, checkpointConfirmer: 'manager' });
+    const t = await makeTask(member.id, { status: 'in_progress', steps: ['A', 'B', 'C', 'D'] });
+    await postUpdate(testDb, member, t.id, { body: 'x', source: 'auto', stepsCompleted: ['A', 'B'] }, NOW);
+    return { manager, member, t };
+  }
+
+  it('progress is identical everywhere when steps are pending_approval (and counts only done)', async () => {
+    const { manager, member, t } = await pendingSetup();
+    await postUpdate(testDb, member, t.id, { body: 'y', source: 'auto', stepsCompleted: ['C'], memberConfirmed: true }, NOW);
+    // manager mode: C is pending too, so nothing is done
+    expect((await taskDetail(testDb, member, t.id, NOW)).progress).toBe(0);
+    await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, NOW);
+    const expected = 25;
+    const plan = await getOwnTaskPlan(testDb, member, t.id);
+    expect(progressPct({ steps: plan.steps as never })).toBe(expected);
+    expect((await taskDetail(testDb, member, t.id, NOW)).progress).toBe(expected);
+    expect((await taskDetail(testDb, manager, t.id, NOW)).progress).toBe(expected);
+    expect((await personTimeline(testDb, manager, member.id, NOW)).tasks[0].progress).toBe(expected);
+    expect((await listMyTasks(testDb, member, {}, NOW))[0].progress).toBe(expected);
+    expect(plan.steps.map((s) => s.status)).toEqual(['done', 'pending_approval', 'pending_approval', 'todo']);
+  });
+
+  it('needsAttention checkpoint_pending: manager only, count, ordered after awaiting_review, not for private', async () => {
+    const { manager, member, t } = await pendingSetup();
+    await makeTask(member.id, { status: 'awaiting_review', mode: 'project' });
+    const items = await needsAttention(testDb, manager, NOW);
+    const kinds = items.map((i) => i.kind);
+    expect(kinds.indexOf('awaiting_review')).toBeLessThan(kinds.indexOf('checkpoint_pending'));
+    const cp = items.filter((i) => i.kind === 'checkpoint_pending');
+    expect(cp).toHaveLength(1);
+    expect(cp[0]).toMatchObject({ taskId: t.id, detailKey: 'checkpointPending', detailParams: { count: 2 } });
+    // the owner and an unrelated user do not get it
+    expect((await needsAttention(testDb, member, NOW)).some((i) => i.kind === 'checkpoint_pending')).toBe(false);
+    const stranger = await makeUser({ level: 'manager' });
+    expect(await needsAttention(testDb, stranger, NOW)).toEqual([]);
+  });
+
+  it('private task pending steps never reach the manager (attention, card counts)', async () => {
+    const manager = await makeUser({ level: 'manager' });
+    const member = await makeUser({ managerId: manager.id, checkpointConfirmer: 'manager' });
+    const t = await makeTask(member.id, { status: 'in_progress', isPrivate: true, steps: ['A'] });
+    await testDb.update(planVersions).set({ steps: [{ title: 'A', status: 'pending_approval' }] }).where(eq(planVersions.taskId, t.id));
+    expect((await needsAttention(testDb, manager, NOW)).some((i) => i.kind === 'checkpoint_pending')).toBe(false);
+    const card = (await teamOverview(testDb, manager, NOW)).tiers.flatMap((x) => x.people).find((p) => p.userId === member.id)!;
+    expect(card.pendingApprovals).toBe(0);
+    // owner sees own private
+    const own = (await teamOverview(testDb, member, NOW)).tiers.flatMap((x) => x.people).find((p) => p.userId === member.id)!;
+    expect(own.pendingApprovals).toBe(1);
+  });
+
+  it('PersonCard.pendingApprovals counts pending steps for the manager', async () => {
+    const { manager, member } = await pendingSetup();
+    const card = (await teamOverview(testDb, manager, NOW)).tiers.flatMap((x) => x.people).find((p) => p.userId === member.id)!;
+    expect(card.pendingApprovals).toBe(2);
+  });
+
+  it('taskDetail: effectiveConfirmer and canReviewCheckpoint follow the current direct manager', async () => {
+    const { manager, member, t } = await pendingSetup();
+    const asMgr = await taskDetail(testDb, manager, t.id, NOW);
+    expect(asMgr).toMatchObject({ effectiveConfirmer: 'manager', canReviewCheckpoint: true });
+    expect(asMgr.plan.steps.find((s) => s.title === 'A')?.status).toBe('pending_approval');
+    expect(await taskDetail(testDb, member, t.id, NOW)).toMatchObject({ effectiveConfirmer: 'manager', canReviewCheckpoint: false });
+    // old manager loses access after a manager change
+    const m2 = await makeUser({ level: 'manager' });
+    await testDb.update(users).set({ managerId: m2.id }).where(eq(users.id, member.id));
+    await expect(taskDetail(testDb, manager, t.id, NOW)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await taskDetail(testDb, m2, t.id, NOW)).canReviewCheckpoint).toBe(true);
+    // nothing pending -> false
+    await reviewCheckpoint(testDb, m2, t.id, null, 'approved', undefined, NOW);
+    expect((await taskDetail(testDb, m2, t.id, NOW)).canReviewCheckpoint).toBe(false);
+  });
+
+  it('taskDetail: private / no-manager owner is member and cannot be reviewed', async () => {
+    const solo = await makeUser({ checkpointConfirmer: 'manager' });
+    const t = await makeTask(solo.id, { status: 'in_progress' });
+    expect(await taskDetail(testDb, solo, t.id, NOW)).toMatchObject({ effectiveConfirmer: 'member', canReviewCheckpoint: false });
+    const manager = await makeUser({ level: 'manager' });
+    const m = await makeUser({ managerId: manager.id, checkpointConfirmer: 'manager' });
+    const pt = await makeTask(m.id, { status: 'in_progress', isPrivate: true });
+    expect((await taskDetail(testDb, m, pt.id, NOW)).effectiveConfirmer).toBe('member');
+  });
+
+  it('personTimeline: checkpointConfirmer and canSetConfirmer (direct manager only)', async () => {
+    const director = await makeUser({ level: 'director' });
+    const manager = await makeUser({ level: 'manager', managerId: director.id });
+    const member = await makeUser({ managerId: manager.id, checkpointConfirmer: 'manager' });
+    expect(await personTimeline(testDb, manager, member.id, NOW)).toMatchObject({ checkpointConfirmer: 'manager', canSetConfirmer: true });
+    expect(await personTimeline(testDb, member, member.id, NOW)).toMatchObject({ checkpointConfirmer: 'manager', canSetConfirmer: false });
+    expect(await personTimeline(testDb, director, manager.id, NOW)).toMatchObject({ canSetConfirmer: true });
+    const admin = await makeUser({ isAdmin: true });
+    await expect(personTimeline(testDb, admin, member.id, NOW)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('listMyTasks and getOwnTaskPlan expose effectiveConfirmer and keep pending_approval', async () => {
+    const { member, t } = await pendingSetup();
+    expect((await listMyTasks(testDb, member, {}, NOW))[0].effectiveConfirmer).toBe('manager');
+    const plan = await getOwnTaskPlan(testDb, member, t.id);
+    expect(plan.effectiveConfirmer).toBe('manager');
+    expect(plan.steps[0]).toEqual({ title: 'A', status: 'pending_approval' });
+  });
+
+  it('pending steps on a cancelled task are not counted nor listed for attention', async () => {
+    const { manager, member, t } = await pendingSetup();
+    await testDb.update(tasks).set({ status: 'cancelled', statusChangedAt: NOW }).where(eq(tasks.id, t.id));
+    expect((await needsAttention(testDb, manager, NOW)).some((i) => i.kind === 'checkpoint_pending')).toBe(false);
+    const card = (await teamOverview(testDb, manager, NOW)).tiers.flatMap((x) => x.people).find((p) => p.userId === member.id)!;
+    expect(card.pendingApprovals).toBe(0);
+    expect((await taskDetail(testDb, manager, t.id, NOW)).canReviewCheckpoint).toBe(false);
   });
 });

@@ -43,7 +43,8 @@
     "emptyHint": "Chưa có việc hay người nào để hiển thị. Hãy làm theo hướng dẫn cài đặt agent (Cài đặt, tạo token, rồi cài skill cho Claude Code hoặc Codex) để agent bắt đầu đồng bộ công việc.",
     "doneActive": "{done} việc xong · {active} việc đang làm",
     "updated": "cập nhật {when}",
-    "pageTitle": "Tổng quan đội ngũ"
+    "pageTitle": "Tổng quan đội ngũ",
+    "pendingApprovals": "{count} chờ duyệt"
   },
   "person": {
     "back": "Trang chủ",
@@ -51,7 +52,13 @@
     "today": "Hôm nay",
     "todayWithDate": "Hôm nay {date}",
     "agreedDue": "Hạn thống nhất {date}",
-    "done": "Xong"
+    "done": "Xong",
+    "confirmerTitle": "Người xác nhận checkpoint",
+    "confirmerHint": "Ai đánh dấu các bước trong plan của người này là xong.",
+    "confirmerMember": "Thành viên tự xác nhận",
+    "confirmerManager": "Tôi (quản lý) duyệt",
+    "confirmerSave": "Lưu",
+    "toastConfirmerSaved": "Đã lưu người xác nhận checkpoint"
   },
   "task": {
     "back": "Trang chủ",
@@ -105,7 +112,23 @@
     "edited": "đã sửa",
     "showMore": "Xem thêm",
     "showLess": "Thu gọn",
-    "progress": "Tiến độ công việc"
+    "progress": "Tiến độ công việc",
+    "stepPending": "Chờ duyệt",
+    "confirmedByMember": "✓ {name} xác nhận",
+    "confirmedByManager": "✓ Quản lý duyệt",
+    "confirmedWhen": "{who} · {when}",
+    "stepApprove": "Đạt",
+    "stepReject": "Chưa đạt",
+    "approveAll": "Duyệt tất cả",
+    "approveAllTitle": "Duyệt tất cả các bước đang chờ?",
+    "approveAllDesc": "Mọi bước đang chờ duyệt của việc này sẽ được đánh dấu xong.",
+    "rejectTitle": "Bước chưa đạt",
+    "rejectDesc": "Nêu rõ còn thiếu gì. Chủ việc sẽ thấy ghi chú này và bước quay về đang làm.",
+    "rejectSend": "Trả lại",
+    "toastApproved": "Đã duyệt bước",
+    "toastRejected": "Đã trả lại bước",
+    "toastApprovedAll": "Đã duyệt các bước",
+    "pendingSteps": "{count} bước chờ duyệt"
   },
   "settings": {
     "title": "Cài đặt",
@@ -309,6 +332,7 @@
   "attention": {
     "pending_confirmation": "Chờ xác nhận",
     "awaiting_review": "Chờ review",
+    "checkpoint_pending": "Bước chờ duyệt",
     "blocked": "Đang kẹt",
     "overdue": "Trễ hạn",
     "stale": "Lâu không cập nhật",
@@ -319,6 +343,7 @@
     "detail": {
       "pendingConfirmation": "Chờ bạn xác nhận plan.",
       "awaitingReview": "Chờ bạn review giải pháp.",
+      "checkpointPending": "Có {count} bước đang chờ bạn duyệt.",
       "overdue": "Hạn thống nhất {due}, dự kiến {expected}.",
       "stale": "Lâu không có cập nhật.",
       "paused": "Tạm dừng.",
@@ -364,6 +389,13 @@
     "notFoundTask": "Không tìm thấy việc này.",
     "adminOnly": "Chỉ quản trị viên mới có quyền thực hiện thao tác này.",
     "staleDaysRange": "Số ngày làm việc phải là số nguyên từ 1 đến 30.",
+    "duplicateStepTitle": "Tên các bước trong plan không được trùng nhau.",
+    "invalidConfirmer": "Người xác nhận checkpoint không hợp lệ, dùng member hoặc manager.",
+    "checkpointConfirmationRequired": "Member phải xác nhận các bước này đã xong. Hãy hỏi member, rồi gửi lại với memberConfirmed: true.",
+    "stepsNotConfirmed": "Mọi bước phải được xác nhận xong trước khi hoàn thành việc. Bước đang chờ duyệt hoặc chưa xong: {steps}.",
+    "stepNotPending": "Không có bước nào đang chờ duyệt.",
+    "rejectNeedsStep": "Chưa đạt phải chỉ rõ một bước; chỉ duyệt đạt mới áp dụng cho mọi bước đang chờ.",
+    "noteRequiredForReject": "Cần nhập ghi chú khi bước chưa đạt.",
     "invalidLevel": "Cấp không hợp lệ.",
     "displayNameRequired": "Tên hiển thị không được để trống.",
     "notFoundUser": "Không tìm thấy người dùng.",
@@ -442,6 +474,7 @@
     "attentionKind": {
       "pending_confirmation": "Chờ xác nhận",
       "awaiting_review": "Chờ review",
+      "checkpoint_pending": "Bước chờ duyệt",
       "blocked": "Đang kẹt",
       "overdue": "Trễ hạn",
       "stale": "Lâu không cập nhật",
@@ -483,6 +516,16 @@
     "settingsLine": "{name} ({level}) — chế độ gửi: {mode}.",
     "confirmed": "Đã xác nhận.",
     "changesRequested": "Đã yêu cầu sửa plan.",
+    "confirmerLabel": "người xác nhận checkpoint: {who}",
+    "confirmerMember": "thành viên",
+    "confirmerManager": "quản lý",
+    "settingsConfirmer": " Người xác nhận checkpoint: {who}.",
+    "detailConfirmer": "Người xác nhận checkpoint: {who}",
+    "stepPending": " (chờ quản lý duyệt)",
+    "feedbackRejected": "- Checkpoint bị trả về ở **{title}**, bước \"{step}\" (quay lại đang làm): {note}",
+    "checkpointApproved": "{count, plural, other {Đã duyệt # bước.}}",
+    "checkpointRejected": "Đã trả bước về \"đang làm\".",
+    "confirmerSet": "{name}: người xác nhận checkpoint giờ là {who}.",
     "reviewResult": "{verdict}."
   },
   "theme": {

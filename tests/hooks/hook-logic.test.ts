@@ -101,12 +101,12 @@ describe('decide', () => {
     const bad = plan([['A', 'pending']]);
     (bad.steps as unknown[]).push({ title: 5, status: 'done' }, null);
     const r = decide(base({ claimed: ['A'] }), bad as never, { stopHookActive: false });
-    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'] });
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'], confirmer: 'manager' });
   });
   const p = plan([['A', 'pending'], ['B', 'pending']]);
   it('decide: new checkpoint not done on server → remindSteps with that step; reminded updated; outstanding true', () => {
     const r = decide(base({ claimed: ['A'] }), p, { stopHookActive: false });
-    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'] });
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'], confirmer: 'manager' });
     expect(t1(r).reminded).toEqual(['A']);
     expect(r.session.outstanding).toBe(true);
   });
@@ -122,7 +122,7 @@ describe('decide', () => {
   });
   it('decide: new checkpoint plus previously reminded pending → remindSteps lists both', () => {
     const r = decide(base({ claimed: ['A', 'B'], reminded: ['A'] }), p, { stopHookActive: false });
-    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A', 'B'] });
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A', 'B'], confirmer: 'manager' });
     expect(t1(r).reminded).toEqual(['A', 'B']);
   });
   it('decide: status awaiting_review/paused/done → none', () => {
@@ -210,7 +210,7 @@ describe('decide: multi-turn and edge cases', () => {
   });
   it('matches trimmed titles but lists the server original title', () => {
     const r = run(base({ claimed: ['Write API'] }), plan([['  Write API ', 'pending']]));
-    expect(r.action).toEqual({ type: 'remindSteps', steps: ['  Write API '] });
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['  Write API '], confirmer: 'manager' });
   });
   it('duplicate plan titles count as done only if all are done', () => {
     expect(run(base({ claimed: ['A'] }), plan([['A', 'done'], ['A', 'pending']])).action.type).toBe('remindSteps');
@@ -236,12 +236,24 @@ describe('turnAssistantTexts: meta and sidechain', () => {
 
 describe('reasonFor', () => {
   it('reasonFor remindSteps mentions update_progress, stepsCompleted, exact titles, review draft', () => {
-    const t = reasonFor({ type: 'remindSteps', steps: ['Write the API', 'Add "tests"'] });
+    const t = reasonFor({ type: 'remindSteps', steps: ['Write the API', 'Add "tests"'], confirmer: 'manager' });
     expect(t).toContain('update_progress');
     expect(t).toContain('stepsCompleted');
     expect(t).toContain('Write the API');
     expect(t).toContain('Add "tests"');
     expect(t).toContain('If your send mode is review, show the member the draft and wait for approval first.');
+  });
+  it('reasonFor remindSteps differs by confirmer', () => {
+    const m = reasonFor({ type: 'remindSteps', steps: ['A'], confirmer: 'member' });
+    expect(m).toContain('memberConfirmed: true');
+    expect(m).toContain('ask the member');
+    const g = reasonFor({ type: 'remindSteps', steps: ['A'], confirmer: 'manager' });
+    expect(g).toContain('wait for manager approval');
+    expect(g).not.toContain('memberConfirmed: true');
+  });
+  it('decide puts the effective confirmer on remindSteps', () => {
+    const r = decide(base({ claimed: ['A'] }), plan([['A', 'todo']], { effectiveConfirmer: 'member' }) as never, { stopHookActive: false });
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'], confirmer: 'member' });
   });
   it('reasonFor remindComplete differs by mode', () => {
     const p = reasonFor({ type: 'remindComplete', mode: 'project' });
@@ -255,5 +267,50 @@ describe('reasonFor', () => {
     expect(e).not.toContain('status complete');
     expect(p).toContain('action "complete"');
     for (const t of [p, e]) expect(t).toContain('If your send mode is review, show the member the draft and wait for approval first.');
+  });
+});
+
+describe('decide with pending_approval', () => {
+  const go = (sess: Session, pl: ReturnType<typeof plan>) => decide(sess, pl as never, { stopHookActive: false });
+  it('pending_approval step counts as reported: no remindSteps, reminded entry dropped', () => {
+    const r = go(base({ claimed: ['A'], reminded: ['A'] }, true), plan([['A', 'pending_approval'], ['B', 'todo']]));
+    expect(r.action).toEqual({ type: 'none' });
+    expect(t1(r).reminded).toEqual([]);
+    expect(r.session.outstanding).toBe(false);
+  });
+  it('first sight of a pending_approval claim does not remind', () => {
+    const r = go(base({ claimed: ['A'] }), plan([['A', 'pending_approval']]));
+    expect(r.action).toEqual({ type: 'none' });
+  });
+  it('all steps pending_approval: no completion reminder', () => {
+    const r = go(base({ claimed: ['A', 'B'] }), plan([['A', 'pending_approval'], ['B', 'pending_approval']]));
+    expect(r.action).toEqual({ type: 'none' });
+  });
+  it('mix of done and pending_approval: no completion reminder; all done: completion reminder', () => {
+    expect(go(base({ claimed: ['A', 'B'] }), plan([['A', 'done'], ['B', 'pending_approval']])).action).toEqual({ type: 'none' });
+    expect(go(base({ claimed: ['A', 'B'] }), plan([['A', 'done'], ['B', 'done']])).action).toMatchObject({ type: 'remindComplete' });
+  });
+  it('rejected step is not reminded on a later poll, only after its marker is re-printed', () => {
+    let r = go(base({ claimed: ['A'] }), plan([['A', 'doing']]));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'], confirmer: 'manager' });
+    r = go(r.session, plan([['A', 'pending_approval']]));
+    expect(r.action).toEqual({ type: 'none' });
+    expect(t1(r).claimed).toEqual([]);
+    expect(t1(r).reminded).toEqual([]);
+    // manager rejected A (doing); another claim keeps the hook polling, A is not nagged
+    const s = applyTurn(r.session, parseMarkers('AGENTSYNC-CHECKPOINT: B')).session;
+    r = go(s, plan([['A', 'doing'], ['B', 'doing']]));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['B'], confirmer: 'manager' });
+    // agent re-prints A's marker -> claimed again -> reminded as new
+    const re = applyTurn(r.session, parseMarkers('AGENTSYNC-CHECKPOINT: A'));
+    expect(re.newCheckpoints).toEqual(['A']);
+    r = go(re.session, plan([['A', 'doing'], ['B', 'pending_approval']]));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'], confirmer: 'manager' });
+  });
+  it('leftover pending_approval when the member is the effective confirmer is treated as unreported', () => {
+    const r = go(base({ claimed: ['A'] }), plan([['A', 'pending_approval']], { effectiveConfirmer: 'member' }));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'], confirmer: 'member' });
+    expect(t1(r).claimed).toEqual(['A']);
+    expect(go(base({ claimed: ['A'] }), plan([['A', 'pending_approval']], { effectiveConfirmer: 'manager' })).action).toEqual({ type: 'none' });
   });
 });

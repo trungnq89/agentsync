@@ -1,12 +1,13 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, notInArray } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import {
-  managerFeedback, planVersions, solutionSummaries, tasks, users,
+  checkpointReviews, managerFeedback, planVersions, solutionSummaries, tasks, users,
   type PlanStep, type Task,
 } from '@/db/schema';
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
 import { isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
+import { assertUniqueStepTitles, normalizePlanSteps } from './confirm';
 import { asDb, currentPlan, lifecycleCtx, requireOwner, type PlanVersion } from './internal';
 import { initialStatus, nextStatus, TERMINAL_STATUSES, type TaskAction, type TaskStatus } from './lifecycle';
 
@@ -38,6 +39,7 @@ export async function createTask(
     throw new DomainError('VALIDATION', 'invalidDate');
   }
   if (input.steps.length === 0) throw new DomainError('VALIDATION', 'planNeedsStep');
+  assertUniqueStepTitles(input.steps);
   if (input.agreedDueDate < input.startDate) {
     throw new DomainError('VALIDATION', 'dueBeforeStart');
   }
@@ -129,6 +131,7 @@ export async function changePlan(
   now: Date = new Date(),
 ): Promise<Task> {
   if (input.steps.length === 0) throw new DomainError('VALIDATION', 'planNeedsStep');
+  assertUniqueStepTitles(input.steps.map((x) => x.title));
   if (input.expectedEndDate !== undefined && !isValidIsoDate(input.expectedEndDate)) {
     throw new DomainError('VALIDATION', 'invalidDate');
   }
@@ -157,7 +160,7 @@ export async function changePlan(
 
     try {
       await tx.insert(planVersions).values({
-        taskId, version: current.version + 1, kind, reason, steps: input.steps, createdAt: now,
+        taskId, version: current.version + 1, kind, reason, steps: normalizePlanSteps(input.steps, current.steps), createdAt: now,
       });
     } catch (e) {
       const code = (e as { code?: string; cause?: { code?: string } });
@@ -166,6 +169,16 @@ export async function changePlan(
       }
       throw e;
     }
+    // Rejections for steps that no longer exist (renamed/removed) can never be re-reported.
+    await tx
+      .update(checkpointReviews)
+      .set({ consumedAt: now })
+      .where(and(
+        eq(checkpointReviews.taskId, taskId),
+        eq(checkpointReviews.decision, 'rejected'),
+        isNull(checkpointReviews.consumedAt),
+        notInArray(checkpointReviews.stepTitle, input.steps.map((x) => x.title)),
+      ));
     if (nextState) {
       await tx
         .update(managerFeedback)
@@ -209,6 +222,12 @@ export async function setTaskStatus(
         .where(eq(solutionSummaries.taskId, taskId));
       if (!summary) {
         throw new DomainError('VALIDATION', 'summaryRequiredBeforeDone');
+      }
+    }
+    if (action === 'complete') {
+      const open = (await currentPlan(tx, taskId)).steps.filter((s) => s.status !== 'done');
+      if (open.length > 0) {
+        throw new DomainError('VALIDATION', 'stepsNotConfirmed', { steps: open.map((s) => s.title).join(', ') });
       }
     }
     const [updated] = await tx

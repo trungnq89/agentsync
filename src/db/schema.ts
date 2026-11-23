@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  pgTable, pgEnum, uuid, text, boolean, integer, date, jsonb, timestamp, unique, check, uniqueIndex, type AnyPgColumn,
+  pgTable, pgEnum, uuid, text, boolean, integer, date, jsonb, timestamp, unique, check, uniqueIndex, index, type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 export const userLevel = pgEnum('user_level', ['director', 'manager', 'leader', 'member']);
@@ -16,7 +16,13 @@ export const reviewVerdict = pgEnum('review_verdict', ['approved', 'changes_need
 export const planChangeKind = pgEnum('plan_change_kind', ['initial', 'edit', 'revision']);
 export const updateSource = pgEnum('update_source', ['auto', 'reviewed']);
 
-export type PlanStep = { title: string; status: 'todo' | 'doing' | 'done' };
+export type PlanStep = {
+  title: string;
+  status: 'todo' | 'doing' | 'pending_approval' | 'done';
+  confirmedBy?: 'member' | 'manager';
+  confirmedById?: string;
+  confirmedAt?: string; // ISO
+};
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });
 const createdAt = () => ts('created_at').notNull().defaultNow();
@@ -38,11 +44,13 @@ export const users = pgTable('users', {
   odooEmployeeId: integer('odoo_employee_id').unique(),
   mustChangePassword: boolean('must_change_password').notNull().default(false),
   source: text('source').notNull().default('local'),
+  checkpointConfirmer: text('checkpoint_confirmer').notNull().default('member'),
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex('users_email_lower_uq').on(sql`lower(${t.email})`),
   check('users_source_check', sql`${t.source} in ('local','odoo')`),
   check('users_locale_check', sql`${t.locale} in ('en','vi')`),
+  check('users_checkpoint_confirmer_check', sql`${t.checkpointConfirmer} in ('member','manager')`),
   check('users_theme_check', sql`${t.theme} in ('system','light','dark')`),
 ]);
 
@@ -94,6 +102,20 @@ export const planVersions = pgTable('plan_versions', {
   steps: jsonb('steps').$type<PlanStep[]>().notNull(),
   createdAt: createdAt(),
 }, (t) => [unique('plan_versions_task_version_uq').on(t.taskId, t.version)]);
+
+export const checkpointReviews = pgTable('checkpoint_reviews', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  taskId: uuid('task_id').notNull().references(() => tasks.id),
+  stepTitle: text('step_title').notNull(),
+  decision: text('decision').notNull(),
+  note: text('note'),
+  reviewerId: uuid('reviewer_id').notNull().references(() => users.id),
+  createdAt: createdAt(),
+  consumedAt: ts('consumed_at'),
+}, (t) => [
+  check('checkpoint_reviews_decision_check', sql`${t.decision} in ('approved','rejected')`),
+  index('checkpoint_reviews_task_idx').on(t.taskId),
+]);
 
 export const updates = pgTable('updates', {
   id: uuid('id').primaryKey().defaultRandom(),

@@ -68,10 +68,11 @@ bearer_token_env_var = "AGENTSYNC_TOKEN"
 - The agent always replies in the language you use. What it reads from AgentSync follows the language chosen in Settings (or the install's default language).
 - The default send mode is `review`: the agent lets you approve every submission first. Switch to `auto` on the Settings page.
 - The agent only sends summaries, never code, secrets or customer data.
+- Finished steps are confirmed before they count. By default (confirmer `member`) the agent shows what it did and asks you "Is step X done?" before reporting it; only your yes marks the step done. If your manager chose to approve your steps themselves (confirmer `manager`), the agent sends the step for approval and tells you it is waiting. A step your manager rejects comes back to "doing" with a note, which the agent shows at the start of your next session. Progress counts only confirmed steps, and a task can be completed only when every step is done. Managers approve with `review_checkpoint` (one step or all pending steps of a task) and choose the confirmer for a direct report with `set_checkpoint_confirmer`.
 
 ## 5. Checkpoint hook
 
-An optional `Stop` hook runs after every agent turn. If the agent printed `AGENTSYNC-CHECKPOINT: <step title>` for a step that AgentSync does not yet show as done, the hook asks the agent to send `update_progress` (your send mode still applies: in `review` mode you see the draft first). It also nudges once to finish the task when every step is done. It is a safety net: the skills already tell the agent to report each step right away.
+An optional `Stop` hook runs after every agent turn. If the agent printed `AGENTSYNC-CHECKPOINT: <step title>` for a step that AgentSync does not yet show as reported (done or waiting for approval), the hook asks the agent to send `update_progress` (your send mode still applies: in `review` mode you see the draft first). It also nudges once to finish the task when every step is done. It is a safety net: the skills already tell the agent to report each step right away.
 
 - Requires Node 20 or newer on your machine. The hook is one file with no dependencies: `plugins/agentsync/hooks/agentsync-hook.mjs`.
 - It uses the same `AGENTSYNC_URL` (your AgentSync address, for example `https://agentsync.example.com`) and `AGENTSYNC_TOKEN` variables as section 1. If either is missing, the hook does nothing.
@@ -80,6 +81,13 @@ An optional `Stop` hook runs after every agent turn. If the agent printed `AGENT
 - **Claude Code:** included in the plugin (`hooks/hooks.json`); `--plugin-dir` loads it. Not manually tested: `claude` was not available when this was written.
 - **Codex:** add a `Stop` hook to `~/.codex/hooks.json` and trust it in `/hooks`. See `plugins/agentsync/codex/README.md`. Codex only sees markers in the final message of a turn (print them there). Not tried with a real Codex.
 - **Antigravity:** a template is in `plugins/agentsync/antigravity/` (see its README). It is **not tested** on a real install, so Antigravity relies on the skills for now.
+
+## 6. Upgrading
+
+1. `git pull`, then rebuild and restart AgentSync (the database migrates on start).
+2. Claude Code with `--plugin-dir` picks up the new plugin (0.2.0) from the pulled folder. For Codex and the alternative install, copy the skills from `plugins/agentsync/skills` again, otherwise your agent keeps the old skills and will not ask for confirmation properly.
+3. Progress % is now confirmed steps divided by total steps. A manual progress override is ignored, so some tasks may show a different percentage.
+4. A task that is in progress needs its steps confirmed before it can be completed. Report each remaining step (the member confirms it, or the manager approves it) first.
 
 ## Verified
 

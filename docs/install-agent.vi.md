@@ -68,10 +68,11 @@ bearer_token_env_var = "AGENTSYNC_TOKEN"
 - Chế độ gửi mặc định là `review`: agent cho bạn duyệt trước mọi lần gửi. Đổi sang `auto` ở trang Cài đặt.
 - Agent luôn trả lời bạn bằng ngôn ngữ bạn đang dùng. Nội dung agent đọc từ AgentSync theo ngôn ngữ bạn chọn trong Cài đặt (hoặc ngôn ngữ mặc định của hệ thống).
 - Agent chỉ gửi bản tóm tắt, không gửi code, secret hay dữ liệu khách hàng.
+- Bước đã xong phải được xác nhận mới được tính. Mặc định (người xác nhận là `member`) agent tóm tắt việc đã làm và hỏi bạn "Bước X đã đạt chưa?" trước khi báo; chỉ khi bạn đồng ý bước mới thành xong. Nếu quản lý chọn tự duyệt bước của bạn (người xác nhận là `manager`), agent gửi bước đi chờ duyệt và báo bạn là đang chờ. Bước bị quản lý "Chưa đạt" quay về "đang làm" kèm ghi chú, agent nhắc ở đầu phiên sau. Tiến độ chỉ tính bước đã xác nhận, và việc chỉ hoàn thành khi mọi bước đã xong. Quản lý duyệt bằng `review_checkpoint` (một bước hoặc mọi bước đang chờ của một việc) và chọn người xác nhận cho nhân sự trực tiếp bằng `set_checkpoint_confirmer`.
 
 ## 5. Checkpoint hook
 
-Hook `Stop` tùy chọn chạy sau mỗi lượt của agent. Nếu agent đã in `AGENTSYNC-CHECKPOINT: <tên bước>` cho một bước mà AgentSync chưa ghi là xong, hook nhắc agent gửi `update_progress` (chế độ gửi của bạn vẫn áp dụng: ở chế độ `review` bạn xem bản nháp trước). Hook cũng nhắc một lần để kết thúc việc khi mọi bước đã xong. Đây chỉ là lưới an toàn: skill đã dặn agent báo từng bước ngay khi xong.
+Hook `Stop` tùy chọn chạy sau mỗi lượt của agent. Nếu agent đã in `AGENTSYNC-CHECKPOINT: <tên bước>` cho một bước mà AgentSync chưa ghi là đã báo (xong hoặc đang chờ duyệt), hook nhắc agent gửi `update_progress` (chế độ gửi của bạn vẫn áp dụng: ở chế độ `review` bạn xem bản nháp trước). Hook cũng nhắc một lần để kết thúc việc khi mọi bước đã xong. Đây chỉ là lưới an toàn: skill đã dặn agent báo từng bước ngay khi xong.
 
 - Cần Node 20 trở lên trên máy bạn. Hook là một file không phụ thuộc thư viện: `plugins/agentsync/hooks/agentsync-hook.mjs`.
 - Dùng cùng biến `AGENTSYNC_URL` (địa chỉ AgentSync, ví dụ `https://agentsync.example.com`) và `AGENTSYNC_TOKEN` như mục 1. Thiếu một trong hai thì hook không làm gì.
@@ -80,6 +81,13 @@ Hook `Stop` tùy chọn chạy sau mỗi lượt của agent. Nếu agent đã i
 - **Claude Code:** đã nằm trong plugin (`hooks/hooks.json`); `--plugin-dir` sẽ nạp nó. Chưa kiểm tra thủ công: lúc viết không có `claude`.
 - **Codex:** thêm hook `Stop` vào `~/.codex/hooks.json` và duyệt trong `/hooks`. Xem `plugins/agentsync/codex/README.md`. Codex chỉ thấy dấu nằm trong tin nhắn cuối của lượt (hãy in dấu ở đó). Chưa chạy thử với Codex thật.
 - **Antigravity:** có mẫu trong `plugins/agentsync/antigravity/` (xem README trong đó). **Chưa kiểm tra thực tế** trên bản cài thật, nên hiện Antigravity dựa vào skill.
+
+## 6. Nâng cấp
+
+1. `git pull`, rồi build lại và khởi động lại AgentSync (cơ sở dữ liệu tự migrate khi khởi động).
+2. Claude Code dùng `--plugin-dir` sẽ lấy plugin mới (0.2.0) từ thư mục vừa pull. Với Codex và cách cài thay thế, hãy chép lại các skill từ `plugins/agentsync/skills`, nếu không agent vẫn dùng skill cũ và không hỏi xác nhận đúng cách.
+3. Tiến độ % giờ là số bước đã xác nhận chia tổng số bước. Giá trị tiến độ nhập tay bị bỏ qua, nên một số việc có thể hiện phần trăm khác.
+4. Việc đang thực hiện cần xác nhận hết các bước mới hoàn thành được. Hãy báo từng bước còn lại (thành viên xác nhận, hoặc quản lý duyệt) trước.
 
 ## Đã kiểm tra
 

@@ -4,6 +4,8 @@ import type { ListedTask, AttentionItem, DigestPerson, PersonCard, taskDetail } 
 /** Translator over the full catalog; keys are namespaced (`mcp.noTasks`, `status.done`). */
 export type T = (key: string, values?: Record<string, string | number | Date>) => string;
 
+const cap = (c: string) => (c === 'manager' ? 'Manager' : 'Member');
+
 export function formatTaskList(t: T, list: ListedTask[]): string {
   if (list.length === 0) return t('mcp.noTasks');
   return [
@@ -14,6 +16,7 @@ export function formatTaskList(t: T, list: ListedTask[]): string {
           title: x.title, id: x.id, status: t(`status.${x.status}`), progress: x.progress,
           health: t(`health.${x.health}`), expected: x.expectedEndDate, due: x.agreedDueDate,
         }) +
+        ` — ${t('mcp.confirmerLabel', { who: t(`mcp.confirmer${cap(x.effectiveConfirmer)}`) })}` +
         (x.repoRef?.branch ? t('mcp.branch', { branch: x.repoRef.branch }) : '') +
         (x.cwdHint ? t('mcp.cwd', { cwd: x.cwdHint }) : ''),
     ),
@@ -60,8 +63,11 @@ export function formatTaskDetail(t: T, d: Awaited<ReturnType<typeof taskDetail>>
     t('mcp.detailStatus', { status: t(`status.${x.status}`), progress: d.progress, health: t(`health.${d.health.health}`) }),
     t('mcp.detailDates', { start: x.startDate, due: x.agreedDueDate, expected: x.expectedEndDate }),
     t('mcp.detailOutcome', { outcome: x.agreedOutcome }),
+    t('mcp.detailConfirmer', { who: t(`mcp.confirmer${cap(d.effectiveConfirmer)}`) }),
     `### ${t('mcp.planHeading')}`,
-    ...d.plan.steps.map((s) => `- [${s.status === 'done' ? 'x' : ' '}] ${s.title}`),
+    ...d.plan.steps.map((s) =>
+      `- [${s.status === 'done' ? 'x' : s.status === 'pending_approval' ? '~' : ' '}] ${s.title}` +
+      (s.status === 'pending_approval' ? t('mcp.stepPending') : '')),
   ];
   const open = d.questions.filter((q) => q.status === 'open');
   if (open.length) {

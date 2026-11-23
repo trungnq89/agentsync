@@ -1,13 +1,14 @@
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, notInArray } from 'drizzle-orm';
 import type { Db } from '@/db/client';
 import {
-  managerFeedback, planVersions, questions, reviews, solutionSummaries, tasks, updates, users,
-  type Task,
+  checkpointReviews, managerFeedback, planVersions, questions, reviews, solutionSummaries, tasks, updates, users,
+  type PlanStep, type Task,
 } from '@/db/schema';
 import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
 import { isValidIsoDate, isWithinHours } from '@/server/clock';
 import { DomainError } from '@/server/errors';
 import { isUuid } from '@/server/ids';
+import { effectiveConfirmer } from './confirm';
 import { nextStatus, TERMINAL_STATUSES } from './lifecycle';
 import { asDb, currentPlan, lifecycleCtx, requireOwner, type Tx } from './internal';
 
@@ -20,6 +21,8 @@ export interface PostUpdateInput {
   body: string;
   stepsCompleted?: string[];
   progressPct?: number;
+  /** The member explicitly agreed the reported steps are done. Required when the member is the effective confirmer. */
+  memberConfirmed?: boolean;
   expectedEndDate?: string;
   source: 'auto' | 'reviewed';
   evidence?: { branch?: string; commits?: number; prUrl?: string };
@@ -58,8 +61,30 @@ export async function postUpdate(
       if (unknown.length > 0) {
         throw new DomainError('VALIDATION', 'unknownSteps', { steps: unknown.join(', ') });
       }
-      const steps = plan.steps.map((s) => (done.includes(s.title) ? { ...s, status: 'done' as const } : s));
+      // Share-lock the owner row so a concurrent confirmer change is serialised with this report.
+      const [owner] = await tx.select().from(users).where(eq(users.id, task.ownerId)).for('share');
+      const confirmer = effectiveConfirmer(task, owner);
+      const changing = plan.steps.filter((s) => done.includes(s.title) && s.status !== 'done'
+        && !(confirmer === 'manager' && s.status === 'pending_approval'));
+      if (changing.length > 0 && confirmer === 'member' && input.memberConfirmed !== true) {
+        throw new DomainError('VALIDATION', 'checkpointConfirmationRequired');
+      }
+      const steps: PlanStep[] = plan.steps.map((s) => {
+        if (!done.includes(s.title) || s.status === 'done') return s;
+        if (confirmer === 'manager') return s.status === 'pending_approval' ? s : { title: s.title, status: 'pending_approval' };
+        return { title: s.title, status: 'done', confirmedBy: 'member', confirmedById: actor.id, confirmedAt: now.toISOString() };
+      });
       await tx.update(planVersions).set({ steps }).where(eq(planVersions.id, plan.id));
+      // Re-reporting a step answers its earlier "not accepted" reviews.
+      await tx
+        .update(checkpointReviews)
+        .set({ consumedAt: now })
+        .where(and(
+          eq(checkpointReviews.taskId, taskId),
+          eq(checkpointReviews.decision, 'rejected'),
+          isNull(checkpointReviews.consumedAt),
+          inArray(checkpointReviews.stepTitle, done),
+        ));
     }
     const [row] = await tx
       .insert(updates)
@@ -273,6 +298,7 @@ export interface PendingFeedback {
   questionsForMe: { questionId: string; taskId: string; title: string; body: string }[];
   answersToMyQuestions: { questionId: string; taskId: string; title: string; body: string; answer: string }[];
   reviewResults: { taskId: string; title: string; verdict: 'approved' | 'changes_needed'; note: string | null }[];
+  rejectedCheckpoints: { taskId: string; title: string; stepTitle: string; note: string; at: Date }[];
 }
 
 export async function getPendingFeedback(db: Db, actor: Actor): Promise<PendingFeedback> {
@@ -323,5 +349,18 @@ export async function getPendingFeedback(db: Db, actor: Actor): Promise<PendingF
     if (r.verdict === 'changes_needed') reviewResults.push(r);
   }
 
-  return { changesRequested, questionsForMe, answersToMyQuestions, reviewResults };
+  const rejectedRows = await db
+    .select({ taskId: tasks.id, title: tasks.title, stepTitle: checkpointReviews.stepTitle, note: checkpointReviews.note, at: checkpointReviews.createdAt })
+    .from(checkpointReviews)
+    .innerJoin(tasks, eq(tasks.id, checkpointReviews.taskId))
+    .where(and(
+      eq(tasks.ownerId, actor.id),
+      notInArray(tasks.status, [...TERMINAL_STATUSES]),
+      eq(checkpointReviews.decision, 'rejected'),
+      isNull(checkpointReviews.consumedAt),
+    ))
+    .orderBy(checkpointReviews.createdAt);
+  const rejectedCheckpoints = rejectedRows.map((r) => ({ ...r, note: r.note ?? '' }));
+
+  return { changesRequested, questionsForMe, answersToMyQuestions, reviewResults, rejectedCheckpoints };
 }

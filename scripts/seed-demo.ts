@@ -100,7 +100,7 @@ export async function seedDemo(db: Db, opts: { lang: DemoLang; now?: Date }): Pr
   const update = (
     task: Task, owner: User, when: Date, body: string, stepsCompleted: string[] = [],
     extra: Partial<Parameters<typeof postUpdate>[3]> = {},
-  ) => postUpdate(db, owner, task.id, { body, stepsCompleted, source: 'auto', ...extra }, when);
+  ) => postUpdate(db, owner, task.id, { body, stepsCompleted, source: 'auto', memberConfirmed: true, ...extra }, when);
 
   // ---- Director: executive task, no manager so it starts in progress
   const priorities = await create(admin, {

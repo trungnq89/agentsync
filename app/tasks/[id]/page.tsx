@@ -61,7 +61,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       {task.mode === 'project' && (
         <SolutionCard taskId={task.id} solution={d.solution} canReview={d.canReview} />
       )}
-      <PlanSummary steps={d.plan.steps} history={d.planHistory} now={now} />
+      <PlanSummary
+        taskId={task.id} ownerName={owner.displayName} steps={d.plan.steps} history={d.planHistory}
+        canReview={d.canReviewCheckpoint} now={now}
+      />
       <ActivityFeed updates={d.updates} now={now} />
     </main>
   );

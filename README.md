@@ -26,8 +26,9 @@ Screenshots show generated demo data (see [Try it with demo data](#try-it-with-d
 
 ## Features
 
-- **Manager board:** people grouped by level, a "needs your attention" list (pending confirmation, awaiting review, blocked, overdue, not updated for a while) and a per-person timeline.
+- **Manager board:** people grouped by level, a "needs your attention" list (pending confirmation, checkpoints awaiting approval, awaiting review, blocked, overdue, not updated for a while) and a per-person timeline.
 - **Plans written by agents, confirmed by managers:** the member's agent drafts the plan; the direct manager confirms it or asks for changes. Later plan changes are kept as revisions.
+- **Checkpoint confirmation:** a finished step counts only once confirmed: by the member (their agent asks them) or approved by the direct manager, who sets which one per person. Progress % is confirmed steps divided by total steps.
 - **Checkpoint Stop hook:** after each agent turn, a hook nudges the agent to report finished steps. Supports Claude Code, Codex and Antigravity (not yet tried on real installs).
 - **MCP for members and managers:** members' agents sync plans, progress and questions; managers' agents can read the board and give feedback.
 - **Solution review for code tasks:** finishing a project task sends a solution summary (problem, solution, alternatives, risks, testing, PR link) to the manager for review.
@@ -89,7 +90,14 @@ Each user creates an agent token in **Settings** and installs the plugin from `p
 
 ## Checkpoint hook
 
-An optional `Stop` hook runs after every agent turn. When the agent printed `AGENTSYNC-CHECKPOINT: <step title>` for a step AgentSync does not yet show as done, the hook asks it to send the progress update (your send mode still applies: in `review` mode you see the draft first). It is a safety net on top of the skills, which already tell the agent to report each step. Details: section 5 of [docs/install-agent.md](docs/install-agent.md).
+An optional `Stop` hook runs after every agent turn. When the agent printed `AGENTSYNC-CHECKPOINT: <step title>` for a step AgentSync does not yet show as reported (done or waiting for approval), the hook asks it to send the progress update (your send mode still applies: in `review` mode you see the draft first). It is a safety net on top of the skills, which already tell the agent to report each step. Details: section 5 of [docs/install-agent.md](docs/install-agent.md).
+
+## Upgrading
+
+1. `git pull`, then rebuild and restart AgentSync (the database migrates on start).
+2. Claude Code with `--plugin-dir` picks up the new plugin (0.2.0) from the pulled folder. For Codex and the alternative install, copy the skills from `plugins/agentsync/skills` again, otherwise your agent keeps the old skills and will not ask for confirmation properly.
+3. Progress % is now confirmed steps divided by total steps. A manual progress override is ignored, so some tasks may show a different percentage.
+4. A task that is in progress needs its steps confirmed before it can be completed. Report each remaining step (the member confirms it, or the manager approves it) first.
 
 ## Odoo HR sync
 

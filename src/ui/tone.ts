@@ -24,6 +24,7 @@ const ATTENTION_TONE: Record<AttentionKind, Tone> = {
   changes_requested: 'warning',
   pending_confirmation: 'info',
   awaiting_review: 'info',
+  checkpoint_pending: 'info',
   question_for_me: 'info',
   paused_or_cancelled: 'neutral',
 };

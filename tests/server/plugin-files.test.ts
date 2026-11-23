@@ -24,7 +24,7 @@ function registered() {
 }
 
 const NON_TOOL_SNAKE = new Set(['changes_needed', 'in_progress']); // enum values, not tools
-const EXTRA_FIELDS = new Set(['sendMode']); // output field of get_my_settings
+const EXTRA_FIELDS = new Set(['sendMode', 'effectiveConfirmer', 'checkpointConfirmer', 'rejectedCheckpoints']); // output field of get_my_settings
 
 function frontmatter(md: string): Record<string, string> {
   const m = md.match(/^---\n([\s\S]*?)\n---\n/);
@@ -68,6 +68,10 @@ describe('agent plugin files', () => {
     for (const t of ['team_overview', 'needs_attention', 'confirm_task', 'request_changes', 'review_solution'])
       expect(read('agentsync-manager')).toContain(`\`${t}\``);
     expect(read('agentsync-session')).toContain('sendMode');
+    for (const t of ['review_checkpoint', 'set_checkpoint_confirmer']) expect(read('agentsync-manager')).toContain(`\`${t}\``);
+    expect(read('agentsync-session')).toContain('`memberConfirmed`');
+    expect(read('agentsync-session')).toContain('rejectedCheckpoints');
+    expect(read('agentsync-plan')).toContain('`revise_plan`');
   });
 
   it('.mcp.json and plugin.json are valid and point at the MCP endpoint', () => {

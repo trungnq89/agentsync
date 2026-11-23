@@ -2,12 +2,14 @@
 import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { getDb } from '@/db';
+import { DomainError } from '@/server/errors';
+import { reviewCheckpoint } from '@/server/tasks/confirm';
 import { answerQuestion, askQuestion, reviewSolution } from '@/server/tasks/activity';
 import { confirmTask, requestChanges } from '@/server/tasks/service';
-import { run, str, type FormState } from '../_lib/action';
+import { domainMessage, run, str, type FormState } from '../_lib/action';
 import { getActor } from '../_lib/actor';
 
-type ToastKey = 'toastConfirmed' | 'toastChangesRequested' | 'toastAnswered' | 'toastAsked' | 'toastReviewed';
+type ToastKey = 'toastConfirmed' | 'toastChangesRequested' | 'toastAnswered' | 'toastAsked' | 'toastReviewed' | 'toastApproved' | 'toastRejected' | 'toastApprovedAll';
 
 const done = async (taskId: string, toast: ToastKey): Promise<FormState> => {
   revalidatePath(`/tasks/${taskId}`);
@@ -58,5 +60,27 @@ export async function reviewAction(_p: FormState, form: FormData): Promise<FormS
   return run(async () => {
     await reviewSolution(getDb(), actor, taskId, verdict, str(form, 'note') || undefined);
     return done(taskId, 'toastReviewed');
+  });
+}
+
+/** Approve/reject one step (`stepTitle`) or, with an empty title, approve every pending step. */
+export async function reviewCheckpointAction(_p: FormState, form: FormData): Promise<FormState> {
+  const actor = await getActor();
+  const taskId = str(form, 'taskId');
+  const stepTitle = str(form, 'stepTitle') || null;
+  const decision = str(form, 'decision') === 'rejected' ? 'rejected' : 'approved';
+  return run(async () => {
+    try {
+      await reviewCheckpoint(getDb(), actor, taskId, stepTitle, decision, str(form, 'note') || undefined);
+    } catch (e) {
+      // A repeated approval (someone else or an earlier click handled the step) is informational; a stale reject is a real error.
+      if (decision === 'approved' && e instanceof DomainError && e.key === 'stepNotPending') {
+        revalidatePath(`/tasks/${taskId}`);
+        return { info: (await domainMessage(e)).message };
+      }
+      throw e;
+    }
+    const toast = decision === 'rejected' ? 'toastRejected' : stepTitle ? 'toastApproved' : 'toastApprovedAll';
+    return done(taskId, toast);
   });
 }

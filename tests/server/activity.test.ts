@@ -60,11 +60,14 @@ describe('activity', () => {
     const { member } = await pair();
     const t = await makeTask(member.id, { status: 'in_progress', steps: ['A', 'B'] });
     await postUpdate(testDb, member, t.id, {
-      ...upd, stepsCompleted: ['A'], progressPct: 50, expectedEndDate: '2026-12-05',
+      ...upd, stepsCompleted: ['A'], memberConfirmed: true, progressPct: 50, expectedEndDate: '2026-12-05',
     }, T0);
     const plan = await getCurrentPlan(testDb, t.id);
     expect(plan.version).toBe(1);
-    expect(plan.steps).toEqual([{ title: 'A', status: 'done' }, { title: 'B', status: 'todo' }]);
+    expect(plan.steps).toEqual([
+      { title: 'A', status: 'done', confirmedBy: 'member', confirmedById: member.id, confirmedAt: T0.toISOString() },
+      { title: 'B', status: 'todo' },
+    ]);
     const [row] = await testDb.select().from(tasks).where(eq(tasks.id, t.id));
     expect(row.progressOverride).toBe(50);
     expect(row.expectedEndDate).toBe('2026-12-05');

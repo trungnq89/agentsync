@@ -43,7 +43,8 @@
     "emptyHint": "There are no tasks or people to display. Follow the agent setup guide (Settings, create a token, then install the skill for Claude Code or Codex) so your agent can start syncing work.",
     "doneActive": "{done} done · {active} in progress",
     "updated": "updated {when}",
-    "pageTitle": "Team overview"
+    "pageTitle": "Team overview",
+    "pendingApprovals": "{count} awaiting approval"
   },
   "person": {
     "back": "Home",
@@ -51,7 +52,13 @@
     "today": "Today",
     "todayWithDate": "Today {date}",
     "agreedDue": "Agreed due date {date}",
-    "done": "Done"
+    "done": "Done",
+    "confirmerTitle": "Checkpoint confirmer",
+    "confirmerHint": "Who marks this person's plan steps as done.",
+    "confirmerMember": "Member confirms themselves",
+    "confirmerManager": "I approve",
+    "confirmerSave": "Save",
+    "toastConfirmerSaved": "Checkpoint confirmer saved"
   },
   "task": {
     "back": "Home",
@@ -105,7 +112,23 @@
     "edited": "edited",
     "showMore": "Show more",
     "showLess": "Collapse",
-    "progress": "Task progress"
+    "progress": "Task progress",
+    "stepPending": "Awaiting approval",
+    "confirmedByMember": "✓ {name} confirmed",
+    "confirmedByManager": "✓ Manager approved",
+    "confirmedWhen": "{who} · {when}",
+    "stepApprove": "Approve",
+    "stepReject": "Not approved",
+    "approveAll": "Approve all",
+    "approveAllTitle": "Approve all pending steps?",
+    "approveAllDesc": "Every step waiting for approval on this task will be marked done.",
+    "rejectTitle": "Step not approved",
+    "rejectDesc": "Explain what is missing. The task owner will see this note and the step returns to in progress.",
+    "rejectSend": "Send back",
+    "toastApproved": "Step approved",
+    "toastRejected": "Step sent back",
+    "toastApprovedAll": "Steps approved",
+    "pendingSteps": "{count, plural, one {# step awaiting approval} other {# steps awaiting approval}}"
   },
   "settings": {
     "title": "Settings",
@@ -309,6 +332,7 @@
   "attention": {
     "pending_confirmation": "Pending confirmation",
     "awaiting_review": "Awaiting review",
+    "checkpoint_pending": "Checkpoints awaiting approval",
     "blocked": "Blocked",
     "overdue": "Overdue",
     "stale": "Not updated for a while",
@@ -319,6 +343,7 @@
     "detail": {
       "pendingConfirmation": "Waiting for you to confirm the plan.",
       "awaitingReview": "Waiting for you to review the solution.",
+      "checkpointPending": "{count, plural, one {# checkpoint is waiting for your approval.} other {# checkpoints are waiting for your approval.}}",
       "overdue": "Agreed due date {due}, expected {expected}.",
       "stale": "No updates for a while.",
       "paused": "Paused.",
@@ -364,6 +389,13 @@
     "notFoundTask": "Task not found.",
     "adminOnly": "Only administrators can perform this action.",
     "staleDaysRange": "The number of working days must be a whole number from 1 to 30.",
+    "duplicateStepTitle": "Step titles must be unique within a plan.",
+    "invalidConfirmer": "Invalid checkpoint confirmer, use member or manager.",
+    "checkpointConfirmationRequired": "The member must confirm these steps are done. Ask the member, then resend with memberConfirmed: true.",
+    "stepsNotConfirmed": "All steps must be confirmed done before the task can be completed. Steps waiting for approval or not yet done: {steps}.",
+    "stepNotPending": "No step is waiting for approval.",
+    "rejectNeedsStep": "Rejecting must name one step; only approval can cover all pending steps.",
+    "noteRequiredForReject": "A note is required when a step is not accepted.",
     "invalidLevel": "Invalid level.",
     "displayNameRequired": "Display name cannot be empty.",
     "notFoundUser": "User not found.",
@@ -442,6 +474,7 @@
     "attentionKind": {
       "pending_confirmation": "Pending confirmation",
       "awaiting_review": "Awaiting review",
+      "checkpoint_pending": "Checkpoints awaiting approval",
       "blocked": "Blocked",
       "overdue": "Overdue",
       "stale": "Not updated for a while",
@@ -483,6 +516,16 @@
     "settingsLine": "{name} ({level}) — send mode: {mode}.",
     "confirmed": "Confirmed.",
     "changesRequested": "Plan changes requested.",
+    "confirmerLabel": "checkpoints confirmed by: {who}",
+    "confirmerMember": "member",
+    "confirmerManager": "manager",
+    "settingsConfirmer": " Checkpoint confirmer: {who}.",
+    "detailConfirmer": "Checkpoint confirmer: {who}",
+    "stepPending": " (awaiting manager approval)",
+    "feedbackRejected": "- Checkpoint rejected on **{title}**, step \"{step}\" (back to doing): {note}",
+    "checkpointApproved": "{count, plural, one {# step approved.} other {# steps approved.}}",
+    "checkpointRejected": "Step rejected and sent back to doing.",
+    "confirmerSet": "{name}: checkpoint confirmer is now {who}.",
     "reviewResult": "{verdict}."
   },
   "theme": {
