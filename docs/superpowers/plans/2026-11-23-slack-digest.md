@@ -25,7 +25,7 @@
   - Đang bật thì phải có ít nhất 1 ngày.
   - Múi giờ phải là tên IANA hợp lệ.
   - Giá trị sai thì ném `VALIDATION` có `field`.
-- **Ghép Slack theo email** (`trim().toLowerCase()`) qua `users.lookupByEmail`, cache vào `users.slackUserId`. Email đổi thì xóa `slackUserId`. Gặp lỗi `user_not_found|channel_not_found|account_inactive` khi gửi thì cũng xóa `slackUserId`.
+- **Ghép Slack theo email** (`trim().toLowerCase()`) qua `users.lookupByEmail`, cache vào `users.slackUserId`. Email đổi thì xóa `slackUserId`. Gặp lỗi `user_not_found|channel_not_found|is_archived` khi gửi thì cũng xóa `slackUserId`. `account_inactive` là lỗi của chính token bot, nên tính là `slackAuthFailed`.
 - **Nội dung tin nhắn:**
   - Phần "Cần bạn xử lý" lấy từ `needsAttention(db, actor)` **bỏ các mục `ownerIsMe`**. Nhóm "Chờ bạn duyệt" gồm `pending_confirmation|awaiting_review|checkpoint_pending|question_for_me`. Nhóm "Có vấn đề" là các loại còn lại. Mỗi nhóm tối đa 10 mục, phần dư hiện "… và N mục khác".
   - Cuối phần đó có dòng tổng hợp team: việc đang làm, việc xong và việc mới tạo kể từ `since`. Chỉ tính cấp dưới trực tiếp, không tính việc riêng tư.
@@ -124,7 +124,7 @@
     - `slackRateLimited`: HTTP 429, kèm `params.retryAfter`
     - `slackUnavailable`: mọi lỗi còn lại
     - Mỗi lỗi có `params.code` là mã của Slack.
-  - `interface DigestTransport { channel: 'slack'; resolveRecipient(db, user): Promise<string>; send(recipient, msg): Promise<void> }`
+  - `interface DigestTransport { channel: 'slack'; resolveRecipient(db, user): Promise<string>; send(db, user, msg): Promise<void> }` (không giữ trạng thái; xem task-2-report "Fixes")
   - `slackTransport(client): DigestTransport`. Hàm `resolveRecipient`:
     - dùng `slackUserId` đã cache nếu có;
     - không có email → ném `noEmail`;

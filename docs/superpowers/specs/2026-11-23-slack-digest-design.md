@@ -96,7 +96,7 @@ Về phía Slack:
 - **Khi không ghép được:**
   - Lỗi `users_not_found`: ghi lần gửi là `failed`, lý do `slackUserNotFound`, và người đó hiện trong bảng "Ghép tài khoản".
   - Không có email: ghi lý do `noEmail`.
-- **Khi đã lưu `slackUserId` mà gửi lỗi:** nếu lỗi là `user_not_found`, `channel_not_found` hoặc `account_inactive`, xóa `slackUserId` và để lần sau ghép lại.
+- **Khi đã lưu `slackUserId` mà gửi lỗi:** nếu lỗi là `user_not_found`, `channel_not_found` hoặc `is_archived`, xóa `slackUserId` và để lần sau ghép lại.
 
 ## 7. Thiết lập cá nhân
 
