@@ -15,25 +15,25 @@ export function defaultTimezone(): string {
   return process.env.DEFAULT_TIMEZONE || 'Asia/Ho_Chi_Minh';
 }
 
+let zones: Set<string> | null = null;
 function validTimezone(tz: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
+  zones ??= new Set([...Intl.supportedValuesOf('timeZone'), 'UTC']);
+  return zones.has(tz);
 }
 
-/** Throws VALIDATION with `field` for any invalid provided value. `days` must be 1..7 and non-empty. */
-export function validateDigestPrefs(p: Partial<DigestPrefs>): void {
+/**
+ * Throws VALIDATION with `field` for any invalid provided value. `days` must be 1..7;
+ * empty days are only rejected while the digest is (effectively) enabled (default: true).
+ */
+export function validateDigestPrefs(p: Partial<DigestPrefs>, effectiveEnabled: boolean = p.enabled ?? true): void {
   if (p.time !== undefined && !TIME_RE.test(p.time)) {
     throw new DomainError('VALIDATION', 'invalidDigestTime', { field: 'time' });
   }
   if (p.days !== undefined) {
-    const ok = Array.isArray(p.days) && p.days.length > 0 && p.days.every((d) => Number.isInteger(d) && d >= 1 && d <= 7);
+    const ok = Array.isArray(p.days) && (p.days.length > 0 || !effectiveEnabled) && p.days.every((d) => Number.isInteger(d) && d >= 1 && d <= 7);
     if (!ok) throw new DomainError('VALIDATION', 'digestDaysRequired', { field: 'days' });
   }
-  if (p.timezone !== undefined && !(typeof p.timezone === 'string' && p.timezone && validTimezone(p.timezone))) {
+  if (p.timezone !== undefined && !(typeof p.timezone === 'string' && validTimezone(p.timezone))) {
     throw new DomainError('VALIDATION', 'invalidTimezone', { field: 'timezone' });
   }
 }
@@ -92,7 +92,20 @@ export async function getMyDigestPrefs(
 }
 
 export async function setMyDigestPrefs(db: Db, actor: Actor, input: Partial<DigestPrefs>): Promise<void> {
-  validateDigestPrefs(input);
+  if (input.days !== undefined && input.days.length === 0 && input.enabled === undefined) {
+    const [cur] = await db.select().from(users).where(eq(users.id, actor.id));
+    const s = await readSettings(db);
+    validateDigestPrefs(input, cur?.digestEnabled ?? s.defaultEnabled);
+  } else {
+    validateDigestPrefs(input);
+  }
+  if (input.enabled === true && input.days === undefined) {
+    const [cur] = await db.select().from(users).where(eq(users.id, actor.id));
+    const s = await readSettings(db);
+    if (cur && effectiveDigestPrefs(cur, s).days.length === 0) {
+      throw new DomainError('VALIDATION', 'digestDaysRequired', { field: 'days' });
+    }
+  }
   const set: Partial<typeof users.$inferInsert> = {};
   if (input.enabled !== undefined) set.digestEnabled = !!input.enabled;
   if (input.time !== undefined) set.digestTime = input.time;

@@ -32,3 +32,5 @@ ALTER TABLE "users" ADD COLUMN "digest_days" integer[];--> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN "digest_timezone" text;--> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN "slack_user_id" text;--> statement-breakpoint
 ALTER TABLE "digest_deliveries" ADD CONSTRAINT "digest_deliveries_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+--> statement-breakpoint
+INSERT INTO "slack_settings" ("id") VALUES (1) ON CONFLICT ("id") DO NOTHING;

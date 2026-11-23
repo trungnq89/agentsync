@@ -461,7 +461,8 @@
     "invalidTimezone": "Choose a valid time zone.",
     "slackTokenRequired": "Save a Slack bot token before turning Slack on.",
     "slackAppUrlRequired": "Set APP_URL on the server before turning Slack on.",
-    "encryptionKeyMissing": "The encryption key (SETTINGS_ENCRYPTION_KEY) is missing or invalid."
+    "encryptionKeyMissing": "The encryption key (SETTINGS_ENCRYPTION_KEY) is missing or invalid.",
+    "slackTokenInvalid": "Slack bot tokens start with xoxb-."
   },
   "mcp": {
     "noTasks": "No tasks.",

@@ -19,7 +19,8 @@ export type SlackSettingsView = {
 export type SlackSettingsInput = {
   enabled?: boolean;
   botToken?: string;
-  defaults?: Partial<DigestPrefs>;
+  /** `timezone: null` resets to the DEFAULT_TIMEZONE env value. */
+  defaults?: Partial<Omit<DigestPrefs, 'timezone'>> & { timezone?: string | null };
 };
 
 const appUrlSet = () => !!process.env.APP_URL?.trim();
@@ -42,11 +43,16 @@ export async function saveSlackSettings(db: Db, actor: Actor, input: SlackSettin
   requireAdmin(actor);
   const token = input.botToken?.trim();
   if (token && !isEncryptionReady()) throw new DomainError('VALIDATION', 'encryptionKeyMissing', { field: 'botToken' });
-  if (input.defaults) validateDigestPrefs(input.defaults);
+  if (token && !token.startsWith('xoxb-')) throw new DomainError('VALIDATION', 'slackTokenInvalid', { field: 'botToken' });
 
   await db.transaction(async (tx) => {
     const row = await readSlackSettingsRow(tx as unknown as Db);
     const set: Partial<typeof slackSettings.$inferInsert> = {};
+    if (input.defaults) {
+      const { timezone, ...rest } = input.defaults;
+      validateDigestPrefs({ ...rest, ...(typeof timezone === 'string' || timezone === undefined ? { timezone } : {}) }, rest.enabled ?? row.defaultEnabled);
+      if (timezone === null) set.defaultTimezone = null;
+    }
     if (token) {
       set.botTokenEnc = encryptSecret(token);
       set.lastError = null;
@@ -65,7 +71,7 @@ export async function saveSlackSettings(db: Db, actor: Actor, input: SlackSettin
       if (d.enabled !== undefined) set.defaultEnabled = d.enabled;
       if (d.time !== undefined) set.defaultTime = d.time;
       if (d.days !== undefined) set.defaultDays = [...new Set(d.days)].sort((a, b) => a - b);
-      if (d.timezone !== undefined) set.defaultTimezone = d.timezone;
+      if (typeof d.timezone === 'string') set.defaultTimezone = d.timezone;
     }
     if (Object.keys(set).length === 0) return;
     await tx.update(slackSettings).set(set).where(eq(slackSettings.id, 1));
@@ -75,5 +81,11 @@ export async function saveSlackSettings(db: Db, actor: Actor, input: SlackSettin
 /** Internal only: decrypted bot token, or null when none is saved. */
 export async function loadSlackToken(db: Db): Promise<string | null> {
   const row = await readSlackSettingsRow(db);
-  return row.botTokenEnc ? decryptSecret(row.botTokenEnc) : null;
+  if (!row.botTokenEnc) return null;
+  try {
+    return decryptSecret(row.botTokenEnc);
+  } catch (e) {
+    if (e instanceof DomainError && e.key === 'odooKeyMissing') throw new DomainError('VALIDATION', 'encryptionKeyMissing');
+    throw e;
+  }
 }

@@ -92,3 +92,67 @@ describe('email change', () => {
     expect((await testDb.select().from(users).where(eq(users.id, u.id)))[0].slackUserId).toBeNull();
   });
 });
+
+describe('review fixes', () => {
+  it('loadSlackToken maps a wrong key to encryptionKeyMissing', async () => {
+    const a = await makeUser({ isAdmin: true });
+    await saveSlackSettings(testDb, a, { botToken: 'xoxb-1' });
+    const orig = process.env.SETTINGS_ENCRYPTION_KEY;
+    process.env.SETTINGS_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+    try {
+      expect((await rejects(loadSlackToken(testDb))).key).toBe('encryptionKeyMissing');
+    } finally {
+      process.env.SETTINGS_ENCRYPTION_KEY = orig;
+    }
+  });
+
+  it('saving a token without a key gives encryptionKeyMissing', async () => {
+    const a = await makeUser({ isAdmin: true });
+    const orig = process.env.SETTINGS_ENCRYPTION_KEY;
+    delete process.env.SETTINGS_ENCRYPTION_KEY;
+    try {
+      expect((await rejects(saveSlackSettings(testDb, a, { botToken: 'xoxb-1' }))).key).toBe('encryptionKeyMissing');
+    } finally {
+      process.env.SETTINGS_ENCRYPTION_KEY = orig;
+    }
+  });
+
+  it('rejects tokens without xoxb- prefix', async () => {
+    const a = await makeUser({ isAdmin: true });
+    const e = await rejects(saveSlackSettings(testDb, a, { botToken: 'abc' }));
+    expect([e.key, e.params?.field]).toEqual(['slackTokenInvalid', 'botToken']);
+  });
+
+  it('validates admin defaults and can reset default timezone', async () => {
+    const a = await makeUser({ isAdmin: true });
+    expect((await rejects(saveSlackSettings(testDb, a, { defaults: { time: '08:10' } }))).key).toBe('invalidDigestTime');
+    expect((await rejects(saveSlackSettings(testDb, a, { defaults: { days: [] } }))).key).toBe('digestDaysRequired');
+    await saveSlackSettings(testDb, a, { defaults: { timezone: 'America/New_York' } });
+    expect((await getSlackSettingsView(testDb, a)).defaults.timezone).toBe('America/New_York');
+    await saveSlackSettings(testDb, a, { defaults: { timezone: null } });
+    expect((await getSlackSettingsView(testDb, a)).defaults.timezone).toBe('Asia/Ho_Chi_Minh');
+  });
+
+  it('rejects non-IANA timezones', async () => {
+    const u = await makeUser();
+    for (const tz of ['+07:00', 'EST', 'asia/ho_chi_minh', '']) {
+      expect((await rejects(setMyDigestPrefs(testDb, u, { timezone: tz }))).key).toBe('invalidTimezone');
+    }
+    await setMyDigestPrefs(testDb, u, { timezone: 'UTC' });
+  });
+
+  it('empty days only rejected when effectively enabled', async () => {
+    const u = await makeUser();
+    expect((await rejects(setMyDigestPrefs(testDb, u, { days: [] }))).key).toBe('digestDaysRequired');
+    await setMyDigestPrefs(testDb, u, { enabled: false, days: [] });
+    await setMyDigestPrefs(testDb, u, { days: [] });
+    expect((await rejects(setMyDigestPrefs(testDb, u, { enabled: true }))).key).toBe('digestDaysRequired');
+  });
+
+  it('email set to null clears slackUserId', async () => {
+    const a = await makeUser({ isAdmin: true });
+    const u = await makeUser({ email: 'a@x.com', slackUserId: 'U1' });
+    await updateUser(testDb, a, u.id, { email: '' });
+    expect((await testDb.select().from(users).where(eq(users.id, u.id)))[0].slackUserId).toBeNull();
+  });
+});
