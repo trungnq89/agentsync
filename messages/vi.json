@@ -462,7 +462,13 @@
     "slackTokenRequired": "Hãy lưu bot token Slack trước khi bật Slack.",
     "slackAppUrlRequired": "Cần đặt APP_URL trên máy chủ trước khi bật Slack.",
     "encryptionKeyMissing": "Thiếu hoặc sai khóa mã hóa (SETTINGS_ENCRYPTION_KEY).",
-    "slackTokenInvalid": "Bot token Slack bắt đầu bằng xoxb-."
+    "slackTokenInvalid": "Bot token Slack bắt đầu bằng xoxb-.",
+    "slackAuthFailed": "Slack từ chối bot token.",
+    "slackUserNotFound": "Không có tài khoản Slack nào khớp với email này.",
+    "slackRecipientGone": "Người nhận trên Slack không còn khả dụng.",
+    "slackRateLimited": "Slack đang giới hạn tốc độ. Thử lại sau {retryAfter} giây.",
+    "slackUnavailable": "Không thể kết nối tới Slack.",
+    "noEmail": "Người dùng này chưa có email."
   },
   "mcp": {
     "noTasks": "Không có việc nào.",

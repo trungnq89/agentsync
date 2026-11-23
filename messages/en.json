@@ -462,7 +462,13 @@
     "slackTokenRequired": "Save a Slack bot token before turning Slack on.",
     "slackAppUrlRequired": "Set APP_URL on the server before turning Slack on.",
     "encryptionKeyMissing": "The encryption key (SETTINGS_ENCRYPTION_KEY) is missing or invalid.",
-    "slackTokenInvalid": "Slack bot tokens start with xoxb-."
+    "slackTokenInvalid": "Slack bot tokens start with xoxb-.",
+    "slackAuthFailed": "Slack rejected the bot token.",
+    "slackUserNotFound": "No Slack account matches this email.",
+    "slackRecipientGone": "The Slack recipient is no longer available.",
+    "slackRateLimited": "Slack is rate limiting requests. Try again in {retryAfter} seconds.",
+    "slackUnavailable": "Could not reach Slack.",
+    "noEmail": "This user has no email address."
   },
   "mcp": {
     "noTasks": "No tasks.",
