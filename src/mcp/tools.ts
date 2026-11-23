@@ -108,6 +108,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       body: z.string().describe('Update text'),
       stepsCompleted: z.array(z.string()).optional().describe('Titles of the steps just completed'),
       progressPct: z.number().int().min(0).max(100).optional().describe('Progress 0-100'),
+      memberConfirmed: z.boolean().optional().describe('Set true only after the member agreed the reported steps are done'),
       expectedEndDate: isoDate.optional().describe('New expected end date, YYYY-MM-DD'),
       source: z.enum(['auto', 'reviewed']).describe('auto = sent by the agent, reviewed = approved by the user'),
       evidence: z.object({

@@ -59,6 +59,7 @@ test('manager asks "Cần sửa" on a project review with a note', async ({ page
       problem: 'Vấn đề P', solution: 'Giải pháp S', rejectedAlternatives: 'Không', keyChanges: 'Đổi X',
       risks: 'Rủi ro R', testing: 'Đã test', prUrl: 'https://example.com/pr/1',
     });
+    await postUpdate(db, leader, t.id, { body: 'Xong các bước', source: 'auto', stepsCompleted: ['Bước 1', 'Bước 2'], memberConfirmed: true });
     await setTaskStatus(db, leader, t.id, 'complete');
     return t;
   });
@@ -178,6 +179,7 @@ for (const locale of ['vi-VN', 'en-US']) {
       await submitSolutionSummary(db, leader, t.id, {
         problem: 'p'.repeat(100), solution: 's', rejectedAlternatives: 'r', keyChanges: 'k', risks: 'r', testing: 't', prUrl: LONG_PR,
       });
+      await postUpdate(db, leader, t.id, { body: 'Xong các bước', source: 'auto', stepsCompleted: ['Bước 1', 'Bước 2'], memberConfirmed: true });
       await setTaskStatus(db, leader, t.id, 'complete');
       return t;
     });

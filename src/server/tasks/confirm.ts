@@ -1,9 +1,11 @@
 import { eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { users, type PlanStep, type Task, type User } from '@/db/schema';
-import { isCurrentManagerOf, type Actor } from '@/server/authz';
+import { checkpointReviews, planVersions, users, type PlanStep, type Task, type User } from '@/db/schema';
+import { isCurrentManagerOf, loadTaskForViewer, type Actor } from '@/server/authz';
 import { DomainError } from '@/server/errors';
 import { isUuid } from '@/server/ids';
+import { asDb, currentPlan } from './internal';
+import { TERMINAL_STATUSES } from './lifecycle';
 
 export type Confirmer = 'member' | 'manager';
 const CONFIRMERS: readonly string[] = ['member', 'manager'];
@@ -53,5 +55,52 @@ export function normalizePlanSteps(submitted: PlanStep[], stored: PlanStep[]): P
     const prev = byTitle.get(s.title);
     if (prev && (prev.status === 'done' || prev.status === 'pending_approval')) return { ...prev };
     return { title: s.title, status: s.status === 'doing' ? 'doing' : 'todo' };
+  });
+}
+
+/**
+ * Direct manager approves or rejects steps waiting for approval. stepTitle null = all pending steps
+ * (approval only). Pattern: same as setCheckpointConfirmer, everyone who is not the owner's current
+ * direct manager (owner, admin, strangers, old manager, anyone on a private task) gets NOT_FOUND.
+ */
+export async function reviewCheckpoint(
+  db: Db,
+  actor: Actor,
+  taskId: string,
+  stepTitle: string | null,
+  decision: 'approved' | 'rejected',
+  note?: string,
+  now: Date = new Date(),
+): Promise<{ approved: number; rejected: number }> {
+  const trimmed = note?.trim() || null;
+  if (decision === 'rejected') {
+    if (stepTitle === null) throw new DomainError('VALIDATION', 'rejectNeedsStep');
+    if (!trimmed) throw new DomainError('VALIDATION', 'noteRequiredForReject', { field: 'note' });
+  }
+  return db.transaction(async (tx) => {
+    const { task, owner } = await loadTaskForViewer(asDb(tx), actor, taskId, { forUpdate: true });
+    if (actor.id === task.ownerId || !isCurrentManagerOf(actor, owner)) {
+      throw new DomainError('NOT_FOUND', 'notFoundTask');
+    }
+    if (TERMINAL_STATUSES.includes(task.status)) throw new DomainError('INVALID_TRANSITION', 'taskClosed');
+    const plan = await currentPlan(tx, taskId);
+    if (stepTitle !== null && !plan.steps.some((s) => s.title === stepTitle)) {
+      throw new DomainError('VALIDATION', 'unknownSteps', { steps: stepTitle });
+    }
+    const targets = plan.steps.filter((s) => s.status === 'pending_approval' && (stepTitle === null || s.title === stepTitle));
+    if (targets.length === 0) throw new DomainError('VALIDATION', 'stepNotPending');
+    const titles = new Set(targets.map((s) => s.title));
+    const steps: PlanStep[] = plan.steps.map((s) => {
+      if (!titles.has(s.title)) return s;
+      if (decision === 'approved') {
+        return { title: s.title, status: 'done', confirmedBy: 'manager', confirmedById: actor.id, confirmedAt: now.toISOString() };
+      }
+      return { title: s.title, status: 'doing' };
+    });
+    await tx.update(planVersions).set({ steps }).where(eq(planVersions.id, plan.id));
+    await tx.insert(checkpointReviews).values(targets.map((s) => ({
+      taskId, stepTitle: s.title, decision, note: decision === 'rejected' ? trimmed : null, reviewerId: actor.id, createdAt: now,
+    })));
+    return decision === 'approved' ? { approved: targets.length, rejected: 0 } : { approved: 0, rejected: targets.length };
   });
 }

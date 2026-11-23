@@ -12,6 +12,14 @@ const base = {
   startDate: '2026-11-23', agreedDueDate: '2026-11-30', steps: ['B1', 'B2'],
 };
 
+/** Test shortcut: mark every plan step confirmed (the confirmation flow is tested in confirm.test.ts). */
+async function allStepsDone(taskId: string) {
+  const plan = await getCurrentPlan(testDb, taskId);
+  await testDb.update(planVersions)
+    .set({ steps: plan.steps.map((s) => ({ ...s, status: 'done' as const })) })
+    .where(eq(planVersions.id, plan.id));
+}
+
 async function pair() {
   const manager = await makeUser({ level: 'manager' });
   const member = await makeUser({ managerId: manager.id });
@@ -145,6 +153,7 @@ describe('task service', () => {
     await testDb.insert(solutionSummaries).values({
       taskId: t.id, problem: 'p', solution: 's', rejectedAlternatives: 'r', keyChanges: 'k', risks: 'x', testing: 't',
     });
+    await allStepsDone(t.id);
     const done = await setTaskStatus(testDb, member, t.id, 'complete');
     expect(done.status).toBe('awaiting_review');
     expect(done.completedAt).not.toBeNull();
@@ -164,6 +173,7 @@ describe('task service', () => {
   it('private project task completes to done without a summary', async () => {
     const { member } = await pair();
     const t = await makeTask(member.id, { mode: 'project', status: 'in_progress', isPrivate: true });
+    await allStepsDone(t.id);
     const done = await setTaskStatus(testDb, member, t.id, 'complete');
     expect(done.status).toBe('done');
   });

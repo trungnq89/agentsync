@@ -214,6 +214,12 @@ export async function setTaskStatus(
         throw new DomainError('VALIDATION', 'summaryRequiredBeforeDone');
       }
     }
+    if (action === 'complete') {
+      const open = (await currentPlan(tx, taskId)).steps.filter((s) => s.status !== 'done');
+      if (open.length > 0) {
+        throw new DomainError('VALIDATION', 'stepsNotConfirmed', { steps: open.map((s) => s.title).join(', ') });
+      }
+    }
     const [updated] = await tx
       .update(tasks)
       .set({
