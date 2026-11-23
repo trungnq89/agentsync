@@ -35,6 +35,7 @@ English: [README.md](README.md)
 - **Phân quyền theo quản lý trực tiếp và việc riêng tư:** chỉ quản lý trực tiếp mới thấy việc của một người; một việc có thể để riêng tư cho chủ sở hữu.
 - **Tiếng Việt và tiếng Anh, giao diện sáng và tối:** mỗi người tự chọn.
 - **Đồng bộ nhân sự Odoo HR (tùy chọn):** đồng bộ chỉ đọc tài khoản và sơ đồ tổ chức từ Odoo HR.
+- **Tóm tắt Slack hằng ngày (tùy chọn, mặc định tắt):** mỗi người nhận một tin nhắn riêng về những việc cần chú ý. Cần `APP_URL` và `SETTINGS_ENCRYPTION_KEY`; tên việc và ghi chú được gửi sang Slack. Cài đặt: [docs/slack-setup.vi.md](docs/slack-setup.vi.md).
 - **Self-host bằng Docker:** một ứng dụng cộng Postgres; không cần dịch vụ ngoài lúc chạy.
 
 ## Bắt đầu nhanh (Docker)
@@ -50,7 +51,7 @@ English: [README.md](README.md)
 
    - `POSTGRES_PASSWORD`: chỉ dùng chữ, số, `-` và `_` (được ghép vào URL cơ sở dữ liệu).
    - `APP_URL`: địa chỉ công khai, ví dụ `https://agentsync.example.com` (hiện trong hướng dẫn cấu hình MCP).
-   - `SETTINGS_ENCRYPTION_KEY`: tạo bằng `openssl rand -base64 32` (cần cho đồng bộ Odoo; hãy giữ cẩn thận).
+   - `SETTINGS_ENCRYPTION_KEY`: tạo bằng `openssl rand -base64 32` (cần cho đồng bộ Odoo và tóm tắt Slack; hãy giữ cẩn thận).
    - `DEFAULT_LOCALE`: `en` hoặc `vi`.
    - `COOKIE_SECURE`: để trống khi `APP_URL` là `https://`. Chỉ khi thử nội bộ qua `http://` thuần mới đặt `COOKIE_SECURE=false`, nếu không trình duyệt sẽ không giữ cookie và đăng nhập bị lặp.
 
@@ -99,6 +100,10 @@ Hook `Stop` (tùy chọn) chạy sau mỗi lượt của agent. Khi agent in ra 
 3. Tiến độ % giờ là số bước đã xác nhận chia tổng số bước. Giá trị tiến độ nhập tay bị bỏ qua, nên một số việc có thể hiện phần trăm khác.
 4. Việc đang thực hiện cần xác nhận hết các bước mới hoàn thành được. Hãy báo từng bước còn lại (thành viên xác nhận, hoặc quản lý duyệt) trước.
 
+## Tóm tắt Slack
+
+Quản trị > **Slack** bật việc gửi mỗi người một tin nhắn riêng hằng ngày về những việc cần chú ý. Tính năng tắt cho tới khi admin nhập bot token và bật. Mỗi người tự chọn giờ, ngày và múi giờ trong Cài đặt. Tên việc, lý do bị vướng và ghi chú được gửi sang Slack. Cài đặt đầy đủ (tạo Slack app, quyền `chat:write` và `users:read.email`): [docs/slack-setup.vi.md](docs/slack-setup.vi.md) ([English](docs/slack-setup.md)).
+
 ## Đồng bộ nhân sự Odoo
 
 Quản trị > **Odoo** giữ tài khoản và sơ đồ tổ chức của AgentSync khớp với danh sách nhân viên trong Odoo HR. Ứng dụng chỉ đọc từ Odoo, không bao giờ ghi.
@@ -131,12 +136,14 @@ Quản trị > **Odoo** giữ tài khoản và sơ đồ tổ chức của Agent
 | --- | --- | --- |
 | `DATABASE_URL` | ứng dụng, script | Chuỗi kết nối Postgres. Trong `docker-compose.prod.yml` được ghép từ `POSTGRES_PASSWORD`; khi phát triển lấy từ `.env`. |
 | `POSTGRES_PASSWORD` | compose production | Bắt buộc. Mật khẩu Postgres đi kèm (chữ, số, `-`, `_`). |
-| `APP_URL` | ứng dụng | Địa chỉ công khai; hiện trong hướng dẫn MCP và quyết định cờ `Secure` mặc định của cookie. Mặc định `http://localhost:3000`. |
+| `APP_URL` | ứng dụng | Địa chỉ công khai; hiện trong hướng dẫn MCP, dùng cho liên kết trong tóm tắt Slack (bắt buộc để bật Slack) và quyết định cờ `Secure` mặc định của cookie. Mặc định `http://localhost:3000`. |
 | `APP_PORT` | compose production | Cổng trên máy host của ứng dụng. Mặc định `3000`. |
 | `DEFAULT_LOCALE` | ứng dụng, MCP | Ngôn ngữ mặc định cho cả hệ thống: `en` hoặc `vi` (mặc định `en`). |
 | `COOKIE_SECURE` | ứng dụng | `true` hoặc `false`. Mặc định: bật khi `APP_URL` bắt đầu bằng `https://`. |
 | `ALLOWED_ORIGINS` | lúc build | Các host (cách nhau bằng dấu phẩy) được gọi Server Actions khi đứng sau proxy đổi `Host`. Đổi giá trị thì phải build lại. |
-| `SETTINGS_ENCRYPTION_KEY` | ứng dụng | 32 byte, base64. Mã hóa API key Odoo đã lưu. Thiếu khóa thì trang Odoo bị khóa. |
+| `SETTINGS_ENCRYPTION_KEY` | ứng dụng | 32 byte, base64. Mã hóa API key Odoo và bot token Slack đã lưu. Thiếu khóa thì trang Odoo và Slack bị khóa. |
+| `DEFAULT_TIMEZONE` | ứng dụng | Múi giờ IANA dùng cho tóm tắt Slack cho tới khi có người chọn múi khác. Mặc định `Asia/Ho_Chi_Minh`. |
+| `SLACK_API_BASE` | ứng dụng (kiểm thử) | Ghi đè địa chỉ API Slack. Chỉ dùng cho kiểm thử đầu cuối. |
 | `DB_PORT` | compose phát triển | Cổng trên máy host của Postgres khi phát triển. Mặc định `5432`. |
 
 ## Tạo admin đầu tiên

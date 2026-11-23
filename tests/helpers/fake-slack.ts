@@ -9,6 +9,8 @@ type Opts = {
   failNext?: FakeSlackFail;
   /** Delay every response (used to exercise client timeouts). */
   delayMs?: number;
+  /** Fixed port (default: random). */
+  port?: number;
 };
 
 export type FakeSlackPost = { channel: string; text: string; blocks?: unknown[] };
@@ -29,6 +31,9 @@ export async function startFakeSlack(opts: Opts) {
         if (opts.delayMs) setTimeout(send, opts.delayMs);
         else send();
       };
+      // Test control endpoints (no auth): GET /__posts lists received messages, POST /__reset clears them.
+      if (req.url === '/__posts') return reply(200, { posts });
+      if (req.url === '/__reset') { posts.length = 0; lookups.length = 0; return reply(200, { ok: true }); }
       const method = (req.url ?? '').replace(/^\/+/, '').split('?')[0];
       if (req.headers.authorization !== `Bearer ${opts.token}`) return reply(200, { ok: false, error: 'invalid_auth' });
       if (failNext && failNext.method === method) {
@@ -65,7 +70,7 @@ export async function startFakeSlack(opts: Opts) {
       return reply(404, { ok: false, error: 'unknown_method' });
     });
   });
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  await new Promise<void>((r) => server.listen(opts.port ?? 0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return {
     url,

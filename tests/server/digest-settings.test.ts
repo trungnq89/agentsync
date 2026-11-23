@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { testDb } from '../helpers/db';
 import { makeUser } from '../helpers/factories';
-import { slackSettings, users } from '@/db/schema';
+import { digestDeliveries, slackSettings, users } from '@/db/schema';
 import { getSlackSettingsView, loadSlackToken, saveSlackSettings } from '@/server/digest/settings';
 import { getMyDigestPrefs, resetMyDigestPrefs, setMyDigestPrefs } from '@/server/digest/prefs';
 import { updateUser } from '@/server/org';
@@ -154,5 +154,29 @@ describe('review fixes', () => {
     const u = await makeUser({ email: 'a@x.com', slackUserId: 'U1' });
     await updateUser(testDb, a, u.id, { email: '' });
     expect((await testDb.select().from(users).where(eq(users.id, u.id)))[0].slackUserId).toBeNull();
+  });
+});
+
+describe('slack settings view', () => {
+  it('exposes pausedUntil', async () => {
+    const a = await makeUser({ isAdmin: true });
+    expect((await getSlackSettingsView(testDb, a)).pausedUntil).toBeNull();
+    const until = new Date('2030-01-01T00:00:00Z');
+    await testDb.update(slackSettings).set({ pausedUntil: until }).where(eq(slackSettings.id, 1));
+    expect((await getSlackSettingsView(testDb, a)).pausedUntil?.getTime()).toBe(until.getTime());
+  });
+});
+
+describe('slack match issue', () => {
+  it('reports noEmail, then a not-found failure, and clears once linked', async () => {
+    const u = await makeUser({ email: null });
+    expect((await getMyDigestPrefs(testDb, u)).slackIssue).toBe('noEmail');
+    await testDb.update(users).set({ email: 'x@y.z' }).where(eq(users.id, u.id));
+    expect((await getMyDigestPrefs(testDb, u)).slackIssue).toBeNull();
+    await testDb.insert(digestDeliveries).values({ userId: u.id, localDate: '2030-01-01', status: 'failed', error: 'slackUserNotFound' });
+    const p = await getMyDigestPrefs(testDb, u);
+    expect([p.slackIssue, p.slackLinked]).toEqual(['slackUserNotFound', false]);
+    await testDb.update(users).set({ slackUserId: 'U1' }).where(eq(users.id, u.id));
+    expect((await getMyDigestPrefs(testDb, u)).slackIssue).toBeNull();
   });
 });

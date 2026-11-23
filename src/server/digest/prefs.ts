@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { slackSettings, users, type SlackSettingsRow, type User } from '@/db/schema';
+import { digestDeliveries, slackSettings, users, type SlackSettingsRow, type User } from '@/db/schema';
 import type { Actor } from '../authz';
 import { DomainError } from '../errors';
 
@@ -79,15 +79,29 @@ export { readSettings as readSlackSettingsRow };
 export async function getMyDigestPrefs(
   db: Db,
   actor: Actor,
-): Promise<DigestPrefsView & { slackEnabled: boolean; slackLinked: boolean | null }> {
+): Promise<DigestPrefsView & { slackEnabled: boolean; slackLinked: boolean | null; slackIssue: 'noEmail' | 'slackUserNotFound' | null }> {
   const s = await readSettings(db);
   const [u] = await db.select().from(users).where(eq(users.id, actor.id));
   if (!u) throw new DomainError('NOT_FOUND', 'notFoundUser');
+  let slackIssue: 'noEmail' | 'slackUserNotFound' | null = null;
+  if (!u.slackUserId) {
+    if (!u.email?.trim()) slackIssue = 'noEmail';
+    else {
+      const [last] = await db
+        .select({ status: digestDeliveries.status, error: digestDeliveries.error })
+        .from(digestDeliveries)
+        .where(and(eq(digestDeliveries.userId, u.id), eq(digestDeliveries.channel, 'slack')))
+        .orderBy(desc(digestDeliveries.localDate), desc(digestDeliveries.updatedAt))
+        .limit(1);
+      if (last?.status === 'failed' && last.error === 'slackUserNotFound') slackIssue = 'slackUserNotFound';
+    }
+  }
   return {
     ...effectiveDigestPrefs(u, s),
     slackEnabled: s.enabled,
-    // null = not matched yet (no attempt made / cache cleared), true = cached Slack id present.
-    slackLinked: u.slackUserId ? true : null,
+    // true = cached Slack id present, false = known match problem (see slackIssue), null = not matched yet.
+    slackLinked: u.slackUserId ? true : slackIssue ? false : null,
+    slackIssue,
   };
 }
 
