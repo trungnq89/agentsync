@@ -309,6 +309,7 @@
   "attention": {
     "pending_confirmation": "Pending confirmation",
     "awaiting_review": "Awaiting review",
+    "checkpoint_pending": "Checkpoints awaiting approval",
     "blocked": "Blocked",
     "overdue": "Overdue",
     "stale": "Not updated for a while",
@@ -319,6 +320,7 @@
     "detail": {
       "pendingConfirmation": "Waiting for you to confirm the plan.",
       "awaitingReview": "Waiting for you to review the solution.",
+      "checkpointPending": "{count, plural, one {# checkpoint is waiting for your approval.} other {# checkpoints are waiting for your approval.}}",
       "overdue": "Agreed due date {due}, expected {expected}.",
       "stale": "No updates for a while.",
       "paused": "Paused.",
@@ -449,6 +451,7 @@
     "attentionKind": {
       "pending_confirmation": "Pending confirmation",
       "awaiting_review": "Awaiting review",
+      "checkpoint_pending": "Checkpoints awaiting approval",
       "blocked": "Blocked",
       "overdue": "Overdue",
       "stale": "Not updated for a while",

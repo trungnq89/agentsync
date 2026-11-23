@@ -10,7 +10,8 @@ import { isUuid } from '@/server/ids';
 import { listDirectReports } from '@/server/org';
 import { computeHealth, progressPct, type Health } from './health';
 import { currentPlan, type PlanVersion } from './internal';
-import { ACTIVE_STATUSES, DONE_STATUSES } from './lifecycle';
+import { effectiveConfirmer, type Confirmer } from './confirm';
+import { ACTIVE_STATUSES, DONE_STATUSES, TERMINAL_STATUSES } from './lifecycle';
 import { getPendingFeedback } from './activity';
 
 /** The only user fields that may leave the server layer via queries. */
@@ -26,6 +27,8 @@ type Level = (typeof LEVEL_ORDER)[number];
 interface Metrics {
   plan: PlanVersion | undefined;
   progress: number;
+  /** Steps waiting for the manager's approval. */
+  pendingSteps: number;
   lastActivityAt: Date;
   planChangedAt: Date | undefined;
   blocker: { body: string; createdAt: Date } | undefined;
@@ -83,6 +86,7 @@ async function loadMetrics(db: Db, rows: Task[], now: Date): Promise<Map<string,
       plan, lastActivityAt, blocker, ...h,
       planChangedAt: plan?.createdAt,
       progress: plan ? progressPct(plan) : 0,
+      pendingSteps: plan ? plan.steps.filter((s) => s.status === 'pending_approval').length : 0,
     });
   }
   return out;
@@ -105,6 +109,8 @@ export interface PersonCard {
   activeCount: number;
   hasBlocked: boolean;
   hasAwaitingReview: boolean;
+  /** Plan steps waiting for the manager's approval (private tasks of others never counted). */
+  pendingApprovals: number;
   lastActivityAt: Date | null;
 }
 
@@ -132,6 +138,7 @@ export async function teamOverview(
       activeCount: active.length,
       hasBlocked: active.some((t) => metrics.get(t.id)!.blocker),
       hasAwaitingReview: mine.some((t) => t.status === 'awaiting_review'),
+      pendingApprovals: mine.reduce((n, t) => n + metrics.get(t.id)!.pendingSteps, 0),
       lastActivityAt: times.length ? new Date(Math.max(...times)) : null,
     };
   });
@@ -149,10 +156,10 @@ export async function teamOverview(
 // ---------------------------------------------------------------- needsAttention
 
 export type AttentionKind =
-  | 'pending_confirmation' | 'awaiting_review' | 'blocked' | 'overdue' | 'stale'
+  | 'pending_confirmation' | 'awaiting_review' | 'checkpoint_pending' | 'blocked' | 'overdue' | 'stale'
   | 'paused_or_cancelled' | 'changes_requested' | 'question_for_me';
 const KIND_ORDER: AttentionKind[] = [
-  'pending_confirmation', 'awaiting_review', 'blocked', 'overdue', 'stale',
+  'pending_confirmation', 'awaiting_review', 'checkpoint_pending', 'blocked', 'overdue', 'stale',
   'paused_or_cancelled', 'changes_requested', 'question_for_me',
 ];
 
@@ -166,8 +173,8 @@ export interface AttentionItem {
   /** User-written text (blocker, note, question, reason); empty when a system detail applies. */
   detail: string;
   /** System-generated detail, translated by the consumer (namespace `attention.detail`). */
-  detailKey?: 'pendingConfirmation' | 'awaitingReview' | 'overdue' | 'stale' | 'paused' | 'cancelled';
-  detailParams?: Record<string, string>;
+  detailKey?: 'pendingConfirmation' | 'awaitingReview' | 'checkpointPending' | 'overdue' | 'stale' | 'paused' | 'cancelled';
+  detailParams?: Record<string, string | number>;
   at: Date;
 }
 
@@ -190,6 +197,11 @@ export async function needsAttention(db: Db, actor: Actor, now: Date = new Date(
     const owner = nameBy.get(t.ownerId)!;
     if (t.status === 'pending_confirmation') push('pending_confirmation', t, owner, '', t.statusChangedAt, { detailKey: 'pendingConfirmation' });
     if (t.status === 'awaiting_review') push('awaiting_review', t, owner, '', t.statusChangedAt, { detailKey: 'awaitingReview' });
+    if (m.pendingSteps > 0) {
+      push('checkpoint_pending', t, owner, '', t.statusChangedAt, {
+        detailKey: 'checkpointPending', detailParams: { count: m.pendingSteps },
+      });
+    }
     if (isActive(t) && m.blocker) push('blocked', t, owner, m.blocker.body, m.blocker.createdAt);
     if (isActive(t) && m.overdue) {
       push('overdue', t, owner, '', m.lastActivityAt, {
@@ -250,7 +262,7 @@ export async function personTimeline(
   actor: Actor,
   userId: string,
   now: Date = new Date(),
-): Promise<{ person: PublicUser; tasks: TimelineTask[] }> {
+): Promise<{ person: PublicUser; checkpointConfirmer: Confirmer; canSetConfirmer: boolean; tasks: TimelineTask[] }> {
   const notFound = () => new DomainError('NOT_FOUND', 'notFoundPerson');
   if (!isUuid(userId)) throw notFound();
   const [person] = await db.select().from(users).where(eq(users.id, userId));
@@ -261,6 +273,8 @@ export async function personTimeline(
   const metrics = await loadMetrics(db, rows, now);
   return {
     person: publicUser(person),
+    checkpointConfirmer: person.checkpointConfirmer === 'manager' ? 'manager' : 'member',
+    canSetConfirmer: isCurrentManagerOf(actor, person),
     tasks: rows.map((t) => ({
       id: t.id, title: t.title, status: t.status, startDate: t.startDate,
       agreedDueDate: t.agreedDueDate, expectedEndDate: t.expectedEndDate,
@@ -301,6 +315,8 @@ export async function taskDetail(db: Db, actor: Actor, taskId: string, now: Date
     canConfirm: isMgr && task.status === 'pending_confirmation',
     canReview: isMgr && task.status === 'awaiting_review',
     canEdit: actor.id === task.ownerId,
+    effectiveConfirmer: effectiveConfirmer(task, ownerRow),
+    canReviewCheckpoint: isMgr && !TERMINAL_STATUSES.includes(task.status) && m.pendingSteps > 0,
   };
 }
 
@@ -344,7 +360,7 @@ export async function weeklyDigest(db: Db, actor: Actor, now: Date = new Date())
 // ---------------------------------------------------------------- listMyTasks
 
 /** Owner's own tasks only, so repoRef/cwdHint are safe to expose here. */
-export type ListedTask = TimelineTask & { repoRef: { repo?: string; branch?: string } | null; cwdHint: string | null };
+export type ListedTask = TimelineTask & { effectiveConfirmer: Confirmer; repoRef: { repo?: string; branch?: string } | null; cwdHint: string | null };
 
 export async function listMyTasks(
   db: Db,
@@ -352,6 +368,8 @@ export async function listMyTasks(
   opts: { includeDone?: boolean } = {},
   now: Date = new Date(),
 ): Promise<ListedTask[]> {
+  const [me] = await db.select().from(users).where(eq(users.id, actor.id));
+  if (!me) throw new DomainError('NOT_FOUND', 'notFoundUser');
   const rows = (await tasksOf(db, [actor.id]))
     .filter((t) => isActive(t) || (opts.includeDone && (DONE_STATUSES.includes(t.status) || t.status === 'cancelled')))
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -360,13 +378,13 @@ export async function listMyTasks(
     id: t.id, title: t.title, status: t.status, startDate: t.startDate,
     agreedDueDate: t.agreedDueDate, expectedEndDate: t.expectedEndDate,
     progress: metrics.get(t.id)!.progress, health: metrics.get(t.id)!.health,
-    repoRef: t.repoRef ?? null, cwdHint: t.cwdHint ?? null,
+    effectiveConfirmer: effectiveConfirmer(t, me), repoRef: t.repoRef ?? null, cwdHint: t.cwdHint ?? null,
   }));
 }
 
 /** Owner-only read of the current plan, for agent hooks. Non-owners get NOT_FOUND. */
 export async function getOwnTaskPlan(db: Db, actor: Actor, taskId: string) {
-  const { task } = await loadTaskForViewer(db, actor, taskId);
+  const { task, owner } = await loadTaskForViewer(db, actor, taskId);
   if (task.ownerId !== actor.id) throw new DomainError('NOT_FOUND', 'notFoundTask');
   const plan = await currentPlan(db, task.id);
   return {
@@ -374,6 +392,7 @@ export async function getOwnTaskPlan(db: Db, actor: Actor, taskId: string) {
     status: task.status,
     mode: task.mode,
     statusChangedAt: task.statusChangedAt.toISOString(),
+    effectiveConfirmer: effectiveConfirmer(task, owner),
     steps: plan.steps.map((s) => ({ title: s.title, status: s.status })),
   };
 }

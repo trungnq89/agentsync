@@ -257,3 +257,41 @@ describe('reasonFor', () => {
     for (const t of [p, e]) expect(t).toContain('If your send mode is review, show the member the draft and wait for approval first.');
   });
 });
+
+describe('decide with pending_approval', () => {
+  const go = (sess: Session, pl: ReturnType<typeof plan>) => decide(sess, pl as never, { stopHookActive: false });
+  it('pending_approval step counts as reported: no remindSteps, reminded entry dropped', () => {
+    const r = go(base({ claimed: ['A'], reminded: ['A'] }, true), plan([['A', 'pending_approval'], ['B', 'todo']]));
+    expect(r.action).toEqual({ type: 'none' });
+    expect(t1(r).reminded).toEqual([]);
+    expect(r.session.outstanding).toBe(false);
+  });
+  it('first sight of a pending_approval claim does not remind', () => {
+    const r = go(base({ claimed: ['A'] }), plan([['A', 'pending_approval']]));
+    expect(r.action).toEqual({ type: 'none' });
+  });
+  it('all steps pending_approval: no completion reminder', () => {
+    const r = go(base({ claimed: ['A', 'B'] }), plan([['A', 'pending_approval'], ['B', 'pending_approval']]));
+    expect(r.action).toEqual({ type: 'none' });
+  });
+  it('mix of done and pending_approval: no completion reminder; all done: completion reminder', () => {
+    expect(go(base({ claimed: ['A', 'B'] }), plan([['A', 'done'], ['B', 'pending_approval']])).action).toEqual({ type: 'none' });
+    expect(go(base({ claimed: ['A', 'B'] }), plan([['A', 'done'], ['B', 'done']])).action).toMatchObject({ type: 'remindComplete' });
+  });
+  it('rejected step back to doing + marker printed again → reminded again', () => {
+    // 1. agent claims A, hook reminds
+    let s = base({ claimed: ['A'] });
+    let r = go(s, plan([['A', 'doing']]));
+    expect(r.action).toEqual({ type: 'remindSteps', steps: ['A'] });
+    // 2. agent reports, server says pending_approval: reminded dropped, nothing outstanding
+    r = go(r.session, plan([['A', 'pending_approval']]));
+    expect(r.action).toEqual({ type: 'none' });
+    expect(t1(r).reminded).toEqual([]);
+    // 3. manager rejected -> doing; A is claimed and no longer reminded, so the next server look reminds again
+    expect(go(r.session, plan([['A', 'doing']])).action).toEqual({ type: 'remindSteps', steps: ['A'] });
+    // 3b. but the marker re-printed makes the hook look at the server again
+    s = applyTurn(r.session, parseMarkers('AGENTSYNC-CHECKPOINT: A')).session;
+    expect(s.outstanding).toBe(true);
+    expect(s.tasks.t1.claimed).toEqual(['A']);
+  });
+});

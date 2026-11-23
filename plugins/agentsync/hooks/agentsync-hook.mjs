@@ -102,6 +102,9 @@ export function applyTurn(session, markers) {
       if (t && !st.claimed.includes(t)) {
         tasks[current] = { ...st, claimed: [...st.claimed, t] };
         (added[current] ??= []).push(t);
+      } else if (t) {
+        // Re-printed marker for a step claimed before (e.g. rejected back to doing): check the server again.
+        outstanding = true;
       }
     }
   }
@@ -123,15 +126,20 @@ export function decide(session, plan, opts) {
   if (plan === null || !id) return { session, action: none };
   const ts = session.tasks[id] ?? { claimed: [], reminded: [] };
 
-  /** @type {Map<string, { original: string, done: boolean }>} */
+  /** @type {Map<string, { original: string, done: boolean, handled: boolean }>} */
   const byTitle = new Map();
   const steps = plan.steps.filter((st) => st && typeof st.title === 'string');
   for (const st of steps) {
     const key = st.title.trim();
     const prev = byTitle.get(key);
-    byTitle.set(key, { original: prev ? prev.original : st.title, done: (prev ? prev.done : true) && st.status === 'done' });
+    byTitle.set(key, {
+      original: prev ? prev.original : st.title,
+      done: (prev ? prev.done : true) && st.status === 'done',
+      // pending_approval counts as reported: the agent has nothing left to send for it.
+      handled: (prev ? prev.handled : true) && (st.status === 'done' || st.status === 'pending_approval'),
+    });
   }
-  const pendingKeys = ts.claimed.filter((c) => byTitle.has(c) && !byTitle.get(c)?.done);
+  const pendingKeys = ts.claimed.filter((c) => byTitle.has(c) && !byTitle.get(c)?.handled);
   const allDone = steps.length > 0 && steps.every((st) => st.status === 'done');
   const outstanding = pendingKeys.length > 0 || (allDone && !TERMINAL_STATUSES.includes(plan.status));
   const keptReminded = ts.reminded.filter((r) => pendingKeys.includes(r));

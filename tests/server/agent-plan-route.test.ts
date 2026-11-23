@@ -19,7 +19,7 @@ describe('agent plan route', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
     const body = await res.json();
-    expect(Object.keys(body)).toEqual(['id', 'status', 'mode', 'statusChangedAt', 'steps']);
+    expect(Object.keys(body)).toEqual(['id', 'status', 'mode', 'statusChangedAt', 'effectiveConfirmer', 'steps']);
     expect(body.id).toBe(t.id);
     expect(body.status).toBe('in_progress');
     expect(typeof body.statusChangedAt).toBe('string');

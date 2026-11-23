@@ -18,6 +18,7 @@ const ICONS: Record<AttentionKind, LucideIcon> = {
   changes_requested: FilePenLine,
   pending_confirmation: UserCheck,
   awaiting_review: Eye,
+  checkpoint_pending: Eye,
   question_for_me: MessageCircleQuestion,
   paused_or_cancelled: PauseCircle,
 };

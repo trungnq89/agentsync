@@ -309,6 +309,7 @@
   "attention": {
     "pending_confirmation": "Chờ xác nhận",
     "awaiting_review": "Chờ review",
+    "checkpoint_pending": "Bước chờ duyệt",
     "blocked": "Đang kẹt",
     "overdue": "Trễ hạn",
     "stale": "Lâu không cập nhật",
@@ -319,6 +320,7 @@
     "detail": {
       "pendingConfirmation": "Chờ bạn xác nhận plan.",
       "awaitingReview": "Chờ bạn review giải pháp.",
+      "checkpointPending": "Có {count} bước đang chờ bạn duyệt.",
       "overdue": "Hạn thống nhất {due}, dự kiến {expected}.",
       "stale": "Lâu không có cập nhật.",
       "paused": "Tạm dừng.",
@@ -449,6 +451,7 @@
     "attentionKind": {
       "pending_confirmation": "Chờ xác nhận",
       "awaiting_review": "Chờ review",
+      "checkpoint_pending": "Bước chờ duyệt",
       "blocked": "Đang kẹt",
       "overdue": "Trễ hạn",
       "stale": "Lâu không cập nhật",
