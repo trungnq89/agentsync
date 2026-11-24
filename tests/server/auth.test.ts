@@ -76,7 +76,7 @@ describe('agent tokens', () => {
     const u = await makeUser();
     const { token } = await createAgentToken(testDb, u.id, 'l');
     const now = new Date('2026-11-21T00:00:00Z');
-    expect((await authenticateAgentToken(testDb, token, now)).id).toBe(u.id);
+    expect((await authenticateAgentToken(testDb, token, now)).user.id).toBe(u.id);
     const [row] = await testDb.select().from(agentTokens).where(eq(agentTokens.userId, u.id));
     expect(row.lastUsedAt?.toISOString()).toBe(now.toISOString());
     await expect(authenticateAgentToken(testDb, 'ags_bogus')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
@@ -101,7 +101,7 @@ describe('agent tokens', () => {
     const b = await makeUser();
     const { token, record } = await createAgentToken(testDb, a.id, 'l');
     await expect(revokeAgentToken(testDb, b.id, record.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect((await authenticateAgentToken(testDb, token)).id).toBe(a.id);
+    expect((await authenticateAgentToken(testDb, token)).user.id).toBe(a.id);
   });
 });
 
@@ -133,7 +133,7 @@ describe('email login and forced change', () => {
     const { token } = await createAgentToken(testDb, u.id, 'l');
     await expect(authenticateAgentToken(testDb, token)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     await changeMyPassword(testDb, u, 'pw-12345', 'new-password-1');
-    expect((await authenticateAgentToken(testDb, token)).id).toBe(u.id);
+    expect((await authenticateAgentToken(testDb, token)).user.id).toBe(u.id);
   });
 });
 

@@ -5,7 +5,7 @@ import { assertPasswordLength, hashPassword, verifyPassword } from './auth/passw
 import type { Actor } from './authz';
 import { DomainError } from './errors';
 
-export type TokenInfo = Pick<AgentToken, 'id' | 'label' | 'prefix' | 'createdAt' | 'lastUsedAt' | 'revokedAt'>;
+export type TokenInfo = Pick<AgentToken, 'id' | 'label' | 'prefix' | 'createdAt' | 'lastUsedAt' | 'revokedAt' | 'scope' | 'expiresAt' | 'legacy'>;
 
 /** The actor's own tokens, newest first. Never exposes hashes. */
 export async function listMyTokens(db: Db, actor: Actor): Promise<TokenInfo[]> {
@@ -17,6 +17,9 @@ export async function listMyTokens(db: Db, actor: Actor): Promise<TokenInfo[]> {
       createdAt: agentTokens.createdAt,
       lastUsedAt: agentTokens.lastUsedAt,
       revokedAt: agentTokens.revokedAt,
+      scope: agentTokens.scope,
+      expiresAt: agentTokens.expiresAt,
+      legacy: agentTokens.legacy,
     })
     .from(agentTokens)
     .where(eq(agentTokens.userId, actor.id))

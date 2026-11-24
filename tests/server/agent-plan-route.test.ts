@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { agentTokens } from '@/db/schema';
 import { createAgentToken, revokeAgentToken } from '@/server/auth/tokens';
 import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
@@ -11,6 +13,14 @@ const call = (id: string, headers: Record<string, string> = {}) =>
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe('agent plan route', () => {
+  it('401 for an expired token', async () => {
+    const u = await makeUser();
+    const { token, record } = await createAgentToken(testDb, u.id, 'x');
+    await testDb.update(agentTokens).set({ expiresAt: new Date() }).where(eq(agentTokens.id, record.id));
+    const t = await makeTask(u.id);
+    expect((await call(t.id, bearer(token))).status).toBe(401);
+  });
+
   it('owner gets plan with exact keys', async () => {
     const u = await makeUser();
     const { token } = await createAgentToken(testDb, u.id, 'x');

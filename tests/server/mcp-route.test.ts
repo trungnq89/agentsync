@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { users } from '@/db/schema';
+import { agentTokens, users } from '@/db/schema';
 import { createAgentToken, revokeAgentToken } from '@/server/auth/tokens';
 import { testDb } from '../helpers/db';
 import { makeUser } from '../helpers/factories';
@@ -35,6 +35,13 @@ describe('mcp route', () => {
     const u = await makeUser();
     const { token } = await createAgentToken(testDb, u.id, 'x');
     await testDb.update(users).set({ disabledAt: new Date() }).where(eq(users.id, u.id));
+    expect((await POST(rpc({ authorization: `Bearer ${token}` }))).status).toBe(401);
+  });
+
+  it('401 for an expired token (expiresAt == now)', async () => {
+    const u = await makeUser();
+    const { token, record } = await createAgentToken(testDb, u.id, 'x');
+    await testDb.update(agentTokens).set({ expiresAt: new Date() }).where(eq(agentTokens.id, record.id));
     expect((await POST(rpc({ authorization: `Bearer ${token}` }))).status).toBe(401);
   });
 

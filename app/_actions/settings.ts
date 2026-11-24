@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { getDb } from '@/db';
 import { changeMyPassword, setMySendMode } from '@/server/account';
-import { createAgentToken, revokeAgentToken } from '@/server/auth/tokens';
+import { createAgentToken, DEFAULT_TOKEN_DAYS, revokeAgentToken, type TokenScope } from '@/server/auth/tokens';
 import { DomainError } from '@/server/errors';
 import { run, str, type FormState } from '../_lib/action';
 import { cookies } from 'next/headers';
@@ -14,7 +14,9 @@ export async function createTokenAction(_p: FormState, form: FormData): Promise<
   return run(async () => {
     const label = str(form, 'label');
     if (!label) throw new DomainError('VALIDATION', 'tokenLabelRequired', { field: 'label' });
-    const { token } = await createAgentToken(getDb(), actor.id, label);
+    const scope = str(form, 'scope') || 'member';
+    const days = Number(str(form, 'days') || DEFAULT_TOKEN_DAYS);
+    const { token } = await createAgentToken(getDb(), actor.id, label, { scope: scope as TokenScope, days });
     revalidatePath('/settings');
     return { token };
   });

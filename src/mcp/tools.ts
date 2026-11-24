@@ -5,6 +5,7 @@ import type { User } from '@/db/schema';
 import type { Locale } from '@/i18n/config';
 import { serverTranslator } from '@/i18n/translator';
 import { isValidIsoDate } from '@/server/clock';
+import type { TokenScope } from '@/server/auth/tokens';
 import { DomainError, translateError } from '@/server/errors';
 import {
   answerQuestion, askQuestion, getPendingFeedback, postUpdate, resolveQuestion, reviewSolution, submitSolutionSummary,
@@ -26,7 +27,16 @@ export interface ToolCtx {
   /** Language of the token owner; all tool output is rendered in it. */
   locale: Locale;
   now?: () => Date;
+  /** Scope of the bearer token; manager-only tools refuse `member` tokens. */
+  tokenScope: TokenScope;
+  token: { expiresAt: Date; legacy: boolean };
 }
+
+/** Tools that act on someone else's data; they need a `manager` token. */
+const MANAGER_TOOLS: ReadonlySet<string> = new Set([
+  'team_overview', 'needs_attention', 'weekly_digest', 'confirm_task', 'request_changes', 'answer_blocker',
+  'ask_question', 'review_solution', 'review_checkpoint', 'set_checkpoint_confirmer',
+]);
 
 const reply = (markdown: string, data: unknown) => ({
   content: [
@@ -61,6 +71,9 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
   ) {
     server.registerTool(name, { description, inputSchema: shape }, (async (args: z.infer<z.ZodObject<S>>) => {
       try {
+        if (MANAGER_TOOLS.has(name) && ctx.tokenScope !== 'manager') {
+          throw new DomainError('FORBIDDEN', 'tokenScopeMember');
+        }
         const { markdown, data } = await run(args, ctx.getActor());
         return reply(markdown, data);
       } catch (e) {
@@ -217,6 +230,9 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       const data = {
         sendMode: actor.sendMode, displayName: actor.displayName, level: actor.level,
         checkpointConfirmer: actor.checkpointConfirmer,
+        tokenScope: ctx.tokenScope,
+        tokenExpiresAt: ctx.token.expiresAt.toISOString(),
+        tokenLegacy: ctx.token.legacy,
       };
       return done(
         t('mcp.settingsLine', { name: actor.displayName, level: t(`level.${actor.level}`), mode: t(`sendMode.${actor.sendMode}`) }) +
@@ -242,6 +258,8 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     { taskId },
     async ({ taskId: id }, actor) => {
       const d = await taskDetail(db, actor, id, now());
+      // A member token only sees its owner's own tasks; same answer as "no access".
+      if (ctx.tokenScope !== 'manager' && d.task.ownerId !== actor.id) throw new DomainError('NOT_FOUND', 'notFoundTask');
       return done(formatTaskDetail(t, d), d);
     });
 
