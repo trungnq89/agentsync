@@ -55,7 +55,8 @@ export function PlanSummary({
                     {s.status === 'done' && s.confirmedBy && (
                       <div className="text-xs text-muted-foreground" data-testid="step-confirmed">
                         {t('confirmedWhen', {
-                          who: s.confirmedBy === 'manager' ? t('confirmedByManager') : t('confirmedByMember', { name: ownerName }),
+                          who: (s.confirmedBy === 'manager' ? t('confirmedByManager') : t('confirmedByMember', { name: ownerName }))
+                            + (s.confirmedVia ? ` ${t(s.confirmedVia === 'agent' ? 'confirmedViaAgent' : 'confirmedViaWeb')}` : ''),
                           when: confirmedAt ? formatRelative(confirmedAt, now, locale) : '',
                         })}
                       </div>

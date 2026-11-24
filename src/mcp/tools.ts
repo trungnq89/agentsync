@@ -125,7 +125,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       }).optional(),
     },
     async ({ taskId: id, ...input }, actor) => {
-      const u = await postUpdate(db, actor, id, input, now());
+      const u = await postUpdate(db, actor, id, { ...input, via: 'agent' }, now());
       return done(t('mcp.updateSent'), u);
     });
 
@@ -312,7 +312,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     },
     async ({ taskId: id, stepTitle, decision, note }, actor) => {
       try {
-        const r = await reviewCheckpoint(db, actor, id, stepTitle ?? null, decision, note, now());
+        const r = await reviewCheckpoint(db, actor, id, stepTitle ?? null, decision, note, now(), 'agent');
         return done(
           decision === 'approved' ? t('mcp.checkpointApproved', { count: r.approved }) : t('mcp.checkpointRejected'),
           r,

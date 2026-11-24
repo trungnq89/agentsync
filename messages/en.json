@@ -116,6 +116,8 @@
     "stepPending": "Awaiting approval",
     "confirmedByMember": "✓ {name} confirmed",
     "confirmedByManager": "✓ Manager approved",
+    "confirmedViaAgent": "(via agent)",
+    "confirmedViaWeb": "(via web)",
     "confirmedWhen": "{who} · {when}",
     "stepApprove": "Approve",
     "stepReject": "Not approved",

@@ -62,6 +62,7 @@ test('manager sets confirmer, then approves, rejects and approves all', async ({
   await step1.getByTestId('step-approve').click();
   await expect(step1).toHaveAttribute('data-status', 'done');
   await expect(step1.getByTestId('step-confirmed')).toContainText('✓ Quản lý duyệt');
+  await expect(step1.getByTestId('step-confirmed')).toContainText('(trên web)');
   await expect(step1.getByTestId('step-confirmed')).toBeVisible();
 
   await leaderReports('Bước 2');

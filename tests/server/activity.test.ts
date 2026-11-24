@@ -65,7 +65,7 @@ describe('activity', () => {
     const plan = await getCurrentPlan(testDb, t.id);
     expect(plan.version).toBe(1);
     expect(plan.steps).toEqual([
-      { title: 'A', status: 'done', confirmedBy: 'member', confirmedById: member.id, confirmedAt: T0.toISOString() },
+      { title: 'A', status: 'done', confirmedBy: 'member', confirmedById: member.id, confirmedAt: T0.toISOString(), confirmedVia: 'agent' },
       { title: 'B', status: 'todo' },
     ]);
     const [row] = await testDb.select().from(tasks).where(eq(tasks.id, t.id));

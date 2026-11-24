@@ -22,6 +22,8 @@ export type PlanStep = {
   confirmedBy?: 'member' | 'manager';
   confirmedById?: string;
   confirmedAt?: string; // ISO
+  /** Where the confirmation came from. Absent on steps confirmed before this was recorded. */
+  confirmedVia?: 'agent' | 'web';
 };
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });

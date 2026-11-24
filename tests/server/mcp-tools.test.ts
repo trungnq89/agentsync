@@ -235,7 +235,7 @@ describe('mcp tools', () => {
       const ok = await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A'], memberConfirmed: true, source: 'auto' });
       expect(ok.isError).toBeFalsy();
       const d = data(await call(member, 'task_detail', { taskId: t.id }));
-      expect(d.plan.steps[0]).toMatchObject({ title: 'A', status: 'done', confirmedBy: 'member', confirmedById: me.id });
+      expect(d.plan.steps[0]).toMatchObject({ title: 'A', status: 'done', confirmedBy: 'member', confirmedById: me.id, confirmedVia: 'agent' });
       expect(d.effectiveConfirmer).toBe('member');
     });
 
@@ -266,6 +266,7 @@ describe('mcp tools', () => {
       const steps = data(await call(manager, 'task_detail', { taskId: t.id })).plan.steps;
       expect(steps.map((s: { status: string }) => s.status)).toEqual(['done', 'done']);
       expect(steps[0].confirmedBy).toBe('manager');
+      expect(steps.map((s: { confirmedVia: string }) => s.confirmedVia)).toEqual(['agent', 'agent']);
     });
 
     it('repeat approve-all is an informative non-error', async () => {

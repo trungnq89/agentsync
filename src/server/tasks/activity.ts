@@ -25,6 +25,8 @@ export interface PostUpdateInput {
   memberConfirmed?: boolean;
   expectedEndDate?: string;
   source: 'auto' | 'reviewed';
+  /** Where the member confirmation came from. Only MCP calls this with memberConfirmed, so default is agent. */
+  via?: 'agent' | 'web';
   evidence?: { branch?: string; commits?: number; prUrl?: string };
 }
 
@@ -72,7 +74,7 @@ export async function postUpdate(
       const steps: PlanStep[] = plan.steps.map((s) => {
         if (!done.includes(s.title) || s.status === 'done') return s;
         if (confirmer === 'manager') return s.status === 'pending_approval' ? s : { title: s.title, status: 'pending_approval' };
-        return { title: s.title, status: 'done', confirmedBy: 'member', confirmedById: actor.id, confirmedAt: now.toISOString() };
+        return { title: s.title, status: 'done', confirmedBy: 'member', confirmedById: actor.id, confirmedAt: now.toISOString(), confirmedVia: input.via ?? 'agent' };
       });
       await tx.update(planVersions).set({ steps }).where(eq(planVersions.id, plan.id));
       // Re-reporting a step answers its earlier "not accepted" reviews.

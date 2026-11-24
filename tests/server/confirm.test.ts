@@ -145,9 +145,14 @@ describe('postUpdate with member confirmer', () => {
     const { member, t } = await setup('member');
     await postUpdate(testDb, member, t.id, upd(['A'], { memberConfirmed: true }), T0);
     expect(await stepsOf(t.id)).toEqual([
-      { title: 'A', status: 'done', confirmedBy: 'member', confirmedById: member.id, confirmedAt: T0.toISOString() },
+      { title: 'A', status: 'done', confirmedBy: 'member', confirmedById: member.id, confirmedAt: T0.toISOString(), confirmedVia: 'agent' },
       { title: 'B', status: 'todo' },
     ]);
+  });
+  it('via defaults to agent and can be set to web', async () => {
+    const { member, t } = await setup('member');
+    await postUpdate(testDb, member, t.id, { ...upd(['A'], { memberConfirmed: true }), via: 'web' }, T0);
+    expect((await stepsOf(t.id))[0].confirmedVia).toBe('web');
   });
   it('re-reporting an already done step is a no-op and needs no confirmation', async () => {
     const { member, t } = await setup('member');
@@ -179,12 +184,26 @@ describe('reviewCheckpoint', () => {
     const r = await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, T1);
     expect(r).toEqual({ approved: 1, rejected: 0 });
     expect(await stepsOf(t.id)).toEqual([
-      { title: 'A', status: 'done', confirmedBy: 'manager', confirmedById: manager.id, confirmedAt: T1.toISOString() },
+      { title: 'A', status: 'done', confirmedBy: 'manager', confirmedById: manager.id, confirmedAt: T1.toISOString(), confirmedVia: 'web' },
       { title: 'B', status: 'pending_approval' },
     ]);
     const rows = await testDb.select().from(checkpointReviews).where(eq(checkpointReviews.taskId, t.id));
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ stepTitle: 'A', decision: 'approved', reviewerId: manager.id });
+  });
+  it('via agent is recorded on approval', async () => {
+    const { manager, t } = await pending();
+    await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, T1, 'agent');
+    expect((await stepsOf(t.id))[0]).toMatchObject({ status: 'done', confirmedVia: 'agent' });
+  });
+  it('legacy done step without confirmedVia is left untouched', async () => {
+    const conf = { confirmedBy: 'member' as const, confirmedById: 'u1', confirmedAt: '2026-11-23T01:00:00.000Z' };
+    const s = await setup('manager', {}, ['A', 'B']);
+    await testDb.update(planVersions).set({ steps: [{ title: 'A', status: 'done', ...conf }, { title: 'B', status: 'pending_approval' }] }).where(eq(planVersions.taskId, s.t.id));
+    await reviewCheckpoint(testDb, s.manager, s.t.id, null, 'approved', undefined, T1);
+    const steps = await stepsOf(s.t.id);
+    expect(steps[0]).toEqual({ title: 'A', status: 'done', ...conf });
+    expect(steps[1].confirmedVia).toBe('web');
   });
   it('approve all (stepTitle null) confirms every pending step only', async () => {
     const { manager, member, t } = await setup('manager', {}, ['A', 'B', 'C']);
@@ -194,6 +213,8 @@ describe('reviewCheckpoint', () => {
     const steps = await stepsOf(t.id);
     expect(steps.map((x) => x.status)).toEqual(['done', 'done', 'todo']);
     expect(steps[0].confirmedBy).toBe('manager');
+    expect(steps.slice(0, 2).map((x) => x.confirmedVia)).toEqual(['web', 'web']);
+    expect(steps[2].confirmedVia).toBeUndefined();
     await expect(reviewCheckpoint(testDb, manager, t.id, null, 'approved'))
       .rejects.toMatchObject({ code: 'VALIDATION', key: 'stepNotPending' });
   });
