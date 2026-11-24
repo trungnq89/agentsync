@@ -10,6 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { listMyTokens } from '@/server/account';
+import { listDirectReports } from '@/server/org';
+import { tokenDaysLeft } from '@/server/auth/token-expiry';
+import { isInsecureAppUrl } from '@/server/auth/insecure-url';
 import { getMyDigestPrefs } from '@/server/digest/prefs';
 import { isTheme } from '@/ui/theme';
 import { getActor } from '../_lib/actor';
@@ -34,6 +37,8 @@ export default async function SettingsPage() {
     getLocale(),
   ]);
   const tokens = await listMyTokens(getDb(), actor);
+  const canChooseScope = !actor.mustChangePassword && (await listDirectReports(getDb(), actor.id)).length > 0;
+  const insecure = isInsecureAppUrl(process.env.APP_URL);
   const digest = actor.mustChangePassword ? null : await getMyDigestPrefs(getDb(), actor);
   const mcpUrl = `${(process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')}/api/mcp`;
   const fmt = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' });
@@ -125,7 +130,12 @@ export default async function SettingsPage() {
               <CardDescription>{t('tokensDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <TokenForm mcpUrl={mcpUrl} />
+              {insecure && (
+                <div role="alert" data-testid="insecure-http-warning" className="rounded-md border border-warning bg-warning-soft p-3 text-sm text-warning-foreground">
+                  {t('insecureHttp')}
+                </div>
+              )}
+              <TokenForm mcpUrl={mcpUrl} canChooseScope={canChooseScope} />
               {tokens.length === 0 ? (
                 <EmptyState title={t('noTokens')} />
               ) : (
@@ -138,6 +148,15 @@ export default async function SettingsPage() {
                           <code>{tok.prefix}…</code> ·{' '}
                           {t('lastUsed', { when: tok.lastUsedAt ? fmt.format(tok.lastUsedAt) : t('neverUsed') })}
                         </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5" data-testid="token-badges">
+                        <Badge tone="info">{t(tok.scope === 'manager' ? 'scopeManager' : 'scopeMember')}</Badge>
+                        {tok.legacy && <Badge tone="warning">{t('legacyBadge')}</Badge>}
+                        {!tok.revokedAt && (() => {
+                          const days = tokenDaysLeft(tok.expiresAt);
+                          if (days === null) return <Badge tone="danger">{t('expiredBadge')}</Badge>;
+                          return <Badge tone={days <= 7 ? 'warning' : 'neutral'}>{t('expiresIn', { days })}</Badge>;
+                        })()}
                       </div>
                       {tok.revokedAt ? (
                         <Badge tone="neutral">{t('revoked')}</Badge>

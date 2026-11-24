@@ -1,6 +1,6 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
 import type { Db } from '@/db/client';
-import { tasks, type User } from '@/db/schema';
+import { agentTokens, tasks, type User } from '@/db/schema';
 import { listDirectReports } from '@/server/org';
 import { needsAttention, type AttentionItem, type AttentionKind } from '@/server/tasks/queries';
 import { getPendingFeedback, type PendingFeedback } from '@/server/tasks/activity';
@@ -20,6 +20,7 @@ export type DigestData = {
     answers: PendingFeedback['answersToMyQuestions'];
     dueSoon: { taskId: string; title: string; dueDate: string; overdue: boolean }[];
     pendingApprovalSteps: number;
+    expiringTokens: { label: string; expiresAt: Date }[];
   };
 };
 
@@ -73,6 +74,17 @@ export async function collectDigestData(
     pendingApprovalSteps += plan ? plan.steps.filter((s) => s.status === 'pending_approval').length : 0;
   }
 
+  const expiringTokens = (await db
+    .select({ label: agentTokens.label, expiresAt: agentTokens.expiresAt })
+    .from(agentTokens)
+    .where(and(
+      eq(agentTokens.userId, user.id),
+      isNull(agentTokens.revokedAt),
+      gt(agentTokens.expiresAt, now),
+      lte(agentTokens.expiresAt, new Date(now.getTime() + 7 * DAY_MS)),
+    ))
+    .orderBy(asc(agentTokens.expiresAt)));
+
   return {
     manager: { awaiting, problems, team },
     mine: {
@@ -82,6 +94,7 @@ export async function collectDigestData(
       answers,
       dueSoon,
       pendingApprovalSteps,
+      expiringTokens,
     },
   };
 }
@@ -92,6 +105,6 @@ export function isDigestEmpty(d: DigestData): boolean {
   return (
     d.manager.awaiting.length === 0 && d.manager.problems.length === 0 &&
     m.rejected.length === 0 && m.changesRequested.length === 0 && m.questionsForMe.length === 0 &&
-    m.answers.length === 0 && m.dueSoon.length === 0
+    m.answers.length === 0 && m.dueSoon.length === 0 && m.expiringTokens.length === 0
   );
 }

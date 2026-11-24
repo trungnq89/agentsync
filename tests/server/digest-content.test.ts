@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { slackSettings, managerFeedback, planVersions, questions, users } from '@/db/schema';
+import { agentTokens, slackSettings, managerFeedback, planVersions, questions, users } from '@/db/schema';
 import { collectDigestData, isDigestEmpty, type DigestData } from '@/server/digest/collect';
 import { buildDigest } from '@/server/digest/build';
 import { serverTranslator } from '@/i18n/translator';
@@ -13,7 +13,7 @@ const TZ = 'Asia/Ho_Chi_Minh';
 const APP = 'https://app.example.com';
 
 const emptyMine = (): DigestData['mine'] => ({
-  rejected: [], changesRequested: [], questionsForMe: [], answers: [], dueSoon: [], pendingApprovalSteps: 0,
+  rejected: [], changesRequested: [], questionsForMe: [], answers: [], dueSoon: [], pendingApprovalSteps: 0, expiringTokens: [],
 });
 const emptyData = (): DigestData => ({
   manager: { awaiting: [], problems: [], team: null }, mine: emptyMine(),
@@ -128,6 +128,41 @@ describe('collectDigestData', () => {
     expect(data.mine.answers.map((a) => a.answer)).toEqual(['new a']);
     const due = Object.fromEntries(data.mine.dueSoon.map((x) => [x.title, x.overdue]));
     expect(due).toEqual({ Tomorrow: false, Yesterday: true });
+  });
+});
+
+describe('expiring tokens', () => {
+  const day = 86_400_000;
+  const tok = (userId: string, label: string, offsetDays: number, revoked = false) =>
+    testDb.insert(agentTokens).values({
+      userId, label, tokenHash: `h-${label}-${Math.random()}`, prefix: 'ags_x',
+      expiresAt: new Date(NOW.getTime() + offsetDays * day), revokedAt: revoked ? NOW : null,
+    });
+
+  it('lists only live tokens expiring within 7 days', async () => {
+    const u = await makeUser({});
+    const other = await makeUser({});
+    await tok(u.id, 'soon', 3);
+    await tok(u.id, 'far', 10);
+    await tok(u.id, 'revoked', 3, true);
+    await tok(u.id, 'expired', -1);
+    await tok(other.id, 'not mine', 2);
+    const d = await collectDigestData(testDb, u, { since: SINCE, now: NOW, timezone: TZ });
+    expect(d.mine.expiringTokens.map((x) => x.label)).toEqual(['soon']);
+    expect(isDigestEmpty(d)).toBe(false);
+    const none = await collectDigestData(testDb, other, { since: SINCE, now: new Date(NOW.getTime() + 30 * day), timezone: TZ });
+    expect(none.mine.expiringTokens).toEqual([]);
+  });
+
+  it('buildDigest shows the escaped label', () => {
+    const d = emptyData();
+    d.mine.expiringTokens.push({ label: '<!channel> & laptop', expiresAt: new Date(NOW.getTime() + 3 * 86_400_000) });
+    const r = buildDigest(d, opts);
+    const s = allText(r);
+    expect(s).toContain('&lt;!channel&gt; &amp; laptop');
+    expect(s).not.toContain('<!channel>');
+    expect(s).toContain(serverTranslator('en', 'digest')('expiringTokens'));
+    expect(r.text).toContain('1');
   });
 });
 

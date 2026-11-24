@@ -165,7 +165,20 @@
     "revoke": "Thu hồi",
     "revokeTitle": "Thu hồi token này?",
     "revokeDesc": "Agent đang dùng \"{label}\" sẽ ngừng hoạt động ngay. Không thể hoàn tác.",
-    "tokenRevoked": "Đã thu hồi token"
+    "tokenRevoked": "Đã thu hồi token",
+    "tokenLifetime": "Hạn dùng",
+    "lifetimeOption": "{days} ngày",
+    "lifetimeHint": "Token ngừng hoạt động sau thời gian này. Khi đó hãy tạo token mới.",
+    "tokenScope": "Quyền",
+    "scopeMemberOption": "member: chỉ việc của bạn",
+    "scopeManagerOption": "manager: gồm cả đội của bạn",
+    "scopeHint": "member chỉ xem và cập nhật việc của chính bạn. manager còn duyệt và trả lời thay cho cấp dưới trực tiếp. Chọn member trừ khi agent cần làm việc như quản lý.",
+    "scopeMember": "member",
+    "scopeManager": "manager",
+    "legacyBadge": "Token cũ, toàn quyền",
+    "expiresIn": "Hết hạn sau {days} ngày",
+    "expiredBadge": "Đã hết hạn",
+    "insecureHttp": "APP_URL dùng HTTP thường trên địa chỉ không phải máy cục bộ, nên token và mật khẩu đi qua mạng không mã hóa. Hãy đặt AgentSync sau HTTPS (xem README)."
   },
   "admin": {
     "title": "Quản trị",
@@ -601,7 +614,9 @@
     "due": "hạn {date}",
     "pendingSteps": "{count} bước của bạn đang chờ duyệt.",
     "more": "… và {count} mục khác",
-    "summary": "{count} mục"
+    "summary": "{count} mục",
+    "expiringTokens": "Token agent sắp hết hạn",
+    "tokenExpires": "{label} hết hạn ngày {date}. Hãy tạo token mới trong Cài đặt."
   },
   "slack": {
     "metaTitle": "Slack",

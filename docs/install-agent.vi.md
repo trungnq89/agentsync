@@ -24,7 +24,11 @@ export AGENTSYNC_URL="https://agentsync.example.com"   # không có dấu / ở 
 export AGENTSYNC_TOKEN="ags_..."
 ```
 
-Không dán token vào chat hay commit vào repo.
+Không dán token vào chat hay commit vào repo. Nếu lưu token trong một file (ví dụ file bạn `source` từ `~/.zshrc`), hãy giới hạn quyền để chỉ bạn đọc được: `chmod 600 ~/.agentsync-env`.
+
+**Phạm vi token.** Token `member` (mặc định) chỉ xem và cập nhật việc của chính bạn. Token `manager` còn duyệt và trả lời thay cho cấp dưới trực tiếp (tổng quan đội, xác nhận, yêu cầu sửa, duyệt checkpoint). Trang Cài đặt chỉ cho chọn `manager` khi bạn có cấp dưới trực tiếp. Không đổi được phạm vi sau khi tạo; cần phạm vi khác thì tạo token mới.
+
+**Hạn dùng.** Mỗi token hết hạn sau 30, 90 (mặc định) hoặc 180 ngày, chọn khi tạo. Token hết hạn hoạt động như token đã thu hồi (HTTP 401). Hãy tạo token mới trong Cài đặt rồi cập nhật `AGENTSYNC_TOKEN`. AgentSync nhắc các token sắp hết hạn trong 7 ngày trong tóm tắt Slack của bạn.
 
 Nếu tài khoản của bạn đang dùng mật khẩu tạm, máy chủ từ chối token agent (HTTP 401, lỗi `passwordChangeRequired`) cho tới khi bạn đăng nhập AgentSync và đổi mật khẩu trong Cài đặt.
 

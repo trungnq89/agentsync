@@ -187,6 +187,19 @@ It prints `SMOKE OK` on success and exits non-zero on any error.
 - Schema and migrations use Drizzle (`src/db/schema.ts`, `drizzle/`).
 - The agent skill bundle lives in `plugins/agentsync` (Claude Code, Codex and an Antigravity template).
 
+## HTTPS
+
+Agent tokens and session cookies must not travel over plain HTTP. Put AgentSync behind a reverse proxy with TLS and set `APP_URL` to the `https://` address. With Caddy (automatic certificates), a `Caddyfile` is enough:
+
+```
+agentsync.example.com {
+    encode gzip
+    reverse_proxy localhost:3000
+}
+```
+
+If `APP_URL` is `http://` on a non-local host, the Settings page shows a warning above the agent tokens.
+
 ## Security notes
 
 - Use HTTPS in production (a reverse proxy such as nginx or Caddy is fine). The session cookie gets the `Secure` flag when `APP_URL` starts with `https://`.

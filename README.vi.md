@@ -187,6 +187,19 @@ In `SMOKE OK` nếu thành công, thoát mã khác 0 nếu có lỗi.
 - Schema và migration bằng Drizzle (`src/db/schema.ts`, thư mục `drizzle/`).
 - Gói skill cho agent nằm ở `plugins/agentsync` (Claude Code, Codex và một mẫu cho Antigravity).
 
+## HTTPS
+
+Token agent và cookie phiên không được đi qua HTTP thường. Hãy đặt AgentSync sau reverse proxy có TLS và đặt `APP_URL` là địa chỉ `https://`. Với Caddy (tự cấp chứng chỉ), một `Caddyfile` là đủ:
+
+```
+agentsync.example.com {
+    encode gzip
+    reverse_proxy localhost:3000
+}
+```
+
+Nếu `APP_URL` là `http://` trên máy không phải cục bộ, trang Cài đặt hiện cảnh báo phía trên phần token agent.
+
 ## Lưu ý bảo mật
 
 - Dùng HTTPS khi chạy thật (reverse proxy như nginx hoặc Caddy là đủ). Cookie phiên có cờ `Secure` khi `APP_URL` bắt đầu bằng `https://`.

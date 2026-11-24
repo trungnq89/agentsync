@@ -24,7 +24,11 @@ export AGENTSYNC_URL="https://agentsync.example.com"   # no trailing /
 export AGENTSYNC_TOKEN="ags_..."
 ```
 
-Never paste the token into a chat or commit it to a repo.
+Never paste the token into a chat or commit it to a repo. If you keep the token in a file (for example a file you `source` from `~/.zshrc`), restrict it so only you can read it: `chmod 600 ~/.agentsync-env`.
+
+**Token scope.** A `member` token (the default) can only see and update your own tasks. A `manager` token can also review and answer for your direct reports (team overview, confirm, request changes, review checkpoints). The Settings page offers `manager` only if you have direct reports. The scope cannot be changed later; create another token if you need a different one.
+
+**Lifetime.** Every token expires after 30, 90 (default) or 180 days, chosen when you create it. An expired token behaves like a revoked one (HTTP 401). Create a new token in Settings and update `AGENTSYNC_TOKEN`. AgentSync lists tokens that expire within 7 days in your Slack digest.
 
 If your account was given a temporary password, the server rejects agent tokens (HTTP 401, error `passwordChangeRequired`) until you sign in to AgentSync and change the password in Settings.
 

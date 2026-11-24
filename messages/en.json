@@ -165,7 +165,20 @@
     "revoke": "Revoke",
     "revokeTitle": "Revoke this token?",
     "revokeDesc": "The agent using \"{label}\" will stop working immediately. This cannot be undone.",
-    "tokenRevoked": "Token revoked"
+    "tokenRevoked": "Token revoked",
+    "tokenLifetime": "Lifetime",
+    "lifetimeOption": "{days} days",
+    "lifetimeHint": "The token stops working after this period. Create a new one then.",
+    "tokenScope": "Access",
+    "scopeMemberOption": "member: your own tasks only",
+    "scopeManagerOption": "manager: also your team",
+    "scopeHint": "member can only see and update your own work. manager can also review and answer for your direct reports. Choose member unless the agent must act as a manager.",
+    "scopeMember": "member",
+    "scopeManager": "manager",
+    "legacyBadge": "Old token, full access",
+    "expiresIn": "{days, plural, one {Expires in # day} other {Expires in # days}}",
+    "expiredBadge": "Expired",
+    "insecureHttp": "APP_URL uses plain HTTP on a non-local address, so tokens and passwords travel unencrypted. Put AgentSync behind HTTPS (see the README)."
   },
   "admin": {
     "title": "Administration",
@@ -601,7 +614,9 @@
     "due": "due {date}",
     "pendingSteps": "{count, plural, one {# step of yours is waiting for approval.} other {# steps of yours are waiting for approval.}}",
     "more": "… and {count} more",
-    "summary": "{count, plural, one {# item} other {# items}}"
+    "summary": "{count, plural, one {# item} other {# items}}",
+    "expiringTokens": "Agent tokens expiring soon",
+    "tokenExpires": "{label} expires on {date}. Create a new token in Settings."
   },
   "slack": {
     "metaTitle": "Slack",

@@ -7,12 +7,13 @@ import { ActionForm } from '@/components/ui/action-form';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
-import { Input } from '@/components/ui/input';
+import { Input, inputClass } from '@/components/ui/input';
+import { DEFAULT_TOKEN_DAYS, TOKEN_LIFETIMES } from '@/server/auth/tokens';
 import { createTokenAction } from '../_actions/settings';
 
 const codeBox = 'overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-surface-muted p-2 text-xs';
 
-export function TokenForm({ mcpUrl }: { mcpUrl: string }) {
+export function TokenForm({ mcpUrl, canChooseScope }: { mcpUrl: string; canChooseScope: boolean }) {
   const t = useTranslations('settings');
   const tokenRef = useRef<HTMLElement>(null);
 
@@ -68,8 +69,25 @@ export function TokenForm({ mcpUrl }: { mcpUrl: string }) {
         <FormField name="label" label={t('tokenLabel')} className="min-w-0 flex-1">
           <Input placeholder={t('tokenLabelPlaceholder')} required />
         </FormField>
-        <Button type="submit">{t('createToken')}</Button>
       </div>
+      <div className="flex flex-wrap items-start gap-3">
+        <FormField name="days" label={t('tokenLifetime')} hint={t('lifetimeHint')} className="min-w-0 flex-1 basis-48">
+          <select defaultValue={DEFAULT_TOKEN_DAYS} className={inputClass}>
+            {TOKEN_LIFETIMES.map((d) => (
+              <option key={d} value={d}>{t('lifetimeOption', { days: d })}</option>
+            ))}
+          </select>
+        </FormField>
+        {canChooseScope && (
+          <FormField name="scope" label={t('tokenScope')} hint={t('scopeHint')} className="min-w-0 flex-1 basis-48">
+            <select defaultValue="member" className={inputClass}>
+              <option value="member">{t('scopeMemberOption')}</option>
+              <option value="manager">{t('scopeManagerOption')}</option>
+            </select>
+          </FormField>
+        )}
+      </div>
+      <Button type="submit">{t('createToken')}</Button>
     </ActionForm>
   );
 }
