@@ -14,9 +14,13 @@ export async function createTokenAction(_p: FormState, form: FormData): Promise<
   return run(async () => {
     const label = str(form, 'label');
     if (!label) throw new DomainError('VALIDATION', 'tokenLabelRequired', { field: 'label' });
-    const scope = str(form, 'scope') || 'member';
+    const rawScope = str(form, 'scope') || 'member';
+    if (rawScope !== 'member' && rawScope !== 'manager') {
+      throw new DomainError('VALIDATION', 'tokenScopeNotAllowed', { field: 'scope' });
+    }
+    const scope: TokenScope = rawScope;
     const days = Number(str(form, 'days') || DEFAULT_TOKEN_DAYS);
-    const { token } = await createAgentToken(getDb(), actor.id, label, { scope: scope as TokenScope, days });
+    const { token } = await createAgentToken(getDb(), actor.id, label, { scope, days });
     revalidatePath('/settings');
     return { token };
   });

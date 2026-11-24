@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { eq } from 'drizzle-orm';
-import { planVersions, users, type User } from '@/db/schema';
+import { planVersions, questions, users, type User } from '@/db/schema';
 import { registerTools } from '@/mcp/tools';
 import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
@@ -395,5 +395,101 @@ describe('mcp tools', () => {
       expect(data.tokenExpiresAt).toBe(EXPIRES.toISOString());
       expect(data.tokenLegacy).toBe(true);
     });
+  });
+
+  describe('member token cannot reach a report via shared tools', () => {
+    async function setup() {
+      const mgr = await makeUser({ level: 'manager' });
+      const rep = await makeUser({ managerId: mgr.id });
+      const t = await makeTask(rep.id, { status: 'in_progress' });
+      return { mgr, rep, t };
+    }
+    const countQ = async () => (await testDb.select().from(questions)).length;
+
+    it.each(['ask_manager', 'report_blocker'])('%s on a report task is NOT_FOUND for member, works for manager', async (name) => {
+      const { mgr, t } = await setup();
+      const bad = await call(await connect(() => mgr, 'en', { scope: 'member' }), name, { taskId: t.id, body: 'x' });
+      expect(bad.isError).toBe(true);
+      expect(await countQ()).toBe(0);
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'manager' }), name, { taskId: t.id, body: 'x' });
+      expect(ok.isError).toBeFalsy();
+      expect(await countQ()).toBe(1);
+    });
+
+    it('answer_question on a report blocker is denied for member token, nothing changes', async () => {
+      const { mgr, rep, t } = await setup();
+      const [q] = await testDb.insert(questions).values({
+        taskId: t.id, authorId: rep.id, direction: 'member_to_manager', body: 'help', isBlocker: true,
+      } as never).returning();
+      const bad = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'answer_question', { questionId: q.id, answer: 'a' });
+      expect(bad.isError).toBe(true);
+      const [mid] = await testDb.select().from(questions).where(eq(questions.id, q.id));
+      expect(mid.status).toBe('open');
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'manager' }), 'answer_question', { questionId: q.id, answer: 'a' });
+      expect(ok.isError).toBeFalsy();
+    });
+
+    it('resolve_question on a report task is denied for member token', async () => {
+      const { mgr, rep, t } = await setup();
+      const [q] = await testDb.insert(questions).values({
+        taskId: t.id, authorId: mgr.id, direction: 'manager_to_member', body: 'q', answer: 'a', status: 'answered',
+      } as never).returning();
+      const bad = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'resolve_question', { questionId: q.id });
+      expect(bad.isError).toBe(true);
+      const [after] = await testDb.select().from(questions).where(eq(questions.id, q.id));
+      expect(after.status).toBe('answered');
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'manager' }), 'resolve_question', { questionId: q.id });
+      expect(ok.isError).toBeFalsy();
+      expect(rep.id).not.toBe(mgr.id);
+    });
+
+    it('get_pending_feedback does not leak a report answers to a member token', async () => {
+      const { mgr, t } = await setup();
+      await testDb.insert(questions).values({
+        taskId: t.id, authorId: mgr.id, direction: 'manager_to_member', body: 'q', answer: 'secret-answer', status: 'answered',
+      } as never);
+      const bad = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'get_pending_feedback');
+      expect(text(bad)).not.toContain('secret-answer');
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'manager' }), 'get_pending_feedback');
+      expect(text(ok)).toContain('secret-answer');
+    });
+
+    it('member token can still answer a question on its own task', async () => {
+      const { mgr } = await setup();
+      const mine = await makeTask(mgr.id, { status: 'in_progress' });
+      const [q] = await testDb.insert(questions).values({
+        taskId: mine.id, authorId: mgr.id, direction: 'manager_to_member', body: 'q',
+      } as never).returning();
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'answer_question', { questionId: q.id, answer: 'a' });
+      expect(ok.isError).toBeFalsy();
+    });
+
+    it('make_task_public on a report task is NOT_FOUND (not ownerOnly) for member token', async () => {
+      const { mgr, t } = await setup();
+      const r = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'make_task_public', { taskId: t.id });
+      expect(r.isError).toBe(true);
+      expect(text(r)).toContain('not found');
+    });
+  });
+
+  it('manager-scoped tools are exactly the Global Constraints list', async () => {
+    const handlers: Record<string, (a: unknown) => Promise<Res>> = {};
+    const stub = { registerTool: (name: string, _c: unknown, h: (a: unknown) => Promise<Res>) => { handlers[name] = h; } };
+    const mgr = await makeUser({ level: 'manager' });
+    registerTools(stub as never, {
+      db: testDb, locale: 'en', getActor: () => mgr,
+      tokenScope: 'member', token: { expiresAt: new Date(0), legacy: false },
+    });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const denied: string[] = [];
+    for (const [name, h] of Object.entries(handlers)) {
+      const r = await h({}).catch(() => null);
+      if (r?.isError && r.content[0].text.includes('member access')) denied.push(name);
+    }
+    spy.mockRestore();
+    expect(denied.sort()).toEqual([
+      'answer_blocker', 'ask_question', 'confirm_task', 'needs_attention', 'request_changes', 'review_checkpoint',
+      'review_solution', 'set_checkpoint_confirmer', 'team_overview', 'weekly_digest',
+    ]);
   });
 });

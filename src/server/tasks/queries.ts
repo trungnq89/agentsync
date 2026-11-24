@@ -114,6 +114,11 @@ export interface PersonCard {
   lastActivityAt: Date | null;
 }
 
+/** Direct reports visible to the actor; a member-scope token has none. */
+async function reportsOf(db: Db, actor: Actor) {
+  return actor.tokenScope === 'member' ? [] : listDirectReports(db, actor.id);
+}
+
 export async function teamOverview(
   db: Db,
   actor: Actor,
@@ -121,7 +126,7 @@ export async function teamOverview(
 ): Promise<{ tiers: { level: Level; people: PersonCard[] }[] }> {
   const [self] = await db.select().from(users).where(eq(users.id, actor.id));
   if (!self) throw new DomainError('NOT_FOUND', 'notFoundUser');
-  const people = [self, ...(await listDirectReports(db, actor.id))];
+  const people = [self, ...(await reportsOf(db, actor))];
   const rows = (await tasksOf(db, people.map((p) => p.id))).filter((t) => !t.isPrivate || t.ownerId === actor.id);
   const metrics = await loadMetrics(db, rows, now);
 
@@ -179,7 +184,7 @@ export interface AttentionItem {
 }
 
 export async function needsAttention(db: Db, actor: Actor, now: Date = new Date()): Promise<AttentionItem[]> {
-  const reports = await listDirectReports(db, actor.id);
+  const reports = await reportsOf(db, actor);
   const nameBy = new Map(reports.map((r) => [r.id, r.displayName]));
   const rows = (await tasksOf(db, reports.map((r) => r.id))).filter((t) => !t.isPrivate);
   const metrics = await loadMetrics(db, rows, now);
@@ -332,7 +337,7 @@ export interface DigestPerson {
 
 export async function weeklyDigest(db: Db, actor: Actor, now: Date = new Date()): Promise<{ people: DigestPerson[] }> {
   const since = now.getTime() - 7 * DAY_MS;
-  const reports = await listDirectReports(db, actor.id);
+  const reports = await reportsOf(db, actor);
   const rows = (await tasksOf(db, reports.map((r) => r.id))).filter((t) => !t.isPrivate);
   const metrics = await loadMetrics(db, rows, now);
   const people: DigestPerson[] = [];

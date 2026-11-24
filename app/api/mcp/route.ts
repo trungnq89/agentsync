@@ -27,7 +27,7 @@ async function handle(req: Request): Promise<Response> {
   const server = new McpServer({ name: 'agentsync', version: '0.1.0' });
   registerTools(server, {
     db,
-    getActor: () => user,
+    getActor: () => ({ ...user, tokenScope: token.scope }),
     locale: isLocale(user.locale) ? user.locale : defaultLocale(),
     tokenScope: token.scope,
     token: { expiresAt: token.expiresAt, legacy: token.legacy },

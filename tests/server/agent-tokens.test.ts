@@ -1,7 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { agentTokens } from '@/db/schema';
 import { authenticateAgentToken, createAgentToken } from '@/server/auth/tokens';
 import { listMyTokens } from '@/server/account';
 import { testDb } from '../helpers/db';
@@ -42,7 +41,7 @@ describe('createAgentToken', () => {
       code: 'VALIDATION', key: 'tokenScopeNotAllowed', params: { field: 'scope' },
     });
     const mgr = await makeUser({ level: 'manager' });
-    const rep = await makeUser({ managerId: mgr.id });
+    await makeUser({ managerId: mgr.id });
     const ok = await createAgentToken(testDb, mgr.id, 'x', { scope: 'manager' }, now);
     expect(ok.record.scope).toBe('manager');
     // a disabled report does not count
@@ -51,7 +50,6 @@ describe('createAgentToken', () => {
     await expect(createAgentToken(testDb, mgr2.id, 'x', { scope: 'manager' }, now)).rejects.toMatchObject({
       key: 'tokenScopeNotAllowed',
     });
-    expect(rep.id).toBeTruthy();
   });
 
   it('rejects an unknown scope value', async () => {
@@ -122,6 +120,5 @@ describe('migration backfill', () => {
       await client.query('DROP SCHEMA IF EXISTS mig_test CASCADE');
       client.release();
     }
-    expect(agentTokens).toBeDefined();
   });
 });

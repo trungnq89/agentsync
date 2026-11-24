@@ -332,7 +332,7 @@ export async function getPendingFeedback(db: Db, actor: Actor): Promise<PendingF
     .where(and(eq(questions.authorId, actor.id), eq(questions.status, 'answered')))
     .orderBy(questions.createdAt);
   const answersToMyQuestions = answered
-    .filter((r) => r.ownerId === actor.id || (!r.isPrivate && r.ownerManagerId === actor.id))
+    .filter((r) => r.ownerId === actor.id || (!r.isPrivate && isCurrentManagerOf(actor, { managerId: r.ownerManagerId })))
     .map((r) => ({ questionId: r.questionId, taskId: r.taskId, title: r.title, body: r.body, answer: r.answer ?? '', answeredAt: r.answeredAt }));
 
   const reviewRows = await db
