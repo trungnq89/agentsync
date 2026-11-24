@@ -99,6 +99,7 @@ An optional `Stop` hook runs after every agent turn. When the agent printed `AGE
 2. Claude Code with `--plugin-dir` picks up the new plugin (0.2.0) from the pulled folder. For Codex and the alternative install, copy the skills from `plugins/agentsync/skills` again, otherwise your agent keeps the old skills and will not ask for confirmation properly.
 3. Progress % is now confirmed steps divided by total steps. A manual progress override is ignored, so some tasks may show a different percentage.
 4. A task that is in progress needs its steps confirmed before it can be completed. Report each remaining step (the member confirms it, or the manager approves it) first.
+5. Agent tokens now have a scope and an expiry. Every existing token becomes a `manager`-scope "legacy" token that expires 90 days after the upgrade (all of them on the same day). Create new tokens (Settings) before then and update `AGENTSYNC_TOKEN`; agents also see a reminder in tool output, and the Slack digest lists tokens expiring within 7 days.
 
 ## Slack digest
 

@@ -154,6 +154,15 @@ describe('expiring tokens', () => {
     expect(none.mine.expiringTokens).toEqual([]);
   });
 
+  it('window boundaries: exactly now is excluded, exactly now+7d is included', async () => {
+    const u = await makeUser({});
+    await tok(u.id, 'at-now', 0);
+    await tok(u.id, 'at-7d', 7);
+    await tok(u.id, 'past-7d', 7.0001);
+    const d = await collectDigestData(testDb, u, { since: SINCE, now: NOW, timezone: TZ });
+    expect(d.mine.expiringTokens.map((x) => x.label)).toEqual(['at-7d']);
+  });
+
   it('buildDigest shows the escaped label', () => {
     const d = emptyData();
     d.mine.expiringTokens.push({ label: '<!channel> & laptop', expiresAt: new Date(NOW.getTime() + 3 * 86_400_000) });
@@ -162,7 +171,7 @@ describe('expiring tokens', () => {
     expect(s).toContain('&lt;!channel&gt; &amp; laptop');
     expect(s).not.toContain('<!channel>');
     expect(s).toContain(serverTranslator('en', 'digest')('expiringTokens'));
-    expect(r.text).toContain('1');
+    expect(r.text).toContain(serverTranslator('en', 'digest')('summary', { count: 1 }));
   });
 });
 

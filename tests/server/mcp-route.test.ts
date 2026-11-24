@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { agentTokens, users } from '@/db/schema';
+import { agentTokens, planVersions, users } from '@/db/schema';
 import { createAgentToken, revokeAgentToken } from '@/server/auth/tokens';
 import { testDb } from '../helpers/db';
-import { makeUser } from '../helpers/factories';
+import { makeTask, makeUser } from '../helpers/factories';
 
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST;
 const { POST, GET, DELETE } = await import('../../app/api/mcp/route');
@@ -57,5 +57,30 @@ describe('mcp route', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.result.tools.map((t: { name: string }) => t.name)).toContain('create_task');
+  });
+
+  it('a legacy manager token can call review_checkpoint and get_my_settings reports tokenLegacy', async () => {
+    const manager = await makeUser({ level: 'manager' });
+    const member = await makeUser({ managerId: manager.id, checkpointConfirmer: 'manager' });
+    const t = await makeTask(member.id, { status: 'in_progress', steps: ['A'] });
+    await testDb.update(planVersions)
+      .set({ steps: [{ title: 'A', status: 'pending_approval' }] })
+      .where(eq(planVersions.taskId, t.id));
+    const { token, record } = await createAgentToken(testDb, manager.id, 'old');
+    await testDb.update(agentTokens).set({ scope: 'manager', legacy: true }).where(eq(agentTokens.id, record.id));
+    const call = async (name: string, args: Record<string, unknown>) => {
+      const res = await POST(new Request('http://localhost/api/mcp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
+      }));
+      expect(res.status).toBe(200);
+      return (await res.json()).result as { isError?: boolean; content: { text: string }[] };
+    };
+    const r = await call('review_checkpoint', { taskId: t.id, stepTitle: 'A', decision: 'approved' });
+    expect(r.isError).toBeFalsy();
+    const s = await call('get_my_settings', {});
+    expect(JSON.parse(s.content[s.content.length - 1].text)).toMatchObject({ tokenLegacy: true, tokenScope: 'manager' });
+    expect(s.content[0].text).toContain('token');
   });
 });

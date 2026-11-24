@@ -57,6 +57,15 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
   const t = serverTranslator(locale);
   const now = () => ctx.now?.() ?? new Date();
 
+  const WARN_MS = 7 * 86_400_000;
+  /** Server-side so even old plugins show it: legacy tokens, or tokens with at most 7 days left. */
+  function expiryNotice(): string {
+    const { expiresAt, legacy } = ctx.token;
+    if (!legacy && expiresAt.getTime() - now().getTime() > WARN_MS) return '';
+    const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(expiresAt);
+    return `\n\n> ${t('mcp.tokenNotice', { date })}`;
+  }
+
   function tool<S extends z.ZodRawShape>(
     name: string,
     scope: TokenScope,
@@ -70,7 +79,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
           throw new DomainError('FORBIDDEN', 'tokenScopeMember');
         }
         const { markdown, data } = await run(args, { ...ctx.getActor(), tokenScope: ctx.tokenScope });
-        return reply(markdown, data);
+        return reply(markdown + expiryNotice(), data);
       } catch (e) {
         if (e instanceof DomainError) {
           const message = translateError(e, locale);
@@ -312,7 +321,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     },
     async ({ taskId: id, stepTitle, decision, note }, actor) => {
       try {
-        const r = await reviewCheckpoint(db, actor, id, stepTitle ?? null, decision, note, now(), 'agent');
+        const r = await reviewCheckpoint(db, actor, id, stepTitle ?? null, decision, note, 'agent', now());
         return done(
           decision === 'approved' ? t('mcp.checkpointApproved', { count: r.approved }) : t('mcp.checkpointRejected'),
           r,

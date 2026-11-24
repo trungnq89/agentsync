@@ -389,7 +389,7 @@ describe('review fixes', () => {
         ...real,
         send: async (db: never, u: never, m: never) => {
           await testDb.$client.query(
-            "select pg_terminate_backend(pid) from pg_locks where locktype = 'advisory' and granted and pid <> pg_backend_pid()",
+            "select pg_terminate_backend(pid) from pg_locks where locktype = 'advisory' and granted and pid <> pg_backend_pid() and not (classid = 0 and objid = 726001024)", // spare the test-run lock held by tests/global-setup.ts
           );
           await new Promise((r) => setTimeout(r, 200));
           return real.send(db, u, m);

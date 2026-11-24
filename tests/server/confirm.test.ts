@@ -181,7 +181,7 @@ describe('reviewCheckpoint', () => {
   }
   it('approve one step → done, confirmedBy manager, history row', async () => {
     const { manager, t } = await pending();
-    const r = await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, T1);
+    const r = await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, 'web', T1);
     expect(r).toEqual({ approved: 1, rejected: 0 });
     expect(await stepsOf(t.id)).toEqual([
       { title: 'A', status: 'done', confirmedBy: 'manager', confirmedById: manager.id, confirmedAt: T1.toISOString(), confirmedVia: 'web' },
@@ -193,14 +193,14 @@ describe('reviewCheckpoint', () => {
   });
   it('via agent is recorded on approval', async () => {
     const { manager, t } = await pending();
-    await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, T1, 'agent');
+    await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, 'agent', T1);
     expect((await stepsOf(t.id))[0]).toMatchObject({ status: 'done', confirmedVia: 'agent' });
   });
   it('legacy done step without confirmedVia is left untouched', async () => {
     const conf = { confirmedBy: 'member' as const, confirmedById: 'u1', confirmedAt: '2026-11-23T01:00:00.000Z' };
     const s = await setup('manager', {}, ['A', 'B']);
     await testDb.update(planVersions).set({ steps: [{ title: 'A', status: 'done', ...conf }, { title: 'B', status: 'pending_approval' }] }).where(eq(planVersions.taskId, s.t.id));
-    await reviewCheckpoint(testDb, s.manager, s.t.id, null, 'approved', undefined, T1);
+    await reviewCheckpoint(testDb, s.manager, s.t.id, null, 'approved', undefined, 'web', T1);
     const steps = await stepsOf(s.t.id);
     expect(steps[0]).toEqual({ title: 'A', status: 'done', ...conf });
     expect(steps[1].confirmedVia).toBe('web');
@@ -208,33 +208,33 @@ describe('reviewCheckpoint', () => {
   it('approve all (stepTitle null) confirms every pending step only', async () => {
     const { manager, member, t } = await setup('manager', {}, ['A', 'B', 'C']);
     await postUpdate(testDb, member, t.id, upd(['A', 'B']), T0);
-    const r = await reviewCheckpoint(testDb, manager, t.id, null, 'approved', undefined, T1);
+    const r = await reviewCheckpoint(testDb, manager, t.id, null, 'approved', undefined, 'web', T1);
     expect(r).toEqual({ approved: 2, rejected: 0 });
     const steps = await stepsOf(t.id);
     expect(steps.map((x) => x.status)).toEqual(['done', 'done', 'todo']);
     expect(steps[0].confirmedBy).toBe('manager');
     expect(steps.slice(0, 2).map((x) => x.confirmedVia)).toEqual(['web', 'web']);
     expect(steps[2].confirmedVia).toBeUndefined();
-    await expect(reviewCheckpoint(testDb, manager, t.id, null, 'approved'))
+    await expect(reviewCheckpoint(testDb, manager, t.id, null, 'approved', undefined, 'web'))
       .rejects.toMatchObject({ code: 'VALIDATION', key: 'stepNotPending' });
   });
   it('rejected without note → VALIDATION field note, nothing changes', async () => {
     const { manager, t } = await pending();
-    await expect(reviewCheckpoint(testDb, manager, t.id, 'A', 'rejected'))
+    await expect(reviewCheckpoint(testDb, manager, t.id, 'A', 'rejected', undefined, 'web'))
       .rejects.toMatchObject({ code: 'VALIDATION', params: { field: 'note' } });
-    await expect(reviewCheckpoint(testDb, manager, t.id, 'A', 'rejected', '   '))
+    await expect(reviewCheckpoint(testDb, manager, t.id, 'A', 'rejected', '   ', 'web'))
       .rejects.toMatchObject({ code: 'VALIDATION' });
     expect((await stepsOf(t.id))[0].status).toBe('pending_approval');
   });
   it('stepTitle null with rejected → VALIDATION', async () => {
     const { manager, t } = await pending();
-    await expect(reviewCheckpoint(testDb, manager, t.id, null, 'rejected', 'no'))
+    await expect(reviewCheckpoint(testDb, manager, t.id, null, 'rejected', 'no', 'web'))
       .rejects.toMatchObject({ code: 'VALIDATION' });
     expect((await stepsOf(t.id))[0].status).toBe('pending_approval');
   });
   it('rejected with note → doing, appears in rejectedCheckpoints until the step is reported again', async () => {
     const { manager, member, t } = await pending();
-    const r = await reviewCheckpoint(testDb, manager, t.id, 'A', 'rejected', ' Thiếu test ', T1);
+    const r = await reviewCheckpoint(testDb, manager, t.id, 'A', 'rejected', ' Thiếu test ', 'web', T1);
     expect(r).toEqual({ approved: 0, rejected: 1 });
     expect((await stepsOf(t.id))[0]).toEqual({ title: 'A', status: 'doing' });
     const fb = await getPendingFeedback(testDb, member);
@@ -251,15 +251,15 @@ describe('reviewCheckpoint', () => {
   });
   it('reporting a different step does not consume the rejection', async () => {
     const { manager, member, t } = await pending();
-    await reviewCheckpoint(testDb, manager, t.id, 'A', 'rejected', 'n', T1);
+    await reviewCheckpoint(testDb, manager, t.id, 'A', 'rejected', 'n', 'web', T1);
     await postUpdate(testDb, member, t.id, upd(['B']), T1);
     expect((await getPendingFeedback(testDb, member)).rejectedCheckpoints).toHaveLength(1);
   });
   it('step that is not pending → VALIDATION stepNotPending; unknown step → unknownSteps', async () => {
     const { manager, member, t } = await setup('manager');
-    await expect(reviewCheckpoint(testDb, manager, t.id, 'A', 'approved'))
+    await expect(reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, 'web'))
       .rejects.toMatchObject({ code: 'VALIDATION', key: 'stepNotPending' });
-    await expect(reviewCheckpoint(testDb, manager, t.id, 'Z', 'approved'))
+    await expect(reviewCheckpoint(testDb, manager, t.id, 'Z', 'approved', undefined, 'web'))
       .rejects.toMatchObject({ code: 'VALIDATION', key: 'unknownSteps' });
     expect(member).toBeTruthy();
   });
@@ -270,9 +270,9 @@ describe('reviewCheckpoint', () => {
     const top = await makeUser({ level: 'director' });
     await testDb.update(users).set({ managerId: top.id }).where(eq(users.id, manager.id));
     for (const who of [member, stranger, admin, top]) {
-      await expect(reviewCheckpoint(testDb, who, t.id, 'A', 'approved')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      await expect(reviewCheckpoint(testDb, who, t.id, 'A', 'approved', undefined, 'web')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     }
-    await expect(reviewCheckpoint(testDb, member, 'bad-id', null, 'approved')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(reviewCheckpoint(testDb, member, 'bad-id', null, 'approved', undefined, 'web')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect((await stepsOf(t.id))[0].status).toBe('pending_approval');
   });
 });
@@ -283,9 +283,9 @@ describe('Review focus 2: manager change and confirmer change with pending steps
     await postUpdate(testDb, member, t.id, upd(['A']), T0);
     const m2 = await makeUser({ level: 'manager' });
     await testDb.update(users).set({ managerId: m2.id }).where(eq(users.id, member.id));
-    await expect(reviewCheckpoint(testDb, m1, t.id, 'A', 'approved')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(reviewCheckpoint(testDb, m1, t.id, 'A', 'approved', undefined, 'web')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect((await stepsOf(t.id))[0].status).toBe('pending_approval');
-    await reviewCheckpoint(testDb, m2, t.id, 'A', 'approved', undefined, T1);
+    await reviewCheckpoint(testDb, m2, t.id, 'A', 'approved', undefined, 'web', T1);
     expect((await stepsOf(t.id))[0]).toMatchObject({ status: 'done', confirmedBy: 'manager', confirmedById: m2.id });
   });
   it('switching manager → member keeps the pending step; manager can still approve', async () => {
@@ -293,7 +293,7 @@ describe('Review focus 2: manager change and confirmer change with pending steps
     await postUpdate(testDb, member, t.id, upd(['A']), T0);
     await setCheckpointConfirmer(testDb, manager, member.id, 'member');
     expect((await stepsOf(t.id))[0].status).toBe('pending_approval');
-    await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, T1);
+    await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, 'web', T1);
     expect((await stepsOf(t.id))[0]).toMatchObject({ status: 'done', confirmedBy: 'manager' });
   });
   it('switching manager → member: member re-reporting a pending step needs and honours memberConfirmed', async () => {
@@ -319,7 +319,7 @@ describe('owner loses their manager while a step is pending', () => {
     const { manager, member, t } = await setup('manager');
     await postUpdate(testDb, member, t.id, upd(['A']), T0);
     await testDb.update(users).set({ managerId: null }).where(eq(users.id, member.id));
-    await expect(reviewCheckpoint(testDb, manager, t.id, 'A', 'approved')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, 'web')).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(postUpdate(testDb, member, t.id, upd(['A']), T1))
       .rejects.toMatchObject({ key: 'checkpointConfirmationRequired' });
     await postUpdate(testDb, member, t.id, upd(['A'], { memberConfirmed: true }), T1);
@@ -331,7 +331,7 @@ describe('changePlan clears rejections of steps that no longer exist', () => {
   async function rejected() {
     const s = await setup('manager');
     await postUpdate(testDb, s.member, s.t.id, upd(['A']), T0);
-    await reviewCheckpoint(testDb, s.manager, s.t.id, 'A', 'rejected', 'redo', T1);
+    await reviewCheckpoint(testDb, s.manager, s.t.id, 'A', 'rejected', 'redo', 'web', T1);
     return s;
   }
   it('renaming A to A2 consumes the rejection', async () => {
@@ -357,7 +357,7 @@ describe('Review focus 3: private task or owner without manager behaves as membe
   });
   it('manager cannot review a private task', async () => {
     const { manager, t } = await setup('manager', { isPrivate: true });
-    await expect(reviewCheckpoint(testDb, manager, t.id, null, 'approved')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(reviewCheckpoint(testDb, manager, t.id, null, 'approved', undefined, 'web')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
   it('owner without a manager configured as manager still confirms themselves', async () => {
     const solo = await makeUser({ checkpointConfirmer: 'manager' });
@@ -377,7 +377,7 @@ describe('setTaskStatus complete requires all steps done', () => {
     await postUpdate(testDb, member, t.id, upd(['A', 'B']), T0);
     await expect(setTaskStatus(testDb, member, t.id, 'complete'))
       .rejects.toMatchObject({ code: 'VALIDATION', key: 'stepsNotConfirmed' });
-    await reviewCheckpoint(testDb, manager, t.id, null, 'approved', undefined, T1);
+    await reviewCheckpoint(testDb, manager, t.id, null, 'approved', undefined, 'web', T1);
     const done = await setTaskStatus(testDb, member, t.id, 'complete', undefined, T1);
     expect(['awaiting_review', 'done']).toContain(done.status);
   });

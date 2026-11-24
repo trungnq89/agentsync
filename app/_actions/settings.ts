@@ -3,7 +3,8 @@ import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { getDb } from '@/db';
 import { changeMyPassword, setMySendMode } from '@/server/account';
-import { createAgentToken, DEFAULT_TOKEN_DAYS, revokeAgentToken, type TokenScope } from '@/server/auth/tokens';
+import { createAgentToken, revokeAgentToken } from '@/server/auth/tokens';
+import { DEFAULT_TOKEN_DAYS, type TokenScope } from '@/server/auth/token-options';
 import { DomainError } from '@/server/errors';
 import { run, str, type FormState } from '../_lib/action';
 import { cookies } from 'next/headers';
@@ -16,11 +17,18 @@ export async function createTokenAction(_p: FormState, form: FormData): Promise<
     if (!label) throw new DomainError('VALIDATION', 'tokenLabelRequired', { field: 'label' });
     const rawScope = str(form, 'scope') || 'member';
     if (rawScope !== 'member' && rawScope !== 'manager') {
-      throw new DomainError('VALIDATION', 'tokenScopeNotAllowed', { field: 'scope' });
+      throw new DomainError('VALIDATION', 'tokenScopeNotAllowed');
     }
     const scope: TokenScope = rawScope;
     const days = Number(str(form, 'days') || DEFAULT_TOKEN_DAYS);
-    const { token } = await createAgentToken(getDb(), actor.id, label, { scope, days });
+    let token: string;
+    try {
+      ({ token } = await createAgentToken(getDb(), actor.id, label, { scope, days }));
+    } catch (e) {
+      // The form only offers a scope select to people with reports, so this error has no field to show on: make it form-level.
+      if (e instanceof DomainError && e.key === 'tokenScopeNotAllowed') throw new DomainError('VALIDATION', 'tokenScopeNotAllowed');
+      throw e;
+    }
     revalidatePath('/settings');
     return { token };
   });

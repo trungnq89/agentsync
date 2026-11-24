@@ -43,7 +43,7 @@ Hiện tại token `ags_…` của agent có đúng quyền của người dùng
 - **Nhắc trước khi hết hạn:**
   - **Trang Cài đặt:** token có nhãn "hết hạn sau N ngày", chuyển màu cảnh báo khi còn 7 ngày hoặc ít hơn. Token đã hết hạn có nhãn "đã hết hạn".
   - **`get_my_settings`:** trả thêm hạn của token đang dùng.
-  - **Slack digest:** phần "Việc của bạn" thêm dòng "Token agent `<nhãn>` hết hạn sau N ngày" khi còn 7 ngày hoặc ít hơn (chưa thu hồi, chưa hết hạn). Dòng này tính là nội dung có giá trị, nên tin vẫn được gửi.
+  - **Slack digest:** phần "Việc của bạn" thêm dòng "Token agent `<nhãn>` hết hạn vào {ngày}" khi còn 7 ngày hoặc ít hơn (chưa thu hồi, chưa hết hạn). Dòng này tính là nội dung có giá trị, nên tin vẫn được gửi.
 - **Gia hạn:** không có. Muốn tiếp tục thì tạo token mới rồi thu hồi token cũ.
 
 ### 2.3 Cảnh báo HTTP (điểm 4)

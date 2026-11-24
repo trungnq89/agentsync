@@ -553,6 +553,7 @@
     "confirmerLabel": "người xác nhận checkpoint: {who}",
     "confirmerMember": "thành viên",
     "confirmerManager": "quản lý",
+    "tokenNotice": "Token agent của bạn hết hạn vào {date} — hãy tạo token mới trong Cài đặt.",
     "settingsConfirmer": " Người xác nhận checkpoint: {who}.",
     "detailConfirmer": "Người xác nhận checkpoint: {who}",
     "stepPending": " (chờ quản lý duyệt)",

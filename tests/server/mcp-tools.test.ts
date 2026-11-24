@@ -13,13 +13,14 @@ const EXPIRES = new Date('2027-02-01T00:00:00Z');
 async function connect(
   getActor: () => User,
   locale: 'en' | 'vi' = 'vi',
-  tok: { scope?: 'member' | 'manager'; legacy?: boolean } = {},
+  tok: { scope?: 'member' | 'manager'; legacy?: boolean; expiresAt?: Date; now?: Date } = {},
 ) {
   const server = new McpServer({ name: 'test', version: '0' });
   registerTools(server, {
     db: testDb, getActor, locale,
     tokenScope: tok.scope ?? 'manager',
-    token: { expiresAt: EXPIRES, legacy: tok.legacy ?? false },
+    token: { expiresAt: tok.expiresAt ?? EXPIRES, legacy: tok.legacy ?? false },
+    ...(tok.now ? { now: () => tok.now! } : {}),
   });
   const client = new Client({ name: 'c', version: '0' });
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -36,6 +37,44 @@ const newTask = {
   title: 'Việc mới', mode: 'executive', agreedOutcome: 'KQ', startDate: '2026-11-23',
   agreedDueDate: '2026-11-30', steps: ['A', 'B'],
 };
+
+describe('mcp tools: token expiry notice', () => {
+  const NOW = new Date('2027-01-10T00:00:00Z');
+  const day = 86_400_000;
+  const ctxFor = (u: User, tok: Parameters<typeof connect>[2]) => connect(() => u, 'en', { now: NOW, ...tok });
+
+  it('adds the notice when the token expires within 7 days', async () => {
+    const me = await makeUser();
+    const c = await ctxFor(me, { scope: 'member', expiresAt: new Date(NOW.getTime() + 3 * day) });
+    const r = await call(c, 'list_my_tasks');
+    expect(text(r)).toContain('Your agent token expires on');
+    expect(text(r)).toContain('Settings');
+    // the data block stays valid JSON
+    expect(() => JSON.parse(r.content[r.content.length - 1].text)).not.toThrow();
+  });
+
+  it('adds the notice for legacy tokens even when far from expiry, in vi too', async () => {
+    const me = await makeUser();
+    const c = await connect(() => me, 'vi', { now: NOW, legacy: true, expiresAt: new Date(NOW.getTime() + 60 * day) });
+    expect(text(await call(c, 'list_my_tasks'))).toContain('Token agent của bạn hết hạn vào');
+  });
+
+  it('is silent for a healthy token and exactly 7 days still warns', async () => {
+    const me = await makeUser();
+    const far = await ctxFor(me, { scope: 'member', expiresAt: new Date(NOW.getTime() + 8 * day) });
+    expect(text(await call(far, 'list_my_tasks'))).not.toContain('Your agent token expires');
+    const edge = await ctxFor(me, { scope: 'member', expiresAt: new Date(NOW.getTime() + 7 * day) });
+    expect(text(await call(edge, 'list_my_tasks'))).toContain('Your agent token expires on');
+  });
+
+  it('does not add the notice to errors', async () => {
+    const me = await makeUser();
+    const c = await ctxFor(me, { scope: 'member', expiresAt: new Date(NOW.getTime() + day) });
+    const r = await call(c, 'team_overview');
+    expect(r.isError).toBe(true);
+    expect(text(r)).not.toContain('Your agent token expires');
+  });
+});
 
 describe('mcp tools', () => {
   it("revise_plan rejects step status 'done' (server-owned)", async () => {

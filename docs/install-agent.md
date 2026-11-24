@@ -17,22 +17,30 @@ The examples below assume the plugin is at `/Users/your-name/agentsync/plugins/a
 
 1. Sign in to AgentSync and open the **Settings** page. You can also pick your language (en/vi) and theme (system/light/dark) there.
 2. Create a new agent token. It looks like `ags_...` and is shown only once: copy it right away.
-3. Add two lines to `~/.zshrc`, then open a new terminal:
+3. Put the two lines in `~/.agentsync-env`, make it readable only by you, and load it from `~/.zshrc`:
 
 ```bash
+# ~/.agentsync-env
 export AGENTSYNC_URL="https://agentsync.example.com"   # no trailing /
 export AGENTSYNC_TOKEN="ags_..."
 ```
 
-Never paste the token into a chat or commit it to a repo. If you keep the token in a file (for example a file you `source` from `~/.zshrc`), restrict it so only you can read it: `chmod 600 ~/.agentsync-env`.
+```bash
+chmod 600 ~/.agentsync-env
+echo '[ -f ~/.agentsync-env ] && source ~/.agentsync-env' >> ~/.zshrc
+```
+
+Then open a new terminal. Never paste the token into a chat or commit it to a repo.
 
 **Token scope.** A `member` token (the default) can only see and update your own tasks. A `manager` token can also review and answer for your direct reports (team overview, confirm, request changes, review checkpoints). The Settings page offers `manager` only if you have direct reports. The scope cannot be changed later; create another token if you need a different one.
 
+**Old tokens.** Tokens created before token scopes existed are marked "Old token, full access" in Settings: they work as `manager` tokens and expire 90 days after the upgrade. Replace them with a scoped token before then.
+
 **Lifetime.** Every token expires after 30, 90 (default) or 180 days, chosen when you create it. An expired token behaves like a revoked one (HTTP 401). Create a new token in Settings and update `AGENTSYNC_TOKEN`. AgentSync lists tokens that expire within 7 days in your Slack digest.
 
-If your account was given a temporary password, the server rejects agent tokens (HTTP 401, error `passwordChangeRequired`) until you sign in to AgentSync and change the password in Settings.
+If your account was given a temporary password, the server rejects agent tokens (HTTP 401) until you sign in to AgentSync and change the password in Settings.
 
-Note: variables in `~/.zshrc` only apply to programs started from a terminal. Desktop apps opened by clicking their icon (Claude Desktop, the Codex app) will NOT see them. Workarounds: open the app from a terminal (for example `open -a "Claude"` after the `export`), or use the CLI (`claude`, `codex`) in a terminal. Setting the variables permanently for desktop apps has not been verified; ask your admin if you need it.
+Note: variables loaded from `~/.zshrc` (through `~/.agentsync-env`) only apply to programs started from a terminal. Desktop apps opened by clicking their icon (Claude Desktop, the Codex app) will NOT see them. Workarounds: open the app from a terminal (for example `open -a "Claude"` after the `export`), or use the CLI (`claude`, `codex`) in a terminal. Setting the variables permanently for desktop apps has not been verified; ask your admin if you need it.
 
 ## 2. Claude Code
 

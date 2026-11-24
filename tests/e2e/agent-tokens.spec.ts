@@ -33,6 +33,23 @@ test('member without reports: no scope select, 30-day token shows badges', async
   await expect(list.getByText('Hết hạn sau 30 ngày')).toBeVisible();
 });
 
+test('a tampered scope=manager from someone without reports shows a form-level error', async ({ page }) => {
+  await loginAs(page, 'loner1', PW);
+  await page.goto('/settings');
+  const form = page.getByTestId('token-form');
+  await form.getByLabel('Nhãn token').fill('Hack');
+  await form.evaluate((f) => {
+    const i = document.createElement('input');
+    i.type = 'hidden';
+    i.name = 'scope';
+    i.value = 'manager';
+    f.appendChild(i);
+  });
+  await form.getByRole('button', { name: 'Tạo token' }).click();
+  await expect(form.getByRole('alert')).toContainText('cấp dưới trực tiếp');
+  await expect(page.getByTestId('new-token')).toHaveCount(0);
+});
+
 test('manager sees the scope select and can create a manager token', async ({ page }) => {
   await loginAs(page, 'manager1', PW);
   await page.goto('/settings');

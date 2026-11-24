@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input, inputClass } from '@/components/ui/input';
-import { DEFAULT_TOKEN_DAYS, TOKEN_LIFETIMES } from '@/server/auth/tokens';
+import { DEFAULT_TOKEN_DAYS, TOKEN_LIFETIMES } from '@/server/auth/token-options';
 import { createTokenAction } from '../_actions/settings';
 
 const codeBox = 'overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-surface-muted p-2 text-xs';

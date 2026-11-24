@@ -4,12 +4,11 @@ import type { Db } from '@/db/client';
 import { agentTokens, users, type AgentToken, type User } from '@/db/schema';
 import { DomainError } from '../errors';
 import { isUuid } from '../ids';
+import { DEFAULT_TOKEN_DAYS, TOKEN_LIFETIMES, type TokenScope } from './token-options';
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-export type TokenScope = 'member' | 'manager';
-export const TOKEN_LIFETIMES = [30, 90, 180] as const;
-export const DEFAULT_TOKEN_DAYS = 90;
+export type { TokenScope };
 const DAY_MS = 86_400_000;
 
 export async function createAgentToken(

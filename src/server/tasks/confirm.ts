@@ -69,9 +69,9 @@ export async function reviewCheckpoint(
   taskId: string,
   stepTitle: string | null,
   decision: 'approved' | 'rejected',
-  note?: string,
+  note: string | undefined,
+  via: 'agent' | 'web',
   now: Date = new Date(),
-  via: 'agent' | 'web' = 'web',
 ): Promise<{ approved: number; rejected: number }> {
   const trimmed = note?.trim() || null;
   if (decision === 'rejected') {

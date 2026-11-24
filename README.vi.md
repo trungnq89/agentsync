@@ -99,6 +99,7 @@ Hook `Stop` (tùy chọn) chạy sau mỗi lượt của agent. Khi agent in ra 
 2. Claude Code dùng `--plugin-dir` sẽ lấy plugin mới (0.2.0) từ thư mục vừa pull. Với Codex và cách cài thay thế, hãy chép lại các skill từ `plugins/agentsync/skills`, nếu không agent vẫn dùng skill cũ và không hỏi xác nhận đúng cách.
 3. Tiến độ % giờ là số bước đã xác nhận chia tổng số bước. Giá trị tiến độ nhập tay bị bỏ qua, nên một số việc có thể hiện phần trăm khác.
 4. Việc đang thực hiện cần xác nhận hết các bước mới hoàn thành được. Hãy báo từng bước còn lại (thành viên xác nhận, hoặc quản lý duyệt) trước.
+5. Token agent giờ có phạm vi và hạn dùng. Mọi token hiện có trở thành token "cũ" phạm vi `manager`, hết hạn sau 90 ngày kể từ lúc nâng cấp (tất cả cùng một ngày). Hãy tạo token mới (Cài đặt) trước thời điểm đó và cập nhật `AGENTSYNC_TOKEN`; agent cũng thấy nhắc trong kết quả tool, và tóm tắt Slack liệt kê token hết hạn trong 7 ngày.
 
 ## Tóm tắt Slack
 

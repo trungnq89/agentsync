@@ -553,6 +553,7 @@
     "confirmerLabel": "checkpoints confirmed by: {who}",
     "confirmerMember": "member",
     "confirmerManager": "manager",
+    "tokenNotice": "Your agent token expires on {date} — create a new one in Settings.",
     "settingsConfirmer": " Checkpoint confirmer: {who}.",
     "detailConfirmer": "Checkpoint confirmer: {who}",
     "stepPending": " (awaiting manager approval)",

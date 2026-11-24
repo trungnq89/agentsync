@@ -120,6 +120,16 @@ describe('hook runtime', () => {
     expect(r3.stdout).toBe('');
   });
 
+  it('server returns 401 → clear log line, no token in the log, silent', async () => {
+    respond = json({ error: 'unauthorized' }, 401);
+    const r = await run(msg(MARK));
+    expect(r.stdout).toBe('');
+    const log = readFileSync(join(dir, 'hook.log'), 'utf8');
+    expect(log).toContain('token rejected: expired, revoked or invalid');
+    expect(log).toContain('create a new token in AgentSync Settings');
+    expect(log).not.toContain('secret-token');
+  });
+
   it('server returns 404 → silent', async () => {
     respond = json({ error: 'nf' }, 404);
     const r = await run(msg(MARK));
