@@ -469,6 +469,8 @@
     "slackRecipientGone": "The Slack recipient is no longer available.",
     "slackRateLimited": "Slack is rate limiting requests. Try again in {retryAfter} seconds.",
     "slackUnavailable": "Could not reach Slack.",
+    "claimed": "Sending…",
+    "unknown": "Unknown error",
     "noEmail": "This user has no email address."
   },
   "mcp": {
@@ -605,8 +607,15 @@
     "keyMissing": "SETTINGS_ENCRYPTION_KEY is not set on the server, so the Slack feature is disabled. Set it and restart the app (see the README).",
     "appUrlMissing": "APP_URL is not set on the server. It is needed for the links in the digest, so Slack cannot be turned on.",
     "connectionTitle": "Bot token",
-    "connectionDesc": "Token of an internal Slack app you created (scopes chat:write and users:read.email). It is stored encrypted and never shown again.",
+    "connectionDesc": "Token of an internal Slack app you created (scopes chat:write, users:read and users:read.email). It is stored encrypted and never shown again.",
     "help": "New to this? Follow the <link>Slack setup guide</link>.",
+    "helpPath": "Full guide: <code>{path}</code> in the AgentSync repository.",
+    "guideTitle": "Quick setup",
+    "guideStep1": "Create an internal app at api.slack.com/apps (From scratch).",
+    "guideStep2": "OAuth & Permissions: add the bot scopes chat:write, users:read and users:read.email.",
+    "guideStep3": "App Home: under Show Tabs, turn the Messages Tab on.",
+    "guideStep4": "Install the app to your workspace and copy the Bot User OAuth Token (xoxb-...).",
+    "guideStep5": "Paste it below, press Save token, then Test connection.",
     "botToken": "Bot token",
     "botTokenSavedHint": "Token saved. Leave empty to keep it.",
     "botTokenEmptyHint": "Starts with xoxb-",
@@ -663,7 +672,6 @@
     "colDate": "Date",
     "colStatus": "Status",
     "colError": "Error",
-    "colSentAt": "Sent",
     "status_sent": "Sent",
     "status_skipped_empty": "Skipped (empty)",
     "status_failed": "Failed"

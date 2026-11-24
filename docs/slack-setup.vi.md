@@ -20,9 +20,10 @@ Khởi động lại ứng dụng sau khi đổi.
 2. Đặt tên (ví dụ `AgentSync`) và chọn workspace của bạn.
 3. Mở **OAuth & Permissions**, trong **Bot Token Scopes** thêm:
    - `chat:write` (gửi tin nhắn riêng),
-   - `users:read.email` (tìm từng người theo email AgentSync).
-4. Chọn **Install to Workspace** và đồng ý.
-5. Sao chép **Bot User OAuth Token**. Token bắt đầu bằng `xoxb-`.
+   - `users:read` và `users:read.email` (tìm từng người theo email AgentSync; Slack cần cả hai).
+4. Mở **App Home**, trong **Show Tabs** hãy bật **Messages Tab** (ô "Allow users to send Slash commands and messages from the messages tab" có thể để tắt). Nếu thiếu, Slack từ chối tin nhắn riêng (`messages_tab_disabled`).
+5. Chọn **Install to Workspace** và đồng ý.
+6. Sao chép **Bot User OAuth Token**. Token bắt đầu bằng `xoxb-`.
 
 App không cần được thêm vào kênh nào: nó chỉ gửi tin nhắn riêng.
 
@@ -44,6 +45,8 @@ Mỗi người tự chỉnh bản tóm tắt của mình ở **Cài đặt > Tó
 ## Xử lý sự cố
 
 - Mục **Lỗi gần nhất** ở tab Slack hiện vấn đề mới nhất. Lỗi "Slack từ chối bot token" nghĩa là token sai, đã bị thu hồi hoặc thiếu quyền: hãy cài lại app và lưu token mới. Sau lỗi này việc gửi tạm dừng một lúc (tab hiện "tạm dừng đến"), và lưu token mới sẽ xóa trạng thái đó.
+- `messages_tab_disabled` trong lịch sử: vào App Home > Show Tabs > bật **Messages Tab**, rồi bấm **Ghép lại** hoặc chờ lần gửi sau.
+- `missing_scope` trong lịch sử: bot thiếu quyền. Thêm `chat:write`, `users:read` và `users:read.email` trong OAuth & Permissions, cài lại app và lưu token mới.
 - **Slack giới hạn tần suất**: việc gửi tự tạm dừng rồi tự chạy lại.
 - Không có gì để báo thì không gửi (lịch sử ghi là bỏ qua).
-- Lịch sử gửi ở tab liệt kê 50 lần gửi gần nhất kèm mã lỗi của Slack, không bao giờ có nội dung tin hay token.
+- Lịch sử gửi ở tab liệt kê 50 lần gửi gần nhất kèm mã lỗi của Slack trong ngoặc (ví dụ `missing_scope`), không bao giờ có nội dung tin hay token.

@@ -37,6 +37,7 @@ test('admin saves the token, tests the connection, turns Slack on and sends a te
   const form = page.getByTestId('slack-token-form');
   await form.getByLabel('Bot token').fill(TOKEN);
   await form.getByRole('button', { name: 'Lưu token' }).click();
+  await expect(page.getByText('Đã lưu token').first()).toBeVisible();
   await expect(page.getByTestId('slack-token-saved')).toBeVisible();
 
   // The token is never rendered back.
@@ -45,7 +46,7 @@ test('admin saves the token, tests the connection, turns Slack on and sends a te
   await expect(page.getByTestId('slack-token-form').getByLabel('Bot token')).toHaveValue('');
 
   await page.getByRole('button', { name: 'Kiểm tra kết nối' }).click();
-  await expect(page.getByTestId('slack-test-result')).toContainText('Acme Team');
+  await expect(page.getByText('Acme Team').first()).toBeVisible();
 
   await page.getByTestId('slack-enable').click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Bật' }).click();
@@ -60,6 +61,14 @@ test('admin saves the token, tests the connection, turns Slack on and sends a te
   // Users without an email cannot be matched.
   const rows = page.getByTestId('slack-unmatched-row');
   await expect(rows.filter({ hasText: 'Người mới' })).toContainText('Chưa có email');
+});
+
+test('admin saves the company defaults unchanged (Asia/Ho_Chi_Minh) and sees the success toast', async ({ page }) => {
+  await loginAs(page, ADMIN.username, ADMIN.password);
+  await page.goto('/admin/slack');
+  await expect(page.getByTestId('slack-defaults-form').getByLabel('Múi giờ')).toHaveValue('Asia/Ho_Chi_Minh');
+  await page.getByTestId('slack-defaults-form').getByRole('button', { name: 'Lưu mặc định' }).click();
+  await expect(page.getByText('Đã lưu mặc định')).toBeVisible();
 });
 
 test('member changes the send time, then goes back to the company default', async ({ page }) => {

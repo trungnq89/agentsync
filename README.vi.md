@@ -36,7 +36,7 @@ English: [README.md](README.md)
 - **Tiếng Việt và tiếng Anh, giao diện sáng và tối:** mỗi người tự chọn.
 - **Đồng bộ nhân sự Odoo HR (tùy chọn):** đồng bộ chỉ đọc tài khoản và sơ đồ tổ chức từ Odoo HR.
 - **Tóm tắt Slack hằng ngày (tùy chọn, mặc định tắt):** mỗi người nhận một tin nhắn riêng về những việc cần chú ý. Cần `APP_URL` và `SETTINGS_ENCRYPTION_KEY`; tên việc và ghi chú được gửi sang Slack. Cài đặt: [docs/slack-setup.vi.md](docs/slack-setup.vi.md).
-- **Self-host bằng Docker:** một ứng dụng cộng Postgres; không cần dịch vụ ngoài lúc chạy.
+- **Self-host bằng Docker:** một ứng dụng cộng Postgres; không cần dịch vụ ngoài lúc chạy, trừ khi bạn bật tích hợp Odoo hoặc Slack (tùy chọn).
 
 ## Bắt đầu nhanh (Docker)
 
@@ -66,7 +66,7 @@ English: [README.md](README.md)
 6. Mỗi người vào **Cài đặt** và tạo token agent.
 7. Cài plugin và kết nối agent: [docs/install-agent.vi.md](docs/install-agent.vi.md).
 
-Container `app` tự chạy migration mỗi lần khởi động; dữ liệu nằm trong volume `pgdata`. Nếu `app` cứ khởi động lại liên tục, xem log: `docker compose -f docker-compose.prod.yml logs app`. Không có dịch vụ ngoài lúc chạy: không CDN, không analytics, font Inter được đóng gói sẵn.
+Container `app` tự chạy migration mỗi lần khởi động; dữ liệu nằm trong volume `pgdata`. Nếu `app` cứ khởi động lại liên tục, xem log: `docker compose -f docker-compose.prod.yml logs app`. Nếu không bật tích hợp Odoo hoặc Slack (tùy chọn), không có dịch vụ ngoài lúc chạy: không CDN, không analytics, font Inter được đóng gói sẵn.
 
 ## Dùng thử với dữ liệu demo
 
@@ -102,7 +102,7 @@ Hook `Stop` (tùy chọn) chạy sau mỗi lượt của agent. Khi agent in ra 
 
 ## Tóm tắt Slack
 
-Quản trị > **Slack** bật việc gửi mỗi người một tin nhắn riêng hằng ngày về những việc cần chú ý. Tính năng tắt cho tới khi admin nhập bot token và bật. Mỗi người tự chọn giờ, ngày và múi giờ trong Cài đặt. Tên việc, lý do bị vướng và ghi chú được gửi sang Slack. Cài đặt đầy đủ (tạo Slack app, quyền `chat:write` và `users:read.email`): [docs/slack-setup.vi.md](docs/slack-setup.vi.md) ([English](docs/slack-setup.md)).
+Quản trị > **Slack** bật việc gửi mỗi người một tin nhắn riêng hằng ngày về những việc cần chú ý. Tính năng tắt cho tới khi admin nhập bot token và bật. Mỗi người tự chọn giờ, ngày và múi giờ trong Cài đặt. Tên việc, lý do bị vướng và ghi chú được gửi sang Slack. Cài đặt đầy đủ (tạo Slack app, quyền `chat:write`, `users:read`, `users:read.email`, và bật Messages Tab trong App Home): [docs/slack-setup.vi.md](docs/slack-setup.vi.md) ([English](docs/slack-setup.md)).
 
 ## Đồng bộ nhân sự Odoo
 
@@ -143,6 +143,7 @@ Quản trị > **Odoo** giữ tài khoản và sơ đồ tổ chức của Agent
 | `ALLOWED_ORIGINS` | lúc build | Các host (cách nhau bằng dấu phẩy) được gọi Server Actions khi đứng sau proxy đổi `Host`. Đổi giá trị thì phải build lại. |
 | `SETTINGS_ENCRYPTION_KEY` | ứng dụng | 32 byte, base64. Mã hóa API key Odoo và bot token Slack đã lưu. Thiếu khóa thì trang Odoo và Slack bị khóa. |
 | `DEFAULT_TIMEZONE` | ứng dụng | Múi giờ IANA dùng cho tóm tắt Slack cho tới khi có người chọn múi khác. Mặc định `Asia/Ho_Chi_Minh`. |
+| `SLACK_DOCS_BASE_URL` | ứng dụng | Tùy chọn. Địa chỉ gốc của thư mục tài liệu đã đăng (ví dụ thư mục `docs/` của bản fork); tab Slack dẫn tới hướng dẫn cài đặt ở đó. Nếu không đặt, tab chỉ ghi đường dẫn tệp. |
 | `SLACK_API_BASE` | ứng dụng (kiểm thử) | Ghi đè địa chỉ API Slack. Chỉ dùng cho kiểm thử đầu cuối. |
 | `DB_PORT` | compose phát triển | Cổng trên máy host của Postgres khi phát triển. Mặc định `5432`. |
 

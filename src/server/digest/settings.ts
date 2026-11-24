@@ -14,6 +14,7 @@ export type SlackSettingsView = {
   defaults: DigestPrefs;
   lastError: string | null;
   lastErrorAt: Date | null;
+  lastErrorCode: string | null;
   pausedUntil: Date | null;
 };
 
@@ -37,6 +38,7 @@ export async function getSlackSettingsView(db: Db, actor: Actor): Promise<SlackS
     defaults: companyDefaults(row),
     lastError: row.lastError,
     lastErrorAt: row.lastErrorAt,
+    lastErrorCode: row.lastErrorCode,
     // Only a pause still in effect is reported.
     pausedUntil: row.pausedUntil && row.pausedUntil.getTime() > Date.now() ? row.pausedUntil : null,
   };
@@ -60,6 +62,7 @@ export async function saveSlackSettings(db: Db, actor: Actor, input: SlackSettin
       set.botTokenEnc = encryptSecret(token);
       set.lastError = null;
       set.lastErrorAt = null;
+      set.lastErrorCode = null;
       set.pausedUntil = null;
     }
     if (input.enabled !== undefined) {

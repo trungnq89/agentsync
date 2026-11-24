@@ -214,6 +214,7 @@ export const slackSettings = pgTable('slack_settings', {
   defaultTimezone: text('default_timezone'),
   lastError: text('last_error'),
   lastErrorAt: ts('last_error_at'),
+  lastErrorCode: text('last_error_code'),
   pausedUntil: ts('paused_until'),
 }, (t) => [check('slack_settings_singleton', sql`${t.id} = 1`)]);
 
@@ -227,6 +228,8 @@ export const digestDeliveries = pgTable('digest_deliveries', {
   status: text('status').notNull(),
   attempts: integer('attempts').notNull().default(1),
   error: text('error'),
+  /** Slack's own error code (sanitised), shown next to the translated `error` key. */
+  errorCode: text('error_code'),
   createdAt: createdAt(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
   sentAt: ts('sent_at'),

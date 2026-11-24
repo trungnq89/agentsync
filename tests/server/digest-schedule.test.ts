@@ -208,6 +208,36 @@ describe('runDigestsIfDue', () => {
     expect(fake.posts).toHaveLength(1);
   });
 
+  it('stores Slack\'s own error code next to the key, never anything else', async () => {
+    await member('a');
+    fake.failNext({ method: 'chat.postMessage', error: 'cannot_dm_bot' });
+    await run(MON_0830);
+    const [r] = await rows();
+    expect([r.error, r.errorCode]).toEqual(['slackUnavailable', 'cannot_dm_bot']);
+    const [d] = await listDigestDeliveries(testDb, admin);
+    expect(d.errorCode).toBe('cannot_dm_bot');
+  });
+
+  it('records the Slack code of an auth failure in lastErrorCode', async () => {
+    await member('a');
+    fake.failNext({ method: 'chat.postMessage', error: 'missing_scope' });
+    await run(MON_0830);
+    const s = await settings();
+    expect([s.lastError, s.lastErrorCode]).toEqual(['slackAuthFailed', 'missing_scope']);
+  });
+
+  it('does not check out a pool client when Slack is off or has no token', async () => {
+    const spy = vi.spyOn(testDb.$client, 'connect');
+    try {
+      await testDb.update(slackSettings).set({ enabled: false }).where(eq(slackSettings.id, 1));
+      expect(await run(MON_0830)).toEqual({ sent: 0, skipped: 0, failed: 0 });
+      // Pool.query connects internally with a callback; a dedicated checkout (promise form) takes no argument.
+      expect(spy.mock.calls.filter((c) => (c as unknown[]).length === 0)).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('gives up after 3 failed attempts', async () => {
     await member('a');
     for (const m of [0, 6, 12]) {
@@ -236,11 +266,11 @@ describe('runDigestsIfDue', () => {
     expect((await listUnmatchedSlackUsers(testDb, admin)).map((x) => x.id)).not.toContain(u.id);
   });
 
-  it('users without email are failed with noEmail and listed as unmatched', async () => {
+  it('users without email are skipped (no row per day) and listed as unmatched', async () => {
     const u = await makeUser({ email: null });
     await makeTask(u.id, { status: 'in_progress', agreedDueDate: '2026-11-20', expectedEndDate: '2026-11-20' });
-    await run(MON_0830);
-    expect((await rows())[0].error).toBe('noEmail');
+    expect(await run(MON_0830)).toEqual({ sent: 0, skipped: 0, failed: 0 });
+    expect(await rows()).toHaveLength(0);
     expect((await listUnmatchedSlackUsers(testDb, admin)).map((x) => x.id)).toContain(u.id);
   });
 

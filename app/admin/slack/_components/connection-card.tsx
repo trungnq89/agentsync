@@ -6,8 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { saveSlackTokenAction, testSlackConnectionAction } from '../../../_actions/slack';
+import { withToast } from './with-toast';
 
-export type ConnectionValues = { tokenSaved: boolean; encryptionReady: boolean; docsUrl: string };
+// The card remounts when the first token is saved, so the toast is raised in the wrapper.
+const saveToken = withToast(saveSlackTokenAction);
+
+export type ConnectionValues = { tokenSaved: boolean; encryptionReady: boolean; docs: { path: string; url: string | null } };
 
 export function ConnectionCard({ values }: { values: ConnectionValues }) {
   const t = useTranslations('slack');
@@ -24,7 +28,7 @@ export function ConnectionCard({ values }: { values: ConnectionValues }) {
             {t('keyMissing')}
           </p>
         )}
-        <ActionForm action={saveSlackTokenAction} className="space-y-4" testId="slack-token-form">
+        <ActionForm action={saveToken} className="space-y-4" testId="slack-token-form">
           <fieldset disabled={locked} className="grid min-w-0 gap-4 sm:grid-cols-2">
             <FormField name="botToken" label={t('botToken')} hint={values.tokenSaved ? t('botTokenSavedHint') : t('botTokenEmptyHint')}>
               <Input type="password" autoComplete="new-password" required={!values.tokenSaved} />
@@ -35,30 +39,30 @@ export function ConnectionCard({ values }: { values: ConnectionValues }) {
             </div>
           </fieldset>
         </ActionForm>
-        <ActionForm
-          action={testSlackConnectionAction}
-          className="flex flex-wrap items-center gap-3"
-          render={(s) =>
-            (s.ok || s.error) && (
-              <p data-testid="slack-test-result" className={s.error ? 'text-sm text-danger-foreground' : 'text-sm text-success-foreground'}>
-                {s.ok ?? s.error}
-              </p>
-            )
-          }
-        >
+        <ActionForm action={testSlackConnectionAction} className="flex flex-wrap items-center gap-3">
           <Button type="submit" variant="outline" disabled={locked || !values.tokenSaved}>
             {t('testConnection')}
           </Button>
         </ActionForm>
-        <p className="text-sm text-muted-foreground">
-          {t.rich('help', {
-            link: (chunks) => (
-              <a href={values.docsUrl} target="_blank" rel="noreferrer" className="font-medium text-primary underline underline-offset-2">
-                {chunks}
-              </a>
-            ),
-          })}
-        </p>
+        <div className="space-y-2 border-t border-border pt-4 text-sm" data-testid="slack-guide">
+          <h3 className="font-medium">{t('guideTitle')}</h3>
+          <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+            {(['guideStep1', 'guideStep2', 'guideStep3', 'guideStep4', 'guideStep5'] as const).map((k) => (
+              <li key={k}>{t(k)}</li>
+            ))}
+          </ol>
+          <p className="text-muted-foreground">
+            {values.docs.url
+              ? t.rich('help', {
+                  link: (chunks) => (
+                    <a href={values.docs.url!} target="_blank" rel="noreferrer" className="font-medium text-primary underline underline-offset-2">
+                      {chunks}
+                    </a>
+                  ),
+                })
+              : t.rich('helpPath', { path: values.docs.path, code: (chunks) => <code className="rounded bg-surface-muted px-1">{chunks}</code> })}
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

@@ -71,6 +71,13 @@
       "when": 1795454002869,
       "tag": "0009_illegal_magdalene",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795455149345,
+      "tag": "0010_silky_solo",
+      "breakpoints": true
     }
   ]
 }

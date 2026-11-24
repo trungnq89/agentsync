@@ -63,7 +63,7 @@ async function claimRow(db: Db, userId: string, localDate: string, now: Date): P
     return { id: ins.id, attempts: 0, release: async () => { await db.delete(digestDeliveries).where(eq(digestDeliveries.id, ins.id)); } };
   }
   const [upd] = await db.update(digestDeliveries)
-    .set({ error: 'claimed', updatedAt: now })
+    .set({ error: 'claimed', errorCode: null, updatedAt: now })
     .where(and(
       eq(digestDeliveries.id, prev.id),
       eq(digestDeliveries.status, 'failed'),
@@ -77,7 +77,7 @@ async function claimRow(db: Db, userId: string, localDate: string, now: Date): P
     id: upd.id,
     attempts: upd.attempts,
     release: async () => {
-      await db.update(digestDeliveries).set({ error: prev.error, updatedAt: prev.updatedAt }).where(eq(digestDeliveries.id, prev.id));
+      await db.update(digestDeliveries).set({ error: prev.error, errorCode: prev.errorCode, updatedAt: prev.updatedAt }).where(eq(digestDeliveries.id, prev.id));
     },
   };
 }
@@ -93,9 +93,9 @@ function userLocale(u: Pick<User, 'locale'>) {
   return isLocale(u.locale) ? u.locale : defaultLocale();
 }
 
-async function recordSlackError(db: Db, key: string, now: Date) {
+async function recordSlackError(db: Db, key: string, now: Date, code: string | null) {
   await db.update(slackSettings)
-    .set({ lastError: key, lastErrorAt: now, pausedUntil: new Date(now.getTime() + AUTH_BACKOFF_MS) })
+    .set({ lastError: key, lastErrorAt: now, lastErrorCode: code, pausedUntil: new Date(now.getTime() + AUTH_BACKOFF_MS) })
     .where(eq(slackSettings.id, 1));
 }
 
@@ -114,7 +114,7 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
   try {
     token = await loadSlackToken(db);
   } catch {
-    await recordSlackError(db, 'encryptionKeyMissing', now);
+    await recordSlackError(db, 'encryptionKeyMissing', now, null);
     return { ...result, aborted: 'encryptionKeyMissing' };
   }
   if (!token) return result;
@@ -124,6 +124,8 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
   for (const u of active) {
     let claim: Claim | null = null;
     try {
+      // No email and no cached Slack id: cannot be matched. They are listed under "Not matched", so no row per day.
+      if (!u.slackUserId && !u.email?.trim()) continue;
       const prefs = effectiveDigestPrefs(u, settings);
       const { due, localDate } = isDue(prefs, now);
       if (!due) continue;
@@ -132,23 +134,24 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
       const since = await sinceFor(db, u.id, now);
       const data = await collectDigestData(db, u, { since, now, timezone: prefs.timezone });
       if (isDigestEmpty(data)) {
-        await db.update(digestDeliveries).set({ status: 'skipped_empty', error: null, updatedAt: now }).where(eq(digestDeliveries.id, claim.id));
+        await db.update(digestDeliveries).set({ status: 'skipped_empty', error: null, errorCode: null, updatedAt: now }).where(eq(digestDeliveries.id, claim.id));
         result.skipped++;
         continue;
       }
       const msg = buildDigest(data, { locale: userLocale(u), timezone: prefs.timezone, appUrl, now });
       await transport.send(db, u, msg);
-      await db.update(digestDeliveries).set({ status: 'sent', error: null, sentAt: now, updatedAt: now }).where(eq(digestDeliveries.id, claim.id));
+      await db.update(digestDeliveries).set({ status: 'sent', error: null, errorCode: null, sentAt: now, updatedAt: now }).where(eq(digestDeliveries.id, claim.id));
       result.sent++;
     } catch (e) {
       const key = e instanceof DomainError ? e.key : 'unknown';
+      const code = e instanceof DomainError && typeof e.params?.code === 'string' ? e.params.code : null;
       if (claim && (key === 'slackAuthFailed' || key === 'slackRateLimited')) {
         await claim.release();
         if (key === 'slackRateLimited') {
           const ra = e instanceof DomainError && typeof e.params?.retryAfter === 'number' ? e.params.retryAfter : 60;
           await db.update(slackSettings).set({ pausedUntil: new Date(now.getTime() + ra * 1000) }).where(eq(slackSettings.id, 1));
         } else {
-          await recordSlackError(db, key, now);
+          await recordSlackError(db, key, now, code);
         }
         return { ...result, aborted: key };
       }
@@ -156,7 +159,7 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
       if (claim) {
         try {
           await db.update(digestDeliveries)
-            .set({ status: 'failed', attempts: claim.attempts + 1, error: key, updatedAt: stamp() })
+            .set({ status: 'failed', attempts: claim.attempts + 1, error: key, errorCode: code, updatedAt: stamp() })
             .where(eq(digestDeliveries.id, claim.id));
         } catch {
           // Row stays 'claimed' and is retried after the gap.
@@ -165,7 +168,7 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
     }
   }
   if (result.sent > 0) {
-    await db.update(slackSettings).set({ lastError: null, lastErrorAt: null }).where(eq(slackSettings.id, 1));
+    await db.update(slackSettings).set({ lastError: null, lastErrorAt: null, lastErrorCode: null }).where(eq(slackSettings.id, 1));
   }
   return result;
 }
@@ -175,6 +178,10 @@ export async function runDigestsUnlocked(db: Db, now: Date, makeTransport: MakeT
  * DB transaction is held open across Slack calls and per-user claims commit individually.
  */
 export async function runDigestsIfDue(db: Db, now: Date, makeTransport: MakeTransport = defaultTransport): Promise<DigestRunResult> {
+  // One pooled query per tick while Slack is off: no dedicated client or lock until there is work to do.
+  const s = await readSlackSettingsRow(db);
+  if (!s.enabled || !s.botTokenEnc || !process.env.APP_URL?.trim()) return { sent: 0, skipped: 0, failed: 0 };
+  if (s.pausedUntil && s.pausedUntil.getTime() > now.getTime()) return { sent: 0, skipped: 0, failed: 0 };
   const conn = await db.$client.connect();
   // A checked-out client has no pool error listener; without one a dropped backend would crash the process.
   let connErr: Error | undefined;
@@ -256,7 +263,7 @@ export async function listDigestDeliveries(db: Db, actor: Actor, limit = 50) {
     .select({
       id: digestDeliveries.id, userId: digestDeliveries.userId, userName: users.displayName,
       localDate: digestDeliveries.localDate, status: digestDeliveries.status, attempts: digestDeliveries.attempts,
-      error: digestDeliveries.error, createdAt: digestDeliveries.createdAt, sentAt: digestDeliveries.sentAt,
+      error: digestDeliveries.error, errorCode: digestDeliveries.errorCode, createdAt: digestDeliveries.createdAt, sentAt: digestDeliveries.sentAt,
     })
     .from(digestDeliveries)
     .innerJoin(users, eq(users.id, digestDeliveries.userId))

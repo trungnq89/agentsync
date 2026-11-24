@@ -36,7 +36,7 @@ Screenshots show generated demo data (see [Try it with demo data](#try-it-with-d
 - **Vietnamese and English, light and dark:** each user picks their own.
 - **Odoo HR sync (optional):** read-only sync of accounts and the org chart from Odoo HR.
 - **Daily Slack digest (optional, off by default):** each person gets a direct message with what needs their attention. Needs `APP_URL` and `SETTINGS_ENCRYPTION_KEY`; task titles and notes are sent to Slack. Setup: [docs/slack-setup.md](docs/slack-setup.md).
-- **Self-hosted with Docker:** one app plus Postgres; no external services at runtime.
+- **Self-hosted with Docker:** one app plus Postgres; no external services at runtime unless you turn on the optional Odoo or Slack integrations.
 
 ## Quick start (Docker)
 
@@ -66,7 +66,7 @@ Screenshots show generated demo data (see [Try it with demo data](#try-it-with-d
 6. Each person opens **Settings** and creates an agent token.
 7. Install the agent plugin and connect your agent: [docs/install-agent.md](docs/install-agent.md).
 
-The `app` container runs migrations on every start; data lives in the `pgdata` volume. If `app` keeps restarting, check `docker compose -f docker-compose.prod.yml logs app`. There are no external services at runtime: no CDN, no analytics, and the Inter font is bundled.
+The `app` container runs migrations on every start; data lives in the `pgdata` volume. If `app` keeps restarting, check `docker compose -f docker-compose.prod.yml logs app`. Unless you turn on the optional Odoo or Slack integrations, there are no external services at runtime: no CDN, no analytics, and the Inter font is bundled.
 
 ## Try it with demo data
 
@@ -102,7 +102,7 @@ An optional `Stop` hook runs after every agent turn. When the agent printed `AGE
 
 ## Slack digest
 
-Admin > **Slack** turns on a daily direct message per person listing what needs their attention. It is off until an admin sets a bot token and turns it on. Each person picks their own time, days and time zone in Settings. Task titles, blocker text and notes are sent to Slack. Full setup (creating the Slack app, scopes `chat:write` and `users:read.email`): [docs/slack-setup.md](docs/slack-setup.md) ([Tiếng Việt](docs/slack-setup.vi.md)).
+Admin > **Slack** turns on a daily direct message per person listing what needs their attention. It is off until an admin sets a bot token and turns it on. Each person picks their own time, days and time zone in Settings. Task titles, blocker text and notes are sent to Slack. Full setup (creating the Slack app, scopes `chat:write`, `users:read`, `users:read.email`, and App Home > Messages Tab on): [docs/slack-setup.md](docs/slack-setup.md) ([Tiếng Việt](docs/slack-setup.vi.md)).
 
 ## Odoo HR sync
 
@@ -143,6 +143,7 @@ Admin > **Odoo** keeps AgentSync accounts and the org chart in step with the emp
 | `ALLOWED_ORIGINS` | build time | Comma-separated hosts allowed to call Server Actions behind a proxy that changes `Host`. Rebuild after changing it. |
 | `SETTINGS_ENCRYPTION_KEY` | app | 32 bytes, base64. Encrypts the stored Odoo API key and Slack bot token. Without it the Odoo and Slack pages are locked. |
 | `DEFAULT_TIMEZONE` | app | IANA time zone used for Slack digests until someone picks another. Default `Asia/Ho_Chi_Minh`. |
+| `SLACK_DOCS_BASE_URL` | app | Optional. Base URL of the published docs (for example your fork's `docs/` folder); the Slack tab links its setup guide there. Without it the tab names the file path. |
 | `SLACK_API_BASE` | app (tests) | Overrides the Slack API URL. Only used by the end-to-end tests. |
 | `DB_PORT` | development compose | Host port of the development Postgres. Default `5432`. |
 

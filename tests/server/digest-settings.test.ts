@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { testDb } from '../helpers/db';
 import { makeUser } from '../helpers/factories';
 import { digestDeliveries, slackSettings, users } from '@/db/schema';
 import { getSlackSettingsView, loadSlackToken, saveSlackSettings } from '@/server/digest/settings';
-import { getMyDigestPrefs, resetMyDigestPrefs, setMyDigestPrefs } from '@/server/digest/prefs';
+import { defaultTimezone, getMyDigestPrefs, resetMyDigestPrefs, setMyDigestPrefs } from '@/server/digest/prefs';
 import { updateUser } from '@/server/org';
 import { DomainError } from '@/server/errors';
 
@@ -131,6 +131,32 @@ describe('review fixes', () => {
     expect((await getSlackSettingsView(testDb, a)).defaults.timezone).toBe('America/New_York');
     await saveSlackSettings(testDb, a, { defaults: { timezone: null } });
     expect((await getSlackSettingsView(testDb, a)).defaults.timezone).toBe('Asia/Ho_Chi_Minh');
+  });
+
+  it('accepts current IANA names that Intl.supportedValuesOf does not list', async () => {
+    const a = await makeUser({ isAdmin: true });
+    await saveSlackSettings(testDb, a, { defaults: { timezone: 'Asia/Ho_Chi_Minh' } });
+    expect((await getSlackSettingsView(testDb, a)).defaults.timezone).toBe('Asia/Ho_Chi_Minh');
+    const m = await makeUser();
+    await setMyDigestPrefs(testDb, m, { timezone: 'Asia/Kolkata' });
+    expect((await getMyDigestPrefs(testDb, m)).timezone).toBe('Asia/Kolkata');
+  });
+
+  it('falls back to Asia/Ho_Chi_Minh (warning once) on an invalid DEFAULT_TIMEZONE', async () => {
+    const prev = process.env.DEFAULT_TIMEZONE;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      process.env.DEFAULT_TIMEZONE = 'Mars/Base';
+      expect(defaultTimezone()).toBe('Asia/Ho_Chi_Minh');
+      expect(defaultTimezone()).toBe('Asia/Ho_Chi_Minh');
+      expect(warn.mock.calls.length).toBeLessThanOrEqual(1);
+      process.env.DEFAULT_TIMEZONE = 'Europe/Kyiv';
+      expect(defaultTimezone()).toBe('Europe/Kyiv');
+    } finally {
+      warn.mockRestore();
+      if (prev === undefined) delete process.env.DEFAULT_TIMEZONE;
+      else process.env.DEFAULT_TIMEZONE = prev;
+    }
   });
 
   it('rejects non-IANA timezones', async () => {

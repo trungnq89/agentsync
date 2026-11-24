@@ -35,7 +35,7 @@ export function StatusCard({ enabled, canEnable }: { enabled: boolean; canEnable
               description={t('enableDesc')}
               confirmLabel={t('enable')}
               tone="primary"
-              action={setSlackEnabledAction}
+              action={toggled}
               trigger={
                 <Button size="sm" disabled={!canEnable} data-testid="slack-enable">
                   {t('enable')}

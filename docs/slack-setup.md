@@ -20,9 +20,10 @@ Restart the app after changing them.
 2. Name it (for example `AgentSync`) and pick your workspace.
 3. Open **OAuth & Permissions** and, under **Bot Token Scopes**, add:
    - `chat:write` (send the direct message),
-   - `users:read.email` (find each person by their AgentSync email).
-4. Choose **Install to Workspace** and approve.
-5. Copy the **Bot User OAuth Token**. It starts with `xoxb-`.
+   - `users:read` and `users:read.email` (find each person by their AgentSync email; Slack needs both).
+4. Open **App Home**, and under **Show Tabs** keep the **Messages Tab** on (the "Allow users to send Slash commands and messages from the messages tab" box can stay off). Without it Slack refuses the direct message (`messages_tab_disabled`).
+5. Choose **Install to Workspace** and approve.
+6. Copy the **Bot User OAuth Token**. It starts with `xoxb-`.
 
 The app does not need to be added to any channel: it only sends direct messages.
 
@@ -44,6 +45,8 @@ Each person can change their own digest in **Settings > Slack digest** (on or of
 ## Troubleshooting
 
 - **Last error** on the Slack tab shows the latest problem. `The bot token was rejected` means the token is wrong, revoked or missing a scope: reinstall the app and save the new token. Sending pauses for a while after such an error (the tab shows "paused until"), and saving a new token clears it.
+- `messages_tab_disabled` in the history: App Home > Show Tabs > turn the **Messages Tab** on, then press **Match again** or wait for the next send.
+- `missing_scope` in the history: the bot lacks a scope. Add `chat:write`, `users:read` and `users:read.email` under OAuth & Permissions, reinstall the app, and save the new token.
 - **Slack is rate limiting**: sending pauses automatically and resumes on its own.
 - Nothing is sent when there is nothing to show (the history records it as skipped).
-- Delivery history on the tab lists the last 50 sends with the Slack error code, never the message text or token.
+- Delivery history on the tab lists the last 50 sends with the Slack error code in brackets (for example `missing_scope`), never the message text or token.

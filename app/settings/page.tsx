@@ -91,7 +91,7 @@ export default async function SettingsPage() {
           {digest && (
             <DigestPrefsCard
               values={{ ...digest, unmatchedReason: digest.slackIssue }}
-              zones={timezoneOptions()}
+              zones={timezoneOptions(digest.timezone)}
             />
           )}
         </>

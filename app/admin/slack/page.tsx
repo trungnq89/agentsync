@@ -20,7 +20,8 @@ export async function generateMetadata() {
 }
 export const dynamic = 'force-dynamic';
 
-const REPO_DOCS = 'https://github.com/trungnq89/agentsync/blob/main/docs';
+/** Optional base URL of the published docs (for forks); without it the guide is named by its repo path. */
+const docsBase = () => process.env.SLACK_DOCS_BASE_URL?.trim().replace(/\/+$/, '') || null;
 const STATUS_TONE: Record<string, Tone> = { sent: 'success', skipped_empty: 'neutral', failed: 'danger' };
 const STATUS_KEY = { sent: 'status_sent', skipped_empty: 'status_skipped_empty', failed: 'status_failed' } as const;
 
@@ -41,10 +42,16 @@ export default async function AdminSlackPage() {
   const tz = settings.defaults.timezone;
   const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: tz });
   const clock = new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: tz });
-  const err = (key: string | null) => (key ? (tErr.has(key) ? tErr(key) : key) : '');
+  const err = (key: string | null, code?: string | null) => {
+    if (!key) return '';
+    const label = tErr.has(key) ? tErr(key) : tErr('unknown');
+    return code ? `${label} (${code})` : label;
+  };
   const paused = settings.pausedUntil;
   const ready = settings.encryptionReady && settings.appUrlSet && settings.tokenSaved;
-  const docsUrl = `${REPO_DOCS}/${locale === 'vi' ? 'slack-setup.vi.md' : 'slack-setup.md'}`;
+  const docsFile = locale === 'vi' ? 'slack-setup.vi.md' : 'slack-setup.md';
+  const base = docsBase();
+  const docs = { path: `docs/${docsFile}`, url: base ? `${base}/${docsFile}` : null };
 
   return (
     <main className="space-y-6">
@@ -61,7 +68,7 @@ export default async function AdminSlackPage() {
         </p>
       )}
 
-      <ConnectionCard key={String(settings.tokenSaved)} values={{ tokenSaved: settings.tokenSaved, encryptionReady: settings.encryptionReady, docsUrl }} />
+      <ConnectionCard key={String(settings.tokenSaved)} values={{ tokenSaved: settings.tokenSaved, encryptionReady: settings.encryptionReady, docs }} />
       <StatusCard enabled={settings.enabled} canEnable={ready} />
 
       {(settings.lastError || paused) && (
@@ -72,7 +79,7 @@ export default async function AdminSlackPage() {
           <CardContent className="space-y-1 text-sm">
             {settings.lastError && (
               <p className="break-words text-danger-foreground">
-                {err(settings.lastError)}
+                {err(settings.lastError, settings.lastErrorCode)}
                 {settings.lastErrorAt && <span className="text-muted-foreground"> {t('lastErrorAt', { when: dateTime.format(settings.lastErrorAt) })}</span>}
               </p>
             )}
@@ -84,7 +91,7 @@ export default async function AdminSlackPage() {
       <DefaultsCard
         key={JSON.stringify(settings.defaults)}
         values={settings.defaults}
-        zones={timezoneOptions()}
+        zones={timezoneOptions(settings.defaults.timezone)}
         locked={!settings.encryptionReady}
       />
 
@@ -146,9 +153,9 @@ export default async function AdminSlackPage() {
                     <TableCell className="font-medium">{d.userName}</TableCell>
                     <TableCell className="whitespace-nowrap">{d.localDate}</TableCell>
                     <TableCell>
-                      <Badge tone={STATUS_TONE[d.status] ?? 'neutral'}>{t(STATUS_KEY[d.status as keyof typeof STATUS_KEY] ?? 'status_failed')}</Badge>
+                      <Badge tone={d.error === 'claimed' ? 'neutral' : (STATUS_TONE[d.status] ?? 'neutral')}>{t(STATUS_KEY[d.status as keyof typeof STATUS_KEY] ?? 'status_failed')}</Badge>
                     </TableCell>
-                    <TableCell className="break-words text-muted-foreground">{err(d.error)}</TableCell>
+                    <TableCell className="break-words text-muted-foreground">{err(d.error, d.errorCode)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -3,6 +3,9 @@ import type { Db } from '@/db/client';
 import { digestDeliveries, slackSettings, users, type SlackSettingsRow, type User } from '@/db/schema';
 import type { Actor } from '../authz';
 import { DomainError } from '../errors';
+import { defaultTimezone, isValidTimezone } from './timezone';
+
+export { defaultTimezone, isValidTimezone };
 
 export type DigestPrefs = { enabled: boolean; time: string; days: number[]; timezone: string };
 export type DigestPrefsView = DigestPrefs & {
@@ -10,16 +13,6 @@ export type DigestPrefsView = DigestPrefs & {
 };
 
 const TIME_RE = /^([01]\d|2[0-3]):(00|15|30|45)$/;
-
-export function defaultTimezone(): string {
-  return process.env.DEFAULT_TIMEZONE || 'Asia/Ho_Chi_Minh';
-}
-
-let zones: Set<string> | null = null;
-function validTimezone(tz: string): boolean {
-  zones ??= new Set([...Intl.supportedValuesOf('timeZone'), 'UTC']);
-  return zones.has(tz);
-}
 
 /**
  * Throws VALIDATION with `field` for any invalid provided value. `days` must be 1..7;
@@ -33,7 +26,7 @@ export function validateDigestPrefs(p: Partial<DigestPrefs>, effectiveEnabled: b
     const ok = Array.isArray(p.days) && (p.days.length > 0 || !effectiveEnabled) && p.days.every((d) => Number.isInteger(d) && d >= 1 && d <= 7);
     if (!ok) throw new DomainError('VALIDATION', 'digestDaysRequired', { field: 'days' });
   }
-  if (p.timezone !== undefined && !(typeof p.timezone === 'string' && validTimezone(p.timezone))) {
+  if (p.timezone !== undefined && !(typeof p.timezone === 'string' && isValidTimezone(p.timezone))) {
     throw new DomainError('VALIDATION', 'invalidTimezone', { field: 'timezone' });
   }
 }
