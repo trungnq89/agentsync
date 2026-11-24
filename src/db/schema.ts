@@ -22,6 +22,8 @@ export type PlanStep = {
   confirmedBy?: 'member' | 'manager';
   confirmedById?: string;
   confirmedAt?: string; // ISO
+  /** Where the confirmation came from. Absent on steps confirmed before this was recorded. */
+  confirmedVia?: 'agent' | 'web';
 };
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });
@@ -74,7 +76,10 @@ export const agentTokens = pgTable('agent_tokens', {
   createdAt: createdAt(),
   lastUsedAt: ts('last_used_at'),
   revokedAt: ts('revoked_at'),
-});
+  scope: text('scope', { enum: ['member', 'manager'] }).notNull().default('member'),
+  expiresAt: ts('expires_at').notNull(),
+  legacy: boolean('legacy').notNull().default(false),
+}, (t) => [check('agent_tokens_scope_check', sql`${t.scope} in ('member', 'manager')`)]);
 
 export const tasks = pgTable('tasks', {
   id: uuid('id').primaryKey().defaultRandom(),

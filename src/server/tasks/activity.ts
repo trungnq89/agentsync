@@ -25,6 +25,8 @@ export interface PostUpdateInput {
   memberConfirmed?: boolean;
   expectedEndDate?: string;
   source: 'auto' | 'reviewed';
+  /** Where the member confirmation came from. Only MCP calls this with memberConfirmed, so default is agent. */
+  via?: 'agent' | 'web';
   evidence?: { branch?: string; commits?: number; prUrl?: string };
 }
 
@@ -72,7 +74,7 @@ export async function postUpdate(
       const steps: PlanStep[] = plan.steps.map((s) => {
         if (!done.includes(s.title) || s.status === 'done') return s;
         if (confirmer === 'manager') return s.status === 'pending_approval' ? s : { title: s.title, status: 'pending_approval' };
-        return { title: s.title, status: 'done', confirmedBy: 'member', confirmedById: actor.id, confirmedAt: now.toISOString() };
+        return { title: s.title, status: 'done', confirmedBy: 'member', confirmedById: actor.id, confirmedAt: now.toISOString(), confirmedVia: input.via ?? 'agent' };
       });
       await tx.update(planVersions).set({ steps }).where(eq(planVersions.id, plan.id));
       // Re-reporting a step answers its earlier "not accepted" reviews.
@@ -332,7 +334,7 @@ export async function getPendingFeedback(db: Db, actor: Actor): Promise<PendingF
     .where(and(eq(questions.authorId, actor.id), eq(questions.status, 'answered')))
     .orderBy(questions.createdAt);
   const answersToMyQuestions = answered
-    .filter((r) => r.ownerId === actor.id || (!r.isPrivate && r.ownerManagerId === actor.id))
+    .filter((r) => r.ownerId === actor.id || (!r.isPrivate && isCurrentManagerOf(actor, { managerId: r.ownerManagerId })))
     .map((r) => ({ questionId: r.questionId, taskId: r.taskId, title: r.title, body: r.body, answer: r.answer ?? '', answeredAt: r.answeredAt }));
 
   const reviewRows = await db

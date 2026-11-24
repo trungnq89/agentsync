@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { createDb } from '../../src/db/client';
-import { tasks, users } from '../../src/db/schema';
+import { planVersions, tasks, users } from '../../src/db/schema';
 import { postUpdate } from '../../src/server/tasks/activity';
 import { loginAs } from '../helpers/auth';
 import { resetE2eDb, seedOrg } from '../helpers/e2e-db';
@@ -62,6 +62,7 @@ test('manager sets confirmer, then approves, rejects and approves all', async ({
   await step1.getByTestId('step-approve').click();
   await expect(step1).toHaveAttribute('data-status', 'done');
   await expect(step1.getByTestId('step-confirmed')).toContainText('✓ Quản lý duyệt');
+  await expect(step1.getByTestId('step-confirmed')).toContainText('(trên web)');
   await expect(step1.getByTestId('step-confirmed')).toBeVisible();
 
   await leaderReports('Bước 2');
@@ -85,6 +86,24 @@ test('manager sets confirmer, then approves, rejects and approves all', async ({
   await page.getByRole('alertdialog').getByRole('button', { name: 'Duyệt tất cả' }).click();
   await expect(step2).toHaveAttribute('data-status', 'done');
   await expect(page.getByTestId('approve-all')).toHaveCount(0);
+});
+
+test('a step confirmed before the source was recorded shows no source text', async ({ page }) => {
+  const id = await taskId();
+  await withDb(async (db) => {
+    const [pv] = await db.select().from(planVersions).where(eq(planVersions.taskId, id)).orderBy(desc(planVersions.version)).limit(1);
+    const steps = pv.steps.map((st, i) => (i === 0
+      ? { ...st, status: 'done' as const, confirmedBy: 'manager' as const, confirmedAt: new Date().toISOString() }
+      : st));
+    await db.update(planVersions).set({ steps }).where(eq(planVersions.id, pv.id));
+  });
+  await loginAs(page, 'manager1', PW);
+  await page.goto(`/tasks/${id}`);
+  const confirmed = page.getByTestId('step-confirmed');
+  await expect(confirmed).toHaveCount(1);
+  await expect(confirmed).toContainText('✓ Quản lý duyệt');
+  await expect(confirmed).not.toContainText('(trên web)');
+  await expect(confirmed).not.toContainText('(qua agent)');
 });
 
 test('a repeated approval shows an info toast, not an error', async ({ page, browser }) => {

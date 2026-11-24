@@ -69,7 +69,8 @@ export async function reviewCheckpoint(
   taskId: string,
   stepTitle: string | null,
   decision: 'approved' | 'rejected',
-  note?: string,
+  note: string | undefined,
+  via: 'agent' | 'web',
   now: Date = new Date(),
 ): Promise<{ approved: number; rejected: number }> {
   const trimmed = note?.trim() || null;
@@ -93,7 +94,7 @@ export async function reviewCheckpoint(
     const steps: PlanStep[] = plan.steps.map((s) => {
       if (!titles.has(s.title)) return s;
       if (decision === 'approved') {
-        return { title: s.title, status: 'done', confirmedBy: 'manager', confirmedById: actor.id, confirmedAt: now.toISOString() };
+        return { title: s.title, status: 'done', confirmedBy: 'manager', confirmedById: actor.id, confirmedAt: now.toISOString(), confirmedVia: via };
       }
       return { title: s.title, status: 'doing' };
     });

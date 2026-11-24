@@ -17,18 +17,30 @@ Các ví dụ dưới đây giả định plugin ở `/Users/ten-ban/agentsync/p
 
 1. Đăng nhập AgentSync, vào trang **Cài đặt**. Tại đây bạn cũng chọn được ngôn ngữ (en/vi) và theme (system/light/dark).
 2. Tạo token agent mới. Token dạng `ags_...`, chỉ hiện một lần: copy ngay.
-3. Thêm hai dòng vào `~/.zshrc`, rồi mở terminal mới:
+3. Ghi hai dòng vào `~/.agentsync-env`, giới hạn quyền để chỉ bạn đọc được, rồi nạp file này từ `~/.zshrc`:
 
 ```bash
+# ~/.agentsync-env
 export AGENTSYNC_URL="https://agentsync.example.com"   # không có dấu / ở cuối
 export AGENTSYNC_TOKEN="ags_..."
 ```
 
-Không dán token vào chat hay commit vào repo.
+```bash
+chmod 600 ~/.agentsync-env
+echo '[ -f ~/.agentsync-env ] && source ~/.agentsync-env' >> ~/.zshrc
+```
 
-Nếu tài khoản của bạn đang dùng mật khẩu tạm, máy chủ từ chối token agent (HTTP 401, lỗi `passwordChangeRequired`) cho tới khi bạn đăng nhập AgentSync và đổi mật khẩu trong Cài đặt.
+Sau đó mở terminal mới. Không dán token vào chat hay commit vào repo.
 
-Lưu ý: biến trong `~/.zshrc` chỉ có hiệu lực với chương trình khởi động từ terminal. Ứng dụng desktop mở bằng cách bấm icon (Claude Desktop, Codex app) sẽ KHÔNG thấy chúng. Cách xử lý: mở ứng dụng từ terminal (ví dụ `open -a "Claude"` sau khi đã `export`), hoặc dùng bản CLI (`claude`, `codex`) trong terminal. Chưa kiểm tra cách đặt biến cố định cho ứng dụng desktop; nếu cần, hỏi admin.
+**Phạm vi token.** Token `member` (mặc định) chỉ xem và cập nhật việc của chính bạn. Token `manager` còn duyệt và trả lời thay cho cấp dưới trực tiếp (tổng quan đội, xác nhận, yêu cầu sửa, duyệt checkpoint). Trang Cài đặt chỉ cho chọn `manager` khi bạn có cấp dưới trực tiếp. Không đổi được phạm vi sau khi tạo; cần phạm vi khác thì tạo token mới.
+
+**Token cũ.** Token tạo trước khi có phạm vi được gắn nhãn "Token cũ, toàn quyền" trong Cài đặt: chúng hoạt động như token `manager` và hết hạn sau 90 ngày kể từ lúc nâng cấp. Hãy thay bằng token có phạm vi trước thời điểm đó.
+
+**Hạn dùng.** Mỗi token hết hạn sau 30, 90 (mặc định) hoặc 180 ngày, chọn khi tạo. Token hết hạn hoạt động như token đã thu hồi (HTTP 401). Hãy tạo token mới trong Cài đặt rồi cập nhật `AGENTSYNC_TOKEN`. AgentSync nhắc các token sắp hết hạn trong 7 ngày trong tóm tắt Slack của bạn.
+
+Nếu tài khoản của bạn đang dùng mật khẩu tạm, máy chủ từ chối token agent (HTTP 401) cho tới khi bạn đăng nhập AgentSync và đổi mật khẩu trong Cài đặt.
+
+Lưu ý: biến nạp từ `~/.zshrc` (qua `~/.agentsync-env`) chỉ có hiệu lực với chương trình khởi động từ terminal. Ứng dụng desktop mở bằng cách bấm icon (Claude Desktop, Codex app) sẽ KHÔNG thấy chúng. Cách xử lý: mở ứng dụng từ terminal (ví dụ `open -a "Claude"` sau khi đã `export`), hoặc dùng bản CLI (`claude`, `codex`) trong terminal. Chưa kiểm tra cách đặt biến cố định cho ứng dụng desktop; nếu cần, hỏi admin.
 
 ## 2. Claude Code
 

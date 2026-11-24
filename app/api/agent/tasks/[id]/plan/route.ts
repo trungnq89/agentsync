@@ -14,7 +14,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const m = /^Bearer\s+(\S+)$/i.exec(req.headers.get('authorization') ?? '');
   if (!m) return unauthorized();
   try {
-    const user = await authenticateAgentToken(db, m[1]);
+    const { user } = await authenticateAgentToken(db, m[1]);
     const { id } = await params;
     return json(await getOwnTaskPlan(db, user, id), 200);
   } catch (e) {

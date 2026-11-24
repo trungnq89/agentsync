@@ -83,6 +83,8 @@ export function buildDigest(d: DigestData, opts: BuildOpts): { text: string; blo
   group(t('questions'), mine.questionsForMe.map((q) => `${link(q.taskId, q.title)} — ${clip(q.body, MAX_NOTE)}`));
   group(t('answers'), mine.answers.map((a) => `${link(a.taskId, a.title)} — ${clip(a.answer, MAX_NOTE)}`));
   group(t('dueSoon'), mine.dueSoon.map((x) => `${link(x.taskId, x.title)} — ${x.overdue ? t('overdue', { date: fmtDue(x.dueDate) }) : t('due', { date: fmtDue(x.dueDate) })}`));
+  const fmtExpiry = new Intl.DateTimeFormat(opts.locale, { dateStyle: 'medium', timeZone: opts.timezone });
+  group(t('expiringTokens'), mine.expiringTokens.map((x) => t('tokenExpires', { label: clip(x.label, 80), date: fmtExpiry.format(x.expiresAt) })));
   if (mine.pendingApprovalSteps > 0) section([t('pendingSteps', { count: mine.pendingApprovalSteps })]);
   if (blocks.length > mineBlocksStart) blocks.splice(mineBlocksStart, 0, { type: 'divider' });
 
@@ -90,6 +92,6 @@ export function buildDigest(d: DigestData, opts: BuildOpts): { text: string; blo
   if (blocks.length > MAX_BLOCKS) blocks.length = MAX_BLOCKS;
 
   const count = mg.awaiting.length + mg.problems.length + mine.rejected.length + mine.changesRequested.length +
-    mine.questionsForMe.length + mine.answers.length + mine.dueSoon.length;
+    mine.questionsForMe.length + mine.answers.length + mine.dueSoon.length + mine.expiringTokens.length;
   return { text: `${header} — ${t('summary', { count })}`, blocks };
 }

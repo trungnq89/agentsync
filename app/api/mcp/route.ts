@@ -14,17 +14,24 @@ async function handle(req: Request): Promise<Response> {
   const db = getDb();
   const m = /^Bearer\s+(\S+)$/i.exec(req.headers.get('authorization') ?? '');
   if (!m) return unauthorized();
-  let user;
+  let auth;
   try {
-    user = await authenticateAgentToken(db, m[1]);
+    auth = await authenticateAgentToken(db, m[1]);
   } catch (e) {
     if (e instanceof DomainError) return unauthorized();
     console.error('[mcp] auth failed', e);
     return Response.json({ error: 'internal_error' }, { status: 500 });
   }
+  const { user, token } = auth;
   // Stateless: a fresh server + transport per request.
   const server = new McpServer({ name: 'agentsync', version: '0.1.0' });
-  registerTools(server, { db, getActor: () => user, locale: isLocale(user.locale) ? user.locale : defaultLocale() });
+  registerTools(server, {
+    db,
+    getActor: () => ({ ...user, tokenScope: token.scope }),
+    locale: isLocale(user.locale) ? user.locale : defaultLocale(),
+    tokenScope: token.scope,
+    token: { expiresAt: token.expiresAt, legacy: token.legacy },
+  });
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

@@ -365,7 +365,9 @@ async function main() {
           if (res.status === 200) plan = await res.json();
           else {
             if (res.status === 404) gone = true; // decided: task unknown/not ours, do not retry every turn
-            log(`plan fetch status ${res.status}`);
+            log(res.status === 401
+              ? 'token rejected: expired, revoked or invalid — create a new token in AgentSync Settings'
+              : `plan fetch status ${res.status}`);
           }
         } catch (e) {
           log(`plan fetch failed: ${e instanceof Error ? e.name : 'error'}`);

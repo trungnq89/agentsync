@@ -5,7 +5,10 @@ import { DomainError } from './errors';
 import { isUuid } from './ids';
 
 /** Admin flag only grants user management, never visibility of others' tasks. */
-export type Actor = Pick<User, 'id' | 'isAdmin'>;
+export type Actor = Pick<User, 'id' | 'isAdmin'> & {
+  /** Set for agent-token requests; a `member` token never acts as a manager. Web sessions leave it unset. */
+  tokenScope?: 'member' | 'manager';
+};
 
 export function requireAdmin(actor: Actor): void {
   if (!actor.isAdmin) throw new DomainError('FORBIDDEN', 'adminOnly');
@@ -13,6 +16,7 @@ export function requireAdmin(actor: Actor): void {
 
 /** Direct manager only: no inheritance up the chain. */
 export function isCurrentManagerOf(actor: Actor, owner: Pick<User, 'managerId'>): boolean {
+  if (actor.tokenScope === 'member') return false;
   return owner.managerId !== null && owner.managerId === actor.id;
 }
 

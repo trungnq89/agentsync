@@ -99,6 +99,7 @@ An optional `Stop` hook runs after every agent turn. When the agent printed `AGE
 2. Claude Code with `--plugin-dir` picks up the new plugin (0.2.0) from the pulled folder. For Codex and the alternative install, copy the skills from `plugins/agentsync/skills` again, otherwise your agent keeps the old skills and will not ask for confirmation properly.
 3. Progress % is now confirmed steps divided by total steps. A manual progress override is ignored, so some tasks may show a different percentage.
 4. A task that is in progress needs its steps confirmed before it can be completed. Report each remaining step (the member confirms it, or the manager approves it) first.
+5. Agent tokens now have a scope and an expiry. Every existing token becomes a `manager`-scope "legacy" token that expires 90 days after the upgrade (all of them on the same day). Create new tokens (Settings) before then and update `AGENTSYNC_TOKEN`; agents also see a reminder in tool output, and the Slack digest lists tokens expiring within 7 days.
 
 ## Slack digest
 
@@ -186,6 +187,19 @@ It prints `SMOKE OK` on success and exits non-zero on any error.
 - The web UI (RSC + server actions, English and Vietnamese) and MCP (`POST /api/mcp`, Streamable HTTP, authenticated with `ags_...` tokens) are thin layers over it.
 - Schema and migrations use Drizzle (`src/db/schema.ts`, `drizzle/`).
 - The agent skill bundle lives in `plugins/agentsync` (Claude Code, Codex and an Antigravity template).
+
+## HTTPS
+
+Agent tokens and session cookies must not travel over plain HTTP. Put AgentSync behind a reverse proxy with TLS and set `APP_URL` to the `https://` address. With Caddy (automatic certificates), a `Caddyfile` is enough:
+
+```
+agentsync.example.com {
+    encode gzip
+    reverse_proxy localhost:3000
+}
+```
+
+If `APP_URL` is `http://` on a non-local host, the Settings page shows a warning above the agent tokens.
 
 ## Security notes
 

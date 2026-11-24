@@ -9,6 +9,8 @@ Use the manager-side tools. Keep answers short and high-level; go into detail on
 
 Always reply to the manager in the language they use.
 
+Manager actions need a `manager`-scope token. If a tool says the token only has member access, tell the manager to create a manager token in Settings and stop retrying.
+
 ## Pick the tool by question
 
 - Team status: `team_overview`.

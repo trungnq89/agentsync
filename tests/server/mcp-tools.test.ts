@@ -1,16 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { eq } from 'drizzle-orm';
-import { users, type User } from '@/db/schema';
+import { planVersions, questions, users, type User } from '@/db/schema';
 import { registerTools } from '@/mcp/tools';
 import { testDb } from '../helpers/db';
 import { makeTask, makeUser } from '../helpers/factories';
 
-async function connect(getActor: () => User, locale: 'en' | 'vi' = 'vi') {
+const EXPIRES = new Date('2027-02-01T00:00:00Z');
+
+async function connect(
+  getActor: () => User,
+  locale: 'en' | 'vi' = 'vi',
+  tok: { scope?: 'member' | 'manager'; legacy?: boolean; expiresAt?: Date; now?: Date } = {},
+) {
   const server = new McpServer({ name: 'test', version: '0' });
-  registerTools(server, { db: testDb, getActor, locale });
+  registerTools(server, {
+    db: testDb, getActor, locale,
+    tokenScope: tok.scope ?? 'manager',
+    token: { expiresAt: tok.expiresAt ?? EXPIRES, legacy: tok.legacy ?? false },
+    ...(tok.now ? { now: () => tok.now! } : {}),
+  });
   const client = new Client({ name: 'c', version: '0' });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(a), client.connect(b)]);
@@ -26,6 +37,44 @@ const newTask = {
   title: 'Việc mới', mode: 'executive', agreedOutcome: 'KQ', startDate: '2026-11-23',
   agreedDueDate: '2026-11-30', steps: ['A', 'B'],
 };
+
+describe('mcp tools: token expiry notice', () => {
+  const NOW = new Date('2027-01-10T00:00:00Z');
+  const day = 86_400_000;
+  const ctxFor = (u: User, tok: Parameters<typeof connect>[2]) => connect(() => u, 'en', { now: NOW, ...tok });
+
+  it('adds the notice when the token expires within 7 days', async () => {
+    const me = await makeUser();
+    const c = await ctxFor(me, { scope: 'member', expiresAt: new Date(NOW.getTime() + 3 * day) });
+    const r = await call(c, 'list_my_tasks');
+    expect(text(r)).toContain('Your agent token expires on');
+    expect(text(r)).toContain('Settings');
+    // the data block stays valid JSON
+    expect(() => JSON.parse(r.content[r.content.length - 1].text)).not.toThrow();
+  });
+
+  it('adds the notice for legacy tokens even when far from expiry, in vi too', async () => {
+    const me = await makeUser();
+    const c = await connect(() => me, 'vi', { now: NOW, legacy: true, expiresAt: new Date(NOW.getTime() + 60 * day) });
+    expect(text(await call(c, 'list_my_tasks'))).toContain('Token agent của bạn hết hạn vào');
+  });
+
+  it('is silent for a healthy token and exactly 7 days still warns', async () => {
+    const me = await makeUser();
+    const far = await ctxFor(me, { scope: 'member', expiresAt: new Date(NOW.getTime() + 8 * day) });
+    expect(text(await call(far, 'list_my_tasks'))).not.toContain('Your agent token expires');
+    const edge = await ctxFor(me, { scope: 'member', expiresAt: new Date(NOW.getTime() + 7 * day) });
+    expect(text(await call(edge, 'list_my_tasks'))).toContain('Your agent token expires on');
+  });
+
+  it('does not add the notice to errors', async () => {
+    const me = await makeUser();
+    const c = await ctxFor(me, { scope: 'member', expiresAt: new Date(NOW.getTime() + day) });
+    const r = await call(c, 'team_overview');
+    expect(r.isError).toBe(true);
+    expect(text(r)).not.toContain('Your agent token expires');
+  });
+});
 
 describe('mcp tools', () => {
   it("revise_plan rejects step status 'done' (server-owned)", async () => {
@@ -140,7 +189,8 @@ describe('mcp tools', () => {
   it('get_my_settings returns sendMode, displayName, level', async () => {
     const me = await makeUser({ displayName: 'Lan', sendMode: 'auto' });
     const r = await call(await connect(() => me), 'get_my_settings');
-    expect(JSON.parse(r.content[1].text)).toEqual({ sendMode: 'auto', displayName: 'Lan', level: 'member', checkpointConfirmer: 'member' });
+    expect(JSON.parse(r.content[1].text)).toEqual({ sendMode: 'auto', displayName: 'Lan', level: 'member', checkpointConfirmer: 'member',
+      tokenScope: 'manager', tokenExpiresAt: EXPIRES.toISOString(), tokenLegacy: false });
   });
 
   it('non-domain errors are not leaked', async () => {
@@ -224,7 +274,7 @@ describe('mcp tools', () => {
       const ok = await call(member, 'update_progress', { taskId: t.id, body: 'x', stepsCompleted: ['A'], memberConfirmed: true, source: 'auto' });
       expect(ok.isError).toBeFalsy();
       const d = data(await call(member, 'task_detail', { taskId: t.id }));
-      expect(d.plan.steps[0]).toMatchObject({ title: 'A', status: 'done', confirmedBy: 'member', confirmedById: me.id });
+      expect(d.plan.steps[0]).toMatchObject({ title: 'A', status: 'done', confirmedBy: 'member', confirmedById: me.id, confirmedVia: 'agent' });
       expect(d.effectiveConfirmer).toBe('member');
     });
 
@@ -255,6 +305,7 @@ describe('mcp tools', () => {
       const steps = data(await call(manager, 'task_detail', { taskId: t.id })).plan.steps;
       expect(steps.map((s: { status: string }) => s.status)).toEqual(['done', 'done']);
       expect(steps[0].confirmedBy).toBe('manager');
+      expect(steps.map((s: { confirmedVia: string }) => s.confirmedVia)).toEqual(['agent', 'agent']);
     });
 
     it('repeat approve-all is an informative non-error', async () => {
@@ -299,5 +350,186 @@ describe('mcp tools', () => {
       const r = await call(member, 'revise_plan', { taskId: t.id, steps: [{ title: 'A', status: 'pending_approval' }] });
       expect(r.isError).toBe(true);
     });
+  });
+
+  describe('token scope', () => {
+    const MANAGER_TOOLS: [string, (taskId: string) => Record<string, unknown>][] = [
+      ['team_overview', () => ({})],
+      ['needs_attention', () => ({})],
+      ['weekly_digest', () => ({})],
+      ['confirm_task', (taskId) => ({ taskId })],
+      ['request_changes', (taskId) => ({ taskId, note: 'n' })],
+      ['answer_blocker', () => ({ questionId: '00000000-0000-4000-8000-000000000000', answer: 'a' })],
+      ['ask_question', (taskId) => ({ taskId, body: 'q' })],
+      ['review_solution', (taskId) => ({ taskId, verdict: 'approved' })],
+      ['review_checkpoint', (taskId) => ({ taskId, decision: 'approved' })],
+      ['set_checkpoint_confirmer', () => ({ userId: '00000000-0000-4000-8000-000000000000', confirmer: 'manager' })],
+    ];
+
+    it.each(MANAGER_TOOLS)('member token calling %s gets isError tokenScopeMember', async (name, args) => {
+      const mgr = await makeUser({ level: 'manager' });
+      const m = await makeUser({ managerId: mgr.id });
+      const t = await makeTask(m.id);
+      const c = await connect(() => mgr, 'en', { scope: 'member' });
+      const r = await call(c, name, args(t.id));
+      expect(r.isError).toBe(true);
+      expect(text(r)).toContain('member access');
+    });
+
+    it('message is translated per locale', async () => {
+      const mgr = await makeUser({ level: 'manager' });
+      const vi = await call(await connect(() => mgr, 'vi', { scope: 'member' }), 'needs_attention');
+      expect(text(vi)).toContain('Token này chỉ có quyền member');
+      const en = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'needs_attention');
+      expect(text(en)).toContain('This token only has member access');
+    });
+
+    it('member token review_checkpoint changes nothing', async () => {
+      const mgr = await makeUser({ level: 'manager' });
+      const m = await makeUser({ managerId: mgr.id });
+      const t = await makeTask(m.id, { status: 'in_progress', steps: ['A'] });
+      const plan = await testDb.select().from(planVersions).where(eq(planVersions.taskId, t.id));
+      await testDb.update(planVersions)
+        .set({ steps: [{ title: 'A', status: 'pending_approval' }] as never })
+        .where(eq(planVersions.id, plan[0].id));
+      const r = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'review_checkpoint',
+        { taskId: t.id, decision: 'approved' });
+      expect(r.isError).toBe(true);
+      const [after] = await testDb.select().from(planVersions).where(eq(planVersions.taskId, t.id));
+      expect((after.steps as { status: string }[])[0].status).toBe('pending_approval');
+    });
+
+    it('manager token review_checkpoint succeeds', async () => {
+      const mgr = await makeUser({ level: 'manager' });
+      const m = await makeUser({ managerId: mgr.id });
+      const t = await makeTask(m.id, { status: 'in_progress', steps: ['A'] });
+      const plan = await testDb.select().from(planVersions).where(eq(planVersions.taskId, t.id));
+      await testDb.update(planVersions)
+        .set({ steps: [{ title: 'A', status: 'pending_approval' }] as never })
+        .where(eq(planVersions.id, plan[0].id));
+      const r = await call(await connect(() => mgr, 'en', { scope: 'manager' }), 'review_checkpoint',
+        { taskId: t.id, decision: 'approved' });
+      expect(r.isError).toBeFalsy();
+    });
+
+    it('member token task_detail: own task ok, report task NOT_FOUND', async () => {
+      const mgr = await makeUser({ level: 'manager' });
+      const m = await makeUser({ managerId: mgr.id });
+      const mine = await makeTask(mgr.id, { title: 'Của tôi' });
+      const theirs = await makeTask(m.id, { title: 'Của cấp dưới' });
+      const c = await connect(() => mgr, 'en', { scope: 'member' });
+      const ok = await call(c, 'task_detail', { taskId: mine.id });
+      expect(ok.isError).toBeFalsy();
+      const bad = await call(c, 'task_detail', { taskId: theirs.id });
+      expect(bad.isError).toBe(true);
+      expect(text(bad)).not.toContain('Của cấp dưới');
+      const cm = await connect(() => mgr, 'en', { scope: 'manager' });
+      expect((await call(cm, 'task_detail', { taskId: theirs.id })).isError).toBeFalsy();
+    });
+
+    it('get_my_settings reports scope and expiry', async () => {
+      const me = await makeUser();
+      const r = await call(await connect(() => me, 'en', { scope: 'member', legacy: true }), 'get_my_settings');
+      const data = JSON.parse(r.content[1].text);
+      expect(data.tokenScope).toBe('member');
+      expect(data.tokenExpiresAt).toBe(EXPIRES.toISOString());
+      expect(data.tokenLegacy).toBe(true);
+    });
+  });
+
+  describe('member token cannot reach a report via shared tools', () => {
+    async function setup() {
+      const mgr = await makeUser({ level: 'manager' });
+      const rep = await makeUser({ managerId: mgr.id });
+      const t = await makeTask(rep.id, { status: 'in_progress' });
+      return { mgr, rep, t };
+    }
+    const countQ = async () => (await testDb.select().from(questions)).length;
+
+    it.each(['ask_manager', 'report_blocker'])('%s on a report task is NOT_FOUND for member, works for manager', async (name) => {
+      const { mgr, t } = await setup();
+      const bad = await call(await connect(() => mgr, 'en', { scope: 'member' }), name, { taskId: t.id, body: 'x' });
+      expect(bad.isError).toBe(true);
+      expect(await countQ()).toBe(0);
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'manager' }), name, { taskId: t.id, body: 'x' });
+      expect(ok.isError).toBeFalsy();
+      expect(await countQ()).toBe(1);
+    });
+
+    it('answer_question on a report blocker is denied for member token, nothing changes', async () => {
+      const { mgr, rep, t } = await setup();
+      const [q] = await testDb.insert(questions).values({
+        taskId: t.id, authorId: rep.id, direction: 'member_to_manager', body: 'help', isBlocker: true,
+      } as never).returning();
+      const bad = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'answer_question', { questionId: q.id, answer: 'a' });
+      expect(bad.isError).toBe(true);
+      const [mid] = await testDb.select().from(questions).where(eq(questions.id, q.id));
+      expect(mid.status).toBe('open');
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'manager' }), 'answer_question', { questionId: q.id, answer: 'a' });
+      expect(ok.isError).toBeFalsy();
+    });
+
+    it('resolve_question on a report task is denied for member token', async () => {
+      const { mgr, rep, t } = await setup();
+      const [q] = await testDb.insert(questions).values({
+        taskId: t.id, authorId: mgr.id, direction: 'manager_to_member', body: 'q', answer: 'a', status: 'answered',
+      } as never).returning();
+      const bad = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'resolve_question', { questionId: q.id });
+      expect(bad.isError).toBe(true);
+      const [after] = await testDb.select().from(questions).where(eq(questions.id, q.id));
+      expect(after.status).toBe('answered');
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'manager' }), 'resolve_question', { questionId: q.id });
+      expect(ok.isError).toBeFalsy();
+      expect(rep.id).not.toBe(mgr.id);
+    });
+
+    it('get_pending_feedback does not leak a report answers to a member token', async () => {
+      const { mgr, t } = await setup();
+      await testDb.insert(questions).values({
+        taskId: t.id, authorId: mgr.id, direction: 'manager_to_member', body: 'q', answer: 'secret-answer', status: 'answered',
+      } as never);
+      const bad = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'get_pending_feedback');
+      expect(text(bad)).not.toContain('secret-answer');
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'manager' }), 'get_pending_feedback');
+      expect(text(ok)).toContain('secret-answer');
+    });
+
+    it('member token can still answer a question on its own task', async () => {
+      const { mgr } = await setup();
+      const mine = await makeTask(mgr.id, { status: 'in_progress' });
+      const [q] = await testDb.insert(questions).values({
+        taskId: mine.id, authorId: mgr.id, direction: 'manager_to_member', body: 'q',
+      } as never).returning();
+      const ok = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'answer_question', { questionId: q.id, answer: 'a' });
+      expect(ok.isError).toBeFalsy();
+    });
+
+    it('make_task_public on a report task is NOT_FOUND (not ownerOnly) for member token', async () => {
+      const { mgr, t } = await setup();
+      const r = await call(await connect(() => mgr, 'en', { scope: 'member' }), 'make_task_public', { taskId: t.id });
+      expect(r.isError).toBe(true);
+      expect(text(r)).toContain('not found');
+    });
+  });
+
+  it('manager-scoped tools are exactly the Global Constraints list', async () => {
+    const handlers: Record<string, (a: unknown) => Promise<Res>> = {};
+    const stub = { registerTool: (name: string, _c: unknown, h: (a: unknown) => Promise<Res>) => { handlers[name] = h; } };
+    const mgr = await makeUser({ level: 'manager' });
+    registerTools(stub as never, {
+      db: testDb, locale: 'en', getActor: () => mgr,
+      tokenScope: 'member', token: { expiresAt: new Date(0), legacy: false },
+    });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const denied: string[] = [];
+    for (const [name, h] of Object.entries(handlers)) {
+      const r = await h({}).catch(() => null);
+      if (r?.isError && r.content[0].text.includes('member access')) denied.push(name);
+    }
+    spy.mockRestore();
+    expect(denied.sort()).toEqual([
+      'answer_blocker', 'ask_question', 'confirm_task', 'needs_attention', 'request_changes', 'review_checkpoint',
+      'review_solution', 'set_checkpoint_confirmer', 'team_overview', 'weekly_digest',
+    ]);
   });
 });

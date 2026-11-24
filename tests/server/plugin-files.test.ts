@@ -19,7 +19,7 @@ function registered() {
       for (const k of Object.keys(cfg.inputSchema ?? {})) fields.add(k);
     },
   } as unknown as McpServer;
-  registerTools(stub, { db: testDb, locale: 'en', getActor: () => { throw new Error('unused'); } });
+  registerTools(stub, { db: testDb, locale: 'en', tokenScope: 'manager', token: { expiresAt: new Date(0), legacy: false }, getActor: () => { throw new Error('unused'); } });
   return { tools, fields };
 }
 

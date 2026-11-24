@@ -5,6 +5,7 @@ import type { User } from '@/db/schema';
 import type { Locale } from '@/i18n/config';
 import { serverTranslator } from '@/i18n/translator';
 import { isValidIsoDate } from '@/server/clock';
+import type { TokenScope } from '@/server/auth/tokens';
 import { DomainError, translateError } from '@/server/errors';
 import {
   answerQuestion, askQuestion, getPendingFeedback, postUpdate, resolveQuestion, reviewSolution, submitSolutionSummary,
@@ -26,6 +27,9 @@ export interface ToolCtx {
   /** Language of the token owner; all tool output is rendered in it. */
   locale: Locale;
   now?: () => Date;
+  /** Scope of the bearer token; manager-only tools refuse `member` tokens. */
+  tokenScope: TokenScope;
+  token: { expiresAt: Date; legacy: boolean };
 }
 
 const reply = (markdown: string, data: unknown) => ({
@@ -53,16 +57,29 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
   const t = serverTranslator(locale);
   const now = () => ctx.now?.() ?? new Date();
 
+  const WARN_MS = 7 * 86_400_000;
+  /** Server-side so even old plugins show it: legacy tokens, or tokens with at most 7 days left. */
+  function expiryNotice(): string {
+    const { expiresAt, legacy } = ctx.token;
+    if (!legacy && expiresAt.getTime() - now().getTime() > WARN_MS) return '';
+    const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(expiresAt);
+    return `\n\n> ${t('mcp.tokenNotice', { date })}`;
+  }
+
   function tool<S extends z.ZodRawShape>(
     name: string,
+    scope: TokenScope,
     description: string,
     shape: S,
-    run: (args: z.infer<z.ZodObject<S>>, actor: User) => Promise<{ markdown: string; data: unknown }>,
+    run: (args: z.infer<z.ZodObject<S>>, actor: User & { tokenScope: TokenScope }) => Promise<{ markdown: string; data: unknown }>,
   ) {
     server.registerTool(name, { description, inputSchema: shape }, (async (args: z.infer<z.ZodObject<S>>) => {
       try {
-        const { markdown, data } = await run(args, ctx.getActor());
-        return reply(markdown, data);
+        if (scope === 'manager' && ctx.tokenScope !== 'manager') {
+          throw new DomainError('FORBIDDEN', 'tokenScopeMember');
+        }
+        const { markdown, data } = await run(args, { ...ctx.getActor(), tokenScope: ctx.tokenScope });
+        return reply(markdown + expiryNotice(), data);
       } catch (e) {
         if (e instanceof DomainError) {
           const message = translateError(e, locale);
@@ -79,14 +96,14 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
   const done = (markdown: string, data: unknown) => ({ markdown, data });
 
   // ------------------------------------------------------------ member
-  tool('list_my_tasks', 'List your tasks (open ones; include finished tasks with includeDone).',
+  tool('list_my_tasks', 'member', 'List your tasks (open ones; include finished tasks with includeDone).',
     { includeDone: z.boolean().optional().describe('Include done/cancelled tasks') },
     async ({ includeDone }, actor) => {
       const list = await listMyTasks(db, actor, { includeDone }, now());
       return done(formatTaskList(t, list), list);
     });
 
-  tool('create_task', 'Create a new task with a plan, pending manager confirmation.',
+  tool('create_task', 'member', 'Create a new task with a plan, pending manager confirmation.',
     {
       title: z.string().describe('Task title'),
       mode: z.enum(['executive', 'project']).describe('executive = no code, project = involves code'),
@@ -103,7 +120,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(t('mcp.taskCreated', { title: task.title, id: task.id }), task);
     });
 
-  tool('update_progress', 'Post a progress update on one of your tasks. When reporting stepsCompleted and the task\'s effectiveConfirmer is member, ask the member first and pass memberConfirmed: true; when it is manager, omit it and the steps go to the manager for approval.',
+  tool('update_progress', 'member', 'Post a progress update on one of your tasks. When reporting stepsCompleted and the task\'s effectiveConfirmer is member, ask the member first and pass memberConfirmed: true; when it is manager, omit it and the steps go to the manager for approval.',
     {
       taskId,
       body: z.string().describe('Update text'),
@@ -117,11 +134,11 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       }).optional(),
     },
     async ({ taskId: id, ...input }, actor) => {
-      const u = await postUpdate(db, actor, id, input, now());
+      const u = await postUpdate(db, actor, id, { ...input, via: 'agent' }, now());
       return done(t('mcp.updateSent'), u);
     });
 
-  tool('revise_plan', 'Revise the plan of a task. Step status is server-owned: send completed steps unchanged by title with status todo or doing; confirmed state is kept by title (renaming a step resets it to todo).',
+  tool('revise_plan', 'member', 'Revise the plan of a task. Step status is server-owned: send completed steps unchanged by title with status todo or doing; confirmed state is kept by title (renaming a step resets it to todo).',
     {
       taskId,
       steps: z.array(planStep).describe('All steps of the new plan'),
@@ -133,7 +150,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(t('mcp.planUpdated'), task);
     });
 
-  tool('set_task_status', 'Change the task status: complete, pause, resume or cancel.',
+  tool('set_task_status', 'member', 'Change the task status: complete, pause, resume or cancel.',
     {
       taskId,
       action: z.enum(['complete', 'pause', 'resume', 'cancel']),
@@ -144,42 +161,42 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(t('mcp.statusNow', { status: t(`status.${task.status}`) }), task);
     });
 
-  tool('make_task_public', 'Make a private task public so your manager can see it.',
+  tool('make_task_public', 'member', 'Make a private task public so your manager can see it.',
     { taskId },
     async ({ taskId: id }, actor) => {
       const task = await makePublic(db, actor, id, now());
       return done(t('mcp.madePublic'), task);
     });
 
-  tool('report_blocker', 'Report a blocker to your manager.',
+  tool('report_blocker', 'member', 'Report a blocker to your manager.',
     { taskId, body: z.string().describe('Blocker description') },
     async ({ taskId: id, body }, actor) => {
       const q = await askQuestion(db, actor, id, body, { isBlocker: true }, now());
       return done(t('mcp.blockerReported'), q);
     });
 
-  tool('ask_manager', 'Ask your manager a question (not a blocker).',
+  tool('ask_manager', 'member', 'Ask your manager a question (not a blocker).',
     { taskId, body: z.string().describe('Question text') },
     async ({ taskId: id, body }, actor) => {
       const q = await askQuestion(db, actor, id, body, { isBlocker: false }, now());
       return done(t('mcp.questionSent'), q);
     });
 
-  tool('answer_question', 'Answer a question from your manager.',
+  tool('answer_question', 'member', 'Answer a question from your manager.',
     { questionId, answer: z.string().describe('Answer') },
     async ({ questionId: id, answer }, actor) => {
       const q = await answerQuestion(db, actor, id, answer, now());
       return done(t('mcp.answered'), q);
     });
 
-  tool('resolve_question', 'Mark a question you asked as resolved (after reading the answer).',
+  tool('resolve_question', 'member', 'Mark a question you asked as resolved (after reading the answer).',
     { questionId },
     async ({ questionId: id }, actor) => {
       const q = await resolveQuestion(db, actor, id);
       return done(t('mcp.resolved'), q);
     });
 
-  tool('submit_solution_summary', 'Submit a solution summary (project-mode tasks) for review.',
+  tool('submit_solution_summary', 'member', 'Submit a solution summary (project-mode tasks) for review.',
     {
       taskId,
       problem: z.string(), solution: z.string(), rejectedAlternatives: z.string(),
@@ -191,7 +208,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(t('mcp.summarySubmitted'), s);
     });
 
-  tool('get_pending_feedback', 'Show pending feedback: plan change requests, questions, answers, review results, and rejectedCheckpoints (steps the manager sent back with a note; rework them, then report the step again).',
+  tool('get_pending_feedback', 'member', 'Show pending feedback: plan change requests, questions, answers, review results, and rejectedCheckpoints (steps the manager sent back with a note; rework them, then report the step again).',
     {},
     async (_a, actor) => {
       const f = await getPendingFeedback(db, actor);
@@ -211,12 +228,15 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(lines.length === 1 ? t('mcp.feedbackNone') : lines.join('\n'), f);
     });
 
-  tool('get_my_settings', 'Show your settings, including sendMode (auto = send automatically, review = review before sending) and checkpointConfirmer (the default who confirms finished steps; the effective confirmer per task is effectiveConfirmer in list_my_tasks/task_detail).',
+  tool('get_my_settings', 'member', 'Show your settings, including sendMode (auto = send automatically, review = review before sending) and checkpointConfirmer (the default who confirms finished steps; the effective confirmer per task is effectiveConfirmer in list_my_tasks/task_detail).',
     {},
     async (_a, actor) => {
       const data = {
         sendMode: actor.sendMode, displayName: actor.displayName, level: actor.level,
         checkpointConfirmer: actor.checkpointConfirmer,
+        tokenScope: ctx.tokenScope,
+        tokenExpiresAt: ctx.token.expiresAt.toISOString(),
+        tokenLegacy: ctx.token.legacy,
       };
       return done(
         t('mcp.settingsLine', { name: actor.displayName, level: t(`level.${actor.level}`), mode: t(`sendMode.${actor.sendMode}`) }) +
@@ -226,60 +246,62 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     });
 
   // ------------------------------------------------------------ manager
-  tool('team_overview', 'Team overview: you and your direct reports.', {},
+  tool('team_overview', 'manager', 'Team overview: you and your direct reports.', {},
     async (_a, actor) => {
       const o = await teamOverview(db, actor, now());
       return done(formatOverview(t, o), o);
     });
 
-  tool('needs_attention', 'Items that need the manager\'s attention.', {},
+  tool('needs_attention', 'manager', 'Items that need the manager\'s attention.', {},
     async (_a, actor) => {
       const items = await needsAttention(db, actor, now());
       return done(formatAttention(t, items), items);
     });
 
-  tool('task_detail', 'Task details: plan, updates, questions.',
+  tool('task_detail', 'member', 'Task details: plan, updates, questions.',
     { taskId },
     async ({ taskId: id }, actor) => {
       const d = await taskDetail(db, actor, id, now());
+      // A member token only sees its owner's own tasks; same answer as "no access".
+      if (ctx.tokenScope !== 'manager' && d.task.ownerId !== actor.id) throw new DomainError('NOT_FOUND', 'notFoundTask');
       return done(formatTaskDetail(t, d), d);
     });
 
-  tool('weekly_digest', 'Weekly digest of your direct reports.', {},
+  tool('weekly_digest', 'manager', 'Weekly digest of your direct reports.', {},
     async (_a, actor) => {
       const d = await weeklyDigest(db, actor, now());
       return done(formatDigest(t, d), d);
     });
 
-  tool('confirm_task', 'Confirm the plan of a task.',
+  tool('confirm_task', 'manager', 'Confirm the plan of a task.',
     { taskId },
     async ({ taskId: id }, actor) => {
       const task = await confirmTask(db, actor, id, now());
       return done(t('mcp.confirmed'), task);
     });
 
-  tool('request_changes', 'Ask the member to revise the plan.',
+  tool('request_changes', 'manager', 'Ask the member to revise the plan.',
     { taskId, note: z.string().describe('Note describing what to change') },
     async ({ taskId: id, note }, actor) => {
       const task = await requestChanges(db, actor, id, note, now());
       return done(t('mcp.changesRequested'), task);
     });
 
-  tool('answer_blocker', 'Answer a member\'s blocker or question.',
+  tool('answer_blocker', 'manager', 'Answer a member\'s blocker or question.',
     { questionId, answer: z.string().describe('Answer') },
     async ({ questionId: id, answer }, actor) => {
       const q = await answerQuestion(db, actor, id, answer, now());
       return done(t('mcp.answered'), q);
     });
 
-  tool('ask_question', 'Ask a member a question about their task.',
+  tool('ask_question', 'manager', 'Ask a member a question about their task.',
     { taskId, body: z.string().describe('Question text') },
     async ({ taskId: id, body }, actor) => {
       const q = await askQuestion(db, actor, id, body, { isBlocker: false }, now());
       return done(t('mcp.questionSent'), q);
     });
 
-  tool('review_solution', 'Review a solution summary: approved or changes_needed. note is required when verdict is changes_needed.',
+  tool('review_solution', 'manager', 'Review a solution summary: approved or changes_needed. note is required when verdict is changes_needed.',
     {
       taskId,
       verdict: z.enum(['approved', 'changes_needed']),
@@ -290,7 +312,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       return done(t('mcp.reviewResult', { verdict: t(`verdict.${verdict}`) }), task);
     });
 
-  tool('review_checkpoint', 'Approve or reject steps waiting for your approval (direct manager only). Omit stepTitle to approve all pending steps of the task; rejecting needs stepTitle and a note.',
+  tool('review_checkpoint', 'manager', 'Approve or reject steps waiting for your approval (direct manager only). Omit stepTitle to approve all pending steps of the task; rejecting needs stepTitle and a note.',
     {
       taskId,
       stepTitle: z.string().optional().describe('Exact step title; omit to approve every pending step (approved only)'),
@@ -299,7 +321,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
     },
     async ({ taskId: id, stepTitle, decision, note }, actor) => {
       try {
-        const r = await reviewCheckpoint(db, actor, id, stepTitle ?? null, decision, note, now());
+        const r = await reviewCheckpoint(db, actor, id, stepTitle ?? null, decision, note, 'agent', now());
         return done(
           decision === 'approved' ? t('mcp.checkpointApproved', { count: r.approved }) : t('mcp.checkpointRejected'),
           r,
@@ -313,7 +335,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       }
     });
 
-  tool('set_checkpoint_confirmer', 'Choose who confirms finished steps for one of your direct reports: member (they confirm themselves) or manager (you approve each step). Direct manager only.',
+  tool('set_checkpoint_confirmer', 'manager', 'Choose who confirms finished steps for one of your direct reports: member (they confirm themselves) or manager (you approve each step). Direct manager only.',
     { userId: z.string().describe('User ID of your direct report'), confirmer: z.enum(['member', 'manager']) },
     async ({ userId, confirmer }, actor) => {
       const u = await setCheckpointConfirmer(db, actor, userId, confirmer);

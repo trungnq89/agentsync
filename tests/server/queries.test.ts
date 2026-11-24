@@ -227,7 +227,7 @@ describe('checkpoint confirmation queries', () => {
     await postUpdate(testDb, member, t.id, { body: 'y', source: 'auto', stepsCompleted: ['C'], memberConfirmed: true }, NOW);
     // manager mode: C is pending too, so nothing is done
     expect((await taskDetail(testDb, member, t.id, NOW)).progress).toBe(0);
-    await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, NOW);
+    await reviewCheckpoint(testDb, manager, t.id, 'A', 'approved', undefined, 'web', NOW);
     const expected = 25;
     const plan = await getOwnTaskPlan(testDb, member, t.id);
     expect(progressPct({ steps: plan.steps as never })).toBe(expected);
@@ -284,7 +284,7 @@ describe('checkpoint confirmation queries', () => {
     await expect(taskDetail(testDb, manager, t.id, NOW)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect((await taskDetail(testDb, m2, t.id, NOW)).canReviewCheckpoint).toBe(true);
     // nothing pending -> false
-    await reviewCheckpoint(testDb, m2, t.id, null, 'approved', undefined, NOW);
+    await reviewCheckpoint(testDb, m2, t.id, null, 'approved', undefined, 'web', NOW);
     expect((await taskDetail(testDb, m2, t.id, NOW)).canReviewCheckpoint).toBe(false);
   });
 
