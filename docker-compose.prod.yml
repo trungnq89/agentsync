@@ -1,5 +1,5 @@
 # Production stack: app + Postgres. The db port is NOT published.
-# Required: POSTGRES_PASSWORD. Optional: SETTINGS_ENCRYPTION_KEY (needed for Odoo sync), APP_URL, COOKIE_SECURE, APP_PORT, DEFAULT_LOCALE, ALLOWED_ORIGINS (build-time).
+# Required: POSTGRES_PASSWORD. Optional: SETTINGS_ENCRYPTION_KEY (needed for Odoo sync and Slack), APP_URL, DEFAULT_TIMEZONE, COOKIE_SECURE, APP_PORT, DEFAULT_LOCALE, ALLOWED_ORIGINS (build-time).
 services:
   db:
     image: postgres:16
@@ -32,6 +32,8 @@ services:
       DEFAULT_LOCALE: ${DEFAULT_LOCALE:-en}
       # Runtime only (encrypts the Odoo API key). Generate: openssl rand -base64 32
       SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
+      # IANA zone for Slack digests until someone picks another
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Ho_Chi_Minh}
     ports:
       - "${APP_PORT:-3000}:3000"
     healthcheck:

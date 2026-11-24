@@ -10,9 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { listMyTokens } from '@/server/account';
+import { getMyDigestPrefs } from '@/server/digest/prefs';
 import { isTheme } from '@/ui/theme';
 import { getActor } from '../_lib/actor';
 import { changePasswordAction, revokeTokenAction, sendModeAction } from '../_actions/settings';
+import { DigestPrefsCard } from '../_components/digest-prefs-card';
+import { timezoneOptions } from '../_lib/timezones';
 import { PreferencesForm } from '../_components/PreferencesForm';
 import { TokenForm } from '../_components/token-form';
 
@@ -31,6 +34,7 @@ export default async function SettingsPage() {
     getLocale(),
   ]);
   const tokens = await listMyTokens(getDb(), actor);
+  const digest = actor.mustChangePassword ? null : await getMyDigestPrefs(getDb(), actor);
   const mcpUrl = `${(process.env.APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')}/api/mcp`;
   const fmt = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' });
   return (
@@ -83,6 +87,13 @@ export default async function SettingsPage() {
               </ActionForm>
             </CardContent>
           </Card>
+
+          {digest && (
+            <DigestPrefsCard
+              values={{ ...digest, unmatchedReason: digest.slackIssue }}
+              zones={timezoneOptions(digest.timezone)}
+            />
+          )}
         </>
       )}
 

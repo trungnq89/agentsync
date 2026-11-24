@@ -45,6 +45,11 @@ export const users = pgTable('users', {
   mustChangePassword: boolean('must_change_password').notNull().default(false),
   source: text('source').notNull().default('local'),
   checkpointConfirmer: text('checkpoint_confirmer').notNull().default('member'),
+  digestEnabled: boolean('digest_enabled'),
+  digestTime: text('digest_time'),
+  digestDays: integer('digest_days').array(),
+  digestTimezone: text('digest_timezone'),
+  slackUserId: text('slack_user_id'),
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex('users_email_lower_uq').on(sql`lower(${t.email})`),
@@ -197,6 +202,40 @@ export const odooSettings = pgTable('odoo_settings', {
   check('odoo_settings_singleton', sql`${t.id} = 1`),
   check('odoo_settings_mode_check', sql`${t.mode} in ('full','incremental','review')`),
   check('odoo_settings_schedule_check', sql`${t.scheduleHours} in (0,1,6,24)`),
+]);
+
+export const slackSettings = pgTable('slack_settings', {
+  id: integer('id').primaryKey().default(1),
+  enabled: boolean('enabled').notNull().default(false),
+  botTokenEnc: text('bot_token_enc'),
+  defaultEnabled: boolean('default_enabled').notNull().default(true),
+  defaultTime: text('default_time').notNull().default('08:30'),
+  defaultDays: integer('default_days').array().notNull().default(sql`'{1,2,3,4,5}'::integer[]`),
+  defaultTimezone: text('default_timezone'),
+  lastError: text('last_error'),
+  lastErrorAt: ts('last_error_at'),
+  lastErrorCode: text('last_error_code'),
+  pausedUntil: ts('paused_until'),
+}, (t) => [check('slack_settings_singleton', sql`${t.id} = 1`)]);
+
+export type SlackSettingsRow = typeof slackSettings.$inferSelect;
+
+export const digestDeliveries = pgTable('digest_deliveries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  localDate: date('local_date', { mode: 'string' }).notNull(),
+  channel: text('channel').notNull().default('slack'),
+  status: text('status').notNull(),
+  attempts: integer('attempts').notNull().default(1),
+  error: text('error'),
+  /** Slack's own error code (sanitised), shown next to the translated `error` key. */
+  errorCode: text('error_code'),
+  createdAt: createdAt(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  sentAt: ts('sent_at'),
+}, (t) => [
+  unique('digest_deliveries_user_date_channel_uq').on(t.userId, t.localDate, t.channel),
+  check('digest_deliveries_status_check', sql`${t.status} in ('sent','skipped_empty','failed')`),
 ]);
 
 export type OdooRunCounts = Record<string, number>;

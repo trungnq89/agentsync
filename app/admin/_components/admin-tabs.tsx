@@ -2,12 +2,13 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { cn } from '@/lib/utils';
 
-/** Segmented navigation between the admin sections (Users | Odoo). */
-export async function AdminTabs({ active }: { active: 'users' | 'odoo' }) {
+/** Segmented navigation between the admin sections (Users | Odoo | Slack). */
+export async function AdminTabs({ active }: { active: 'users' | 'odoo' | 'slack' }) {
   const t = await getTranslations('admin');
   const tabs = [
     { id: 'users', href: '/admin', label: t('tabUsers') },
     { id: 'odoo', href: '/admin/odoo', label: t('tabOdoo') },
+    { id: 'slack', href: '/admin/slack', label: t('tabSlack') },
   ] as const;
   return (
     <nav aria-label={t('tabsLabel')} className="inline-flex rounded-lg border border-border bg-surface-muted p-1" data-testid="admin-tabs">

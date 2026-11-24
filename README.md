@@ -35,7 +35,8 @@ Screenshots show generated demo data (see [Try it with demo data](#try-it-with-d
 - **Direct-manager permissions and private tasks:** only a person's direct manager sees their tasks; a task can be private to its owner.
 - **Vietnamese and English, light and dark:** each user picks their own.
 - **Odoo HR sync (optional):** read-only sync of accounts and the org chart from Odoo HR.
-- **Self-hosted with Docker:** one app plus Postgres; no external services at runtime.
+- **Daily Slack digest (optional, off by default):** each person gets a direct message with what needs their attention. Needs `APP_URL` and `SETTINGS_ENCRYPTION_KEY`; task titles and notes are sent to Slack. Setup: [docs/slack-setup.md](docs/slack-setup.md).
+- **Self-hosted with Docker:** one app plus Postgres; no external services at runtime unless you turn on the optional Odoo or Slack integrations.
 
 ## Quick start (Docker)
 
@@ -50,7 +51,7 @@ Screenshots show generated demo data (see [Try it with demo data](#try-it-with-d
 
    - `POSTGRES_PASSWORD`: letters, digits, `-` and `_` only (it is spliced into the database URL).
    - `APP_URL`: the public address, for example `https://agentsync.example.com` (shown in the MCP setup snippet).
-   - `SETTINGS_ENCRYPTION_KEY`: generate with `openssl rand -base64 32` (needed for Odoo sync; keep it safe).
+   - `SETTINGS_ENCRYPTION_KEY`: generate with `openssl rand -base64 32` (needed for Odoo sync and the Slack digest; keep it safe).
    - `DEFAULT_LOCALE`: `en` or `vi`.
    - `COOKIE_SECURE`: leave unset when `APP_URL` is `https://`. For internal testing over plain `http://`, set `COOKIE_SECURE=false`, otherwise the browser drops the cookie and sign-in loops.
 
@@ -65,7 +66,7 @@ Screenshots show generated demo data (see [Try it with demo data](#try-it-with-d
 6. Each person opens **Settings** and creates an agent token.
 7. Install the agent plugin and connect your agent: [docs/install-agent.md](docs/install-agent.md).
 
-The `app` container runs migrations on every start; data lives in the `pgdata` volume. If `app` keeps restarting, check `docker compose -f docker-compose.prod.yml logs app`. There are no external services at runtime: no CDN, no analytics, and the Inter font is bundled.
+The `app` container runs migrations on every start; data lives in the `pgdata` volume. If `app` keeps restarting, check `docker compose -f docker-compose.prod.yml logs app`. Unless you turn on the optional Odoo or Slack integrations, there are no external services at runtime: no CDN, no analytics, and the Inter font is bundled.
 
 ## Try it with demo data
 
@@ -99,6 +100,10 @@ An optional `Stop` hook runs after every agent turn. When the agent printed `AGE
 3. Progress % is now confirmed steps divided by total steps. A manual progress override is ignored, so some tasks may show a different percentage.
 4. A task that is in progress needs its steps confirmed before it can be completed. Report each remaining step (the member confirms it, or the manager approves it) first.
 
+## Slack digest
+
+Admin > **Slack** turns on a daily direct message per person listing what needs their attention. It is off until an admin sets a bot token and turns it on. Each person picks their own time, days and time zone in Settings. Task titles, blocker text and notes are sent to Slack. Full setup (creating the Slack app, scopes `chat:write`, `users:read`, `users:read.email`, and App Home > Messages Tab on): [docs/slack-setup.md](docs/slack-setup.md) ([Tiếng Việt](docs/slack-setup.vi.md)).
+
 ## Odoo HR sync
 
 Admin > **Odoo** keeps AgentSync accounts and the org chart in step with the employees of Odoo HR. It only ever reads from Odoo.
@@ -131,12 +136,15 @@ Admin > **Odoo** keeps AgentSync accounts and the org chart in step with the emp
 | --- | --- | --- |
 | `DATABASE_URL` | app, scripts | Postgres connection string. In `docker-compose.prod.yml` it is built from `POSTGRES_PASSWORD`; in development it comes from `.env`. |
 | `POSTGRES_PASSWORD` | production compose | Required. Password of the bundled Postgres (letters, digits, `-`, `_`). |
-| `APP_URL` | app | Public base URL; shown in the MCP snippet and decides the default cookie `Secure` flag. Default `http://localhost:3000`. |
+| `APP_URL` | app | Public base URL; shown in the MCP snippet, used for the links in Slack digests (required to turn Slack on) and decides the default cookie `Secure` flag. Default `http://localhost:3000`. |
 | `APP_PORT` | production compose | Host port of the app. Default `3000`. |
 | `DEFAULT_LOCALE` | app, MCP | Install-wide default language: `en` or `vi` (default `en`). |
 | `COOKIE_SECURE` | app | `true` or `false`. Default: on when `APP_URL` starts with `https://`. |
 | `ALLOWED_ORIGINS` | build time | Comma-separated hosts allowed to call Server Actions behind a proxy that changes `Host`. Rebuild after changing it. |
-| `SETTINGS_ENCRYPTION_KEY` | app | 32 bytes, base64. Encrypts the stored Odoo API key. Without it the Odoo page is locked. |
+| `SETTINGS_ENCRYPTION_KEY` | app | 32 bytes, base64. Encrypts the stored Odoo API key and Slack bot token. Without it the Odoo and Slack pages are locked. |
+| `DEFAULT_TIMEZONE` | app | IANA time zone used for Slack digests until someone picks another. Default `Asia/Ho_Chi_Minh`. |
+| `SLACK_DOCS_BASE_URL` | app | Optional. Base URL of the published docs (for example your fork's `docs/` folder); the Slack tab links its setup guide there. Without it the tab names the file path. |
+| `SLACK_API_BASE` | app (tests) | Overrides the Slack API URL. Only used by the end-to-end tests. |
 | `DB_PORT` | development compose | Host port of the development Postgres. Default `5432`. |
 
 ## Create the first admin

@@ -296,7 +296,7 @@ export async function reviewSolution(
 export interface PendingFeedback {
   changesRequested: { taskId: string; title: string; note: string }[];
   questionsForMe: { questionId: string; taskId: string; title: string; body: string }[];
-  answersToMyQuestions: { questionId: string; taskId: string; title: string; body: string; answer: string }[];
+  answersToMyQuestions: { questionId: string; taskId: string; title: string; body: string; answer: string; answeredAt: Date | null }[];
   reviewResults: { taskId: string; title: string; verdict: 'approved' | 'changes_needed'; note: string | null }[];
   rejectedCheckpoints: { taskId: string; title: string; stepTitle: string; note: string; at: Date }[];
 }
@@ -324,7 +324,7 @@ export async function getPendingFeedback(db: Db, actor: Actor): Promise<PendingF
   const answered = await db
     .select({
       questionId: questions.id, taskId: tasks.id, title: tasks.title, body: questions.body,
-      answer: questions.answer, ownerId: tasks.ownerId, isPrivate: tasks.isPrivate, ownerManagerId: users.managerId,
+      answer: questions.answer, answeredAt: questions.answeredAt, ownerId: tasks.ownerId, isPrivate: tasks.isPrivate, ownerManagerId: users.managerId,
     })
     .from(questions)
     .innerJoin(tasks, eq(tasks.id, questions.taskId))
@@ -333,7 +333,7 @@ export async function getPendingFeedback(db: Db, actor: Actor): Promise<PendingF
     .orderBy(questions.createdAt);
   const answersToMyQuestions = answered
     .filter((r) => r.ownerId === actor.id || (!r.isPrivate && r.ownerManagerId === actor.id))
-    .map((r) => ({ questionId: r.questionId, taskId: r.taskId, title: r.title, body: r.body, answer: r.answer ?? '' }));
+    .map((r) => ({ questionId: r.questionId, taskId: r.taskId, title: r.title, body: r.body, answer: r.answer ?? '', answeredAt: r.answeredAt }));
 
   const reviewRows = await db
     .select({ taskId: tasks.id, title: tasks.title, verdict: reviews.verdict, note: reviews.note })

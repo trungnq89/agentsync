@@ -57,6 +57,27 @@
       "when": 1795442562461,
       "tag": "0007_nappy_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795446778644,
+      "tag": "0008_deep_ulik",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795454002869,
+      "tag": "0009_illegal_magdalene",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795455149345,
+      "tag": "0010_silky_solo",
+      "breakpoints": true
     }
   ]
 }

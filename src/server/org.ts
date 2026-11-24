@@ -171,7 +171,11 @@ export async function updateUser(
   if (patch.displayName !== undefined) set.displayName = patch.displayName.trim();
   if (patch.level !== undefined) set.level = patch.level;
   if (managerId !== undefined) set.managerId = managerId;
-  if (email !== undefined) set.email = email;
+  if (email !== undefined) {
+    set.email = email;
+    // Slack match is by email: a changed email invalidates the cached Slack id.
+    if (email !== (existing.email?.trim().toLowerCase() ?? null)) set.slackUserId = null;
+  }
   if (patch.isAdmin !== undefined) set.isAdmin = patch.isAdmin;
   if (patch.disabled !== undefined) set.disabledAt = patch.disabled ? now : null;
   if (Object.keys(set).length === 0) return existing;
